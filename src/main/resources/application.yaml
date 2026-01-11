@@ -1,3 +1,16 @@
 spring:
   application:
     name: hereeat
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+      base-path: /actuator
+    jmx:
+      exposure:
+        exclude: "*"
+  health:
+    defaults:
+      enabled: true
