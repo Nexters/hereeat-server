@@ -1,5 +1,6 @@
 package com.hereeat.global.common.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -21,6 +22,7 @@ public class BaseEntity {
     private Long id;
 
     @CreatedDate
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @LastModifiedDate
