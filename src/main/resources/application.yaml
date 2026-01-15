@@ -2,6 +2,22 @@ spring:
   application:
     name: hereeat
 
+datasource:
+  db:
+    core:
+      driver-class-name: org.postgresql.Driver
+      jdbc-url: ${DATASOURCE_DB_CORE_JDBC_URL}
+      username: ${DATASOURCE_DB_CORE_USERNAME}
+      password: ${DATASOURCE_DB_CORE_PASSWORD}
+      pool-name: core-db-pool
+      maximum-pool-size: 10
+      connection-timeout: 1500
+      keepalive-time: 30000
+      validation-timeout: 1000
+      max-lifetime: 600000
+      data-source-properties:
+        rewriteBatchedStatements: true
+
 management:
   endpoints:
     web:
