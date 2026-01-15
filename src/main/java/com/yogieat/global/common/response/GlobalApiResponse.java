@@ -1,7 +1,7 @@
-package com.hereeat.global.common.response;
+package com.yogieat.global.common.response;
 
 import java.time.LocalDateTime;
-import com.hereeat.global.error.ErrorResponse;
+import com.yogieat.global.error.ErrorResponse;
 
 public record GlobalApiResponse(int status, Object data, LocalDateTime timestamp) {
     public static GlobalApiResponse success(int status, Object data) {

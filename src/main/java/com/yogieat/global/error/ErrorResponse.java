@@ -1,4 +1,4 @@
-package com.hereeat.global.error;
+package com.yogieat.global.error;
 
 public record ErrorResponse(String errorCode, String message) {
 

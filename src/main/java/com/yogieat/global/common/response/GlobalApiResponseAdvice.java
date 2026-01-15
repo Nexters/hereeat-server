@@ -1,4 +1,4 @@
-package com.hereeat.global.common.response;
+package com.yogieat.global.common.response;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.NonNull;
@@ -13,7 +13,7 @@ import org.springframework.http.server.ServletServerHttpResponse;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
-@RestControllerAdvice(basePackages = "com.hereeat")
+@RestControllerAdvice(basePackages = "com.yogieat")
 public class GlobalApiResponseAdvice implements ResponseBodyAdvice<Object> {
     
     @Override

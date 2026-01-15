@@ -1,4 +1,4 @@
-package com.hereeat.global.common.entity;
+package com.yogieat.global.common.entity;
 
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;

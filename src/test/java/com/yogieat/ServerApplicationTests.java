@@ -1,10 +1,10 @@
-package com.hereeat;
+package com.yogieat;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class HereeatApplicationTests {
+class ServerApplicationTests {
 
 	@Test
 	void contextLoads() {
