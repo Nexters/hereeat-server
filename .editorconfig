@@ -1,0 +1,46 @@
+# EditorConfig: https://editorconfig.org
+root = true
+
+# 모든 파일 공통
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+insert_final_newline = true
+max_line_length = 120
+
+# Java 파일
+[*.java]
+ij_continuation_indent_size = 8
+
+# Wildcard import 방지 (999로 설정하면 사실상 사용 안함)
+ij_java_class_count_to_use_import_on_demand = 999
+ij_java_names_count_to_use_import_on_demand = 999
+
+# Static wildcard import 방지
+ij_java_packages_to_use_import_on_demand =
+
+# Import 순서
+ij_java_imports_layout = java.**,|,javax.**,|,jakarta.**,|,org.**,|,com.**,|,*,|,$*
+
+# XML (Spring 설정, pom.xml 등)
+[*.xml]
+indent_size = 2
+
+# YAML (application.yml 등)
+[*.{yml,yaml}]
+indent_size = 2
+
+# JSON
+[*.json]
+indent_size = 2
+
+# Markdown
+[*.md]
+trim_trailing_whitespace = false
+
+# Shell scripts
+[*.sh]
+end_of_line = lf

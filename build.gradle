@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.9'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.diffplug.spotless' version '7.0.2'
 }
 
 group = 'com.yogieat'
@@ -35,6 +36,42 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// Spotless 설정
+spotless {
+    java {
+        target("**/*.java")
+        importOrder()
+        removeUnusedImports() // 사용하지 않는 import 제거
+        trimTrailingWhitespace() // 공백 제거
+        endWithNewline() // 끝부분 NewLine 처리
+    }
+
+    // SQL 파일 포맷팅 (선택)
+    sql {
+        target 'src/**/*.sql'
+        dbeaver()
+    }
+
+    // YAML, JSON 등 기타 파일
+    format 'misc', {
+        target '*.md', '.gitignore', '*.yml', '*.yaml'
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+// Git Hook 자동 설치
+tasks.register('installGitHook', Copy) {
+    from file('scripts/pre-commit')
+    into file('.git/hooks')
+}
+
+// 첫 빌드시 자동 설치
+tasks.named('compileJava') {
+    dependsOn 'installGitHook'
+    dependsOn 'spotlessCheck'
 }
 
 tasks.named('test') {

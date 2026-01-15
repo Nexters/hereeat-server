@@ -1,7 +1,7 @@
 package com.yogieat.global.common.response;
 
-import java.time.LocalDateTime;
 import com.yogieat.global.error.ErrorResponse;
+import java.time.LocalDateTime;
 
 public record GlobalApiResponse(int status, Object data, LocalDateTime timestamp) {
     public static GlobalApiResponse success(int status, Object data) {
