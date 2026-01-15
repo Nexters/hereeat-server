@@ -1,4 +1,4 @@
-package com.hereeat.global.common.entity;
+package com.yogieat.global.common.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;

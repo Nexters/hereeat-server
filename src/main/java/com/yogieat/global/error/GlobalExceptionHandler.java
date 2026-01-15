@@ -1,4 +1,4 @@
-package com.hereeat.global.error;
+package com.yogieat.global.error;
 
 import java.util.HashMap;
 import java.util.List;
@@ -22,7 +22,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import com.hereeat.global.common.response.GlobalApiResponse;
+import com.yogieat.global.common.response.GlobalApiResponse;
 
 @Slf4j
 @RestControllerAdvice

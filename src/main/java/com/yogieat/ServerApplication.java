@@ -1,14 +1,13 @@
-package com.hereeat;
+package com.yogieat;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 @SpringBootApplication
-public class HereeatApplication {
+public class ServerApplication {
 
 	static void main(String[] args) {
-		SpringApplication.run(HereeatApplication.class, args);
+		SpringApplication.run(ServerApplication.class, args);
 	}
 
 }

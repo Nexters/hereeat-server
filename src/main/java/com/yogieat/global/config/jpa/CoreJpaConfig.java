@@ -1,4 +1,4 @@
-package com.hereeat.global.config.jpa;
+package com.yogieat.global.config.jpa;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -9,12 +9,12 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableTransactionManagement
 @EntityScan(
         basePackages = {
-                "com.hereeat"
+                "com.yogieat"
         }
 )
 @EnableJpaRepositories(
         basePackages = {
-                "com.hereeat"
+                "com.yogieat"
         }
 )
 public class CoreJpaConfig { // JPA + Transaction + Repository

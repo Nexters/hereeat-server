@@ -1,4 +1,4 @@
-package com.hereeat.global.config.datasource;
+package com.yogieat.global.config.datasource;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
