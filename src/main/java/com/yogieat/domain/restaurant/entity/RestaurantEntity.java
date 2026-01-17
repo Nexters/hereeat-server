@@ -54,6 +54,7 @@ public class RestaurantEntity extends BaseEntity {
 
     public static Restaurant toDomain(RestaurantEntity entity) {
         return new Restaurant(
+                entity.getId(),
                 entity.getName(),
                 entity.getAddress(),
                 entity.getRating(),

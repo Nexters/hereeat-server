@@ -1,6 +1,7 @@
 package com.yogieat.domain.restaurant.domain;
 
 public record Restaurant(
+        Long id,
         String name,
         String address,
         Double rating,
