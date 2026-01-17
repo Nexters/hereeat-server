@@ -1,0 +1,142 @@
+name: develop Build And Deploy
+
+on:
+  push:
+    branches: [ "develop" ]
+
+env:
+  DOCKERHUB_USERNAME: yogieat
+  DOCKERHUB_IMAGE_NAME: yogieat-server
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: DEV
+    strategy:
+      matrix:
+        java-version: [ "25" ]
+        distribution: [ "corretto" ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: ${{ matrix.distribution }}
+          cache: 'gradle'
+          cache-dependency-path: |
+            **/*.gradle*
+            **/gradle-wrapper.properties
+
+      # Gradlew 실행 허용
+      - name: Run chmod to make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Docker 메타데이터 추출
+      - name: Extract Docker metadata
+        id: metadata
+        uses: docker/metadata-action@v5.5.0
+        env:
+          DOCKERHUB_IMAGE_FULL_NAME: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_IMAGE_NAME }}
+        with:
+          images: ${{ env.DOCKERHUB_IMAGE_FULL_NAME }}
+          tags: |
+            type=sha,prefix=
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: api
+          push: true
+          tags: |
+            yogieat/yogieat-server:api-${{ steps.metadata.outputs.tags }}
+          platforms: linux/amd64
+
+      - name: Discord notification for build
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          title: "🐳 Docker 이미지 빌드 및 푸시"
+          description: |
+            **상태**: ${{ job.status }}
+            **브랜치**: ${{ github.ref_name }}
+            **커밋**: ${{ github.sha }}
+            **커밋 메시지**: ${{ github.event.head_commit.message }}
+          color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
+          username: GitHub Actions
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: always() && (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      # 서버로 docker-compose 파일 전송
+      - name: Copy docker-compose file to EC2
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avzr --delete
+          remote_host: ${{ secrets.EC2_HOST }}
+          remote_user: ${{ secrets.EC2_USERNAME }}
+          remote_key: ${{ secrets.EC2_PRIVATE_KEY }}
+          path: ./docker/docker-compose.yaml
+          remote_path: /root
+
+      # TODO: 서버로 Nginx 설정 파일 전송
+#      - name: Copy default.conf to EC2
+#        uses: burnett01/rsync-deployments@7.0.1
+#        with:
+#          switches: -avzr --delete
+#          remote_host: ${{ secrets.EC2_HOST }}
+#          remote_user: ${{ secrets.EC2_USERNAME }}
+#          remote_key: ${{ secrets.EC2_PRIVATE_KEY }}
+#          path: ./nginx
+#          remote_path: /root
+
+      # EC2로 배포
+      - name: Deploy to EC2 Server
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE_FULL_URL: ${{ steps.metadata.outputs.tags }}
+          DOCKERHUB_IMAGE_NAME: ${{ env.DOCKERHUB_IMAGE_NAME }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          envs: IMAGE_FULL_URL, DOCKERHUB_IMAGE_NAME # docker-compose.yml 에서 사용할 환경 변수
+          debug: true
+          script: |
+            echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ env.DOCKERHUB_USERNAME }}" --password-stdin
+            docker compose up -d
+            docker exec -d nginx nginx -s reload
+            docker image prune -a -f
+
+      - name: Discord notification for deployment
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          title: "🚀 DEV 서버 배포"
+          description: |
+            **상태**: ${{ job.status }}
+            **브랜치**: ${{ github.ref_name }}
+            **커밋**: ${{ github.sha }}
+            **커밋 메시지**: ${{ github.event.head_commit.message }}
+            **배포 시간**: ${{ github.event.repository.updated_at }}
+          color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
+          username: GitHub Actions
