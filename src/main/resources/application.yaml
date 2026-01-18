@@ -30,3 +30,8 @@ management:
   health:
     defaults:
       enabled: true
+
+ai:
+  gemini:
+    api-key: ${AI_GEMINI_API_KEY}
+    model: ${AI_GEMINI_MODEL:gemini-2.5-flash}
