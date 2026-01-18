@@ -1,5 +1,6 @@
 package com.yogieat.domain.restaurant.repository;
 
+import com.yogieat.domain.restaurant.service.RestaurantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
