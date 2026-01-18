@@ -1,9 +1,7 @@
 package com.yogieat.domain.user.repository;
 
 import com.yogieat.domain.user.service.UserRepository;
-
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.stereotype.Repository;
 
 @Repository

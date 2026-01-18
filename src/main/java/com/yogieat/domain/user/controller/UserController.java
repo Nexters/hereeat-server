@@ -1,9 +1,7 @@
 package com.yogieat.domain.user.controller;
 
 import com.yogieat.domain.user.service.UserService;
-
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 

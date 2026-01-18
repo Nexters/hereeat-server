@@ -2,12 +2,9 @@ package com.yogieat.domain.user.entity;
 
 import com.yogieat.domain.user.domain.User;
 import com.yogieat.global.common.entity.BaseEntity;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-
 import jakarta.persistence.Table;
-
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
