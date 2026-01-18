@@ -31,6 +31,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'com.google.genai:google-genai:1.10.0'
+    implementation 'org.hibernate:hibernate-spatial:6.6.10.Final'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.h2database:h2'
     runtimeOnly 'org.postgresql:postgresql'
