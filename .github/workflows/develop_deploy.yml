@@ -12,6 +12,8 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     environment: DEV
+    outputs:
+      image-tag: ${{ steps.metadata.outputs.tags }}
     strategy:
       matrix:
         java-version: [ "25" ]
@@ -87,6 +89,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    environment: DEV
     if: always() && (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
 
     steps:
@@ -118,7 +121,7 @@ jobs:
       - name: Deploy to Instance Server
         uses: appleboy/ssh-action@v1.0.3
         env:
-          IMAGE_FULL_URL: ${{ steps.metadata.outputs.tags }}
+          IMAGE_FULL_URL: ${{ needs.build-and-push.outputs.image-tag }}
           DOCKERHUB_IMAGE_NAME: ${{ env.DOCKERHUB_IMAGE_NAME }}
         with:
           host: ${{ secrets.SERVER_HOST }}
