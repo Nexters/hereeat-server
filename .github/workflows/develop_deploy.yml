@@ -30,6 +30,11 @@ jobs:
             **/*.gradle*
             **/gradle-wrapper.properties
 
+      - name: Setup Gradle Build
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/develop' }}
+
       # Gradlew 실행 허용
       - name: Run chmod to make gradlew executable
         run: chmod +x ./gradlew
