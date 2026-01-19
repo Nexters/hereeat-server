@@ -58,7 +58,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./docker
-          target: api
+          target: yogieat-api
           push: true
           tags: |
             yogieat/${{ steps.metadata.outputs.tags }}
