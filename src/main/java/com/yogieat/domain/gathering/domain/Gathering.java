@@ -11,6 +11,6 @@ public record Gathering(
         LocalDate scheduledDate,
         TimeSlot timeSlot,
         Place place,
-        int headCount
+        Integer headCount
 ) {
 }

@@ -35,7 +35,7 @@ public class GatheringEntity extends BaseEntity {
     private Place place;
 
     @Column(name = "head_count")
-    private int headCount;
+    private Integer headCount;
 
     @Builder(access = AccessLevel.PRIVATE)
     public GatheringEntity(
