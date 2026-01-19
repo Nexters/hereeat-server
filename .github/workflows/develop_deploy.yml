@@ -68,8 +68,7 @@ jobs:
           context: .
           file: ./docker/Dockerfile
           push: true
-          tags: |
-            yogieat/${{ steps.metadata.outputs.tags }}
+          tags: ${{ steps.metadata.outputs.tags }}
           platforms: linux/amd64
 
       - name: Discord notification for build
