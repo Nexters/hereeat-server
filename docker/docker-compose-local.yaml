@@ -1,0 +1,27 @@
+services:
+  yogieat-db:
+    image: postgis/postgis:16-3.4
+    container_name: yogieat-db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: yogieat
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: yogieat!@
+      TZ: Asia/Seoul
+    command: [ "postgres", "-c", "log_statement=all" ]
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - yogieat-network
+#  TODO: Redis, etc.
+
+networks:
+  yogieat-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongodb_data:
