@@ -40,3 +40,8 @@ out/
 ### AI ###
 .serena
 .claude
+
+### ENV ###
+.env
+.*.env
+.env.*
