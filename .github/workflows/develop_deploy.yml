@@ -9,11 +9,9 @@ env:
   DOCKERHUB_IMAGE_NAME: yogieat-server
 
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
     environment: DEV
-    outputs:
-      image-tag: ${{ steps.short-sha.outputs.image-tag }}
     strategy:
       matrix:
         java-version: [ "25" ]
@@ -50,11 +48,16 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Get short SHA
-        id: short-sha
-        run: |
-          echo "sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
-          echo "image-tag=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_IMAGE_NAME }}:$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+      # Docker 메타데이터 추출
+      - name: Extract Docker metadata
+        id: metadata
+        uses: docker/metadata-action@v5.5.0
+        env:
+          DOCKERHUB_IMAGE_FULL_NAME: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_IMAGE_NAME }}
+        with:
+          images: ${{ env.DOCKERHUB_IMAGE_FULL_NAME }}
+          tags: |
+            type=sha,prefix=
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -65,34 +68,8 @@ jobs:
           context: .
           file: ./docker/Dockerfile
           push: true
-          tags: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_IMAGE_NAME }}:${{ steps.short-sha.outputs.sha }}
+          tags: ${{ steps.metadata.outputs.tags }}
           platforms: linux/amd64
-
-      - name: Discord notification for build
-        if: always()
-        uses: sarisia/actions-status-discord@v1
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          title: "🐳 Docker 이미지 빌드 및 푸시"
-          description: |
-            **상태**: ${{ job.status }}
-            **브랜치**: ${{ github.ref_name }}
-            **커밋**: ${{ github.sha }}
-            **커밋 메시지**: ${{ github.event.head_commit.message }}
-          color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
-          username: GitHub Actions
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    environment: DEV
-    if: always() && (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Debug image tag
-        run: echo "Image tag from build job - ${{ needs.build-and-push.outputs.image-tag }}"
 
       # 서버로 docker-compose 파일 전송
       - name: Copy docker-compose file to Server
@@ -124,22 +101,22 @@ jobs:
           key: ${{ secrets.SERVER_PRIVATE_KEY }}
           script: |
             echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ env.DOCKERHUB_USERNAME }}" --password-stdin
-            echo "Deploying with IMAGE_FULL_URL=${{ needs.build-and-push.outputs.image-tag }}"
+            echo "Deploying with IMAGE_FULL_URL=${{ steps.metadata.outputs.tags }}"
             cd /root
-            IMAGE_FULL_URL="${{ needs.build-and-push.outputs.image-tag }}" DOCKERHUB_IMAGE_NAME="${{ env.DOCKERHUB_IMAGE_NAME }}" docker compose -f docker-compose.yaml up -d
+            IMAGE_FULL_URL="${{ steps.metadata.outputs.tags }}" DOCKERHUB_IMAGE_NAME="${{ env.DOCKERHUB_IMAGE_NAME }}" docker compose -f docker-compose.yaml up -d
             docker image prune -a -f
 
-      - name: Discord notification for deployment
+      - name: Discord notification
         if: always()
         uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          title: "🚀 DEV 서버 배포"
+          title: "🚀 DEV 빌드 및 배포"
           description: |
             **상태**: ${{ job.status }}
             **브랜치**: ${{ github.ref_name }}
             **커밋**: ${{ github.sha }}
             **커밋 메시지**: ${{ github.event.head_commit.message }}
-            **배포 시간**: ${{ github.event.repository.updated_at }}
+            **이미지**: ${{ steps.metadata.outputs.tags }}
           color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
           username: GitHub Actions
