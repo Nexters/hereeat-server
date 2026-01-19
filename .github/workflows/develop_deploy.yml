@@ -61,7 +61,7 @@ jobs:
           target: api
           push: true
           tags: |
-            yogieat/yogieat-server:api-${{ steps.metadata.outputs.tags }}
+            yogieat/${{ steps.metadata.outputs.tags }}
           platforms: linux/amd64
 
       - name: Discord notification for build
