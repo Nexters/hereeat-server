@@ -7,10 +7,13 @@ services:
       - "8080:8080"
     environment:
       - TZ=Asia/Seoul
+      - DATASOURCE_DB_CORE_JDBC_URL=jdbc:postgresql://yogieat-db:5432/yogieat
     networks:
       - yogieat-network
     env_file:
       - .env
+    depends_on:
+      - yogieat-db
   yogieat-db:
     image: postgis/postgis:15-3.3
     container_name: yogieat-db
@@ -18,9 +21,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: ${DATASOURCE_DB_CORE_JDBC_URL}
-      POSTGRES_USER: ${DATASOURCE_DB_CORE_USERNAME}
-      POSTGRES_PASSWORD: ${DATASOURCE_DB_CORE_PASSWORD}
+      DATASOURCE_DB_CORE_JDBC_URL: yogieat-db
+      DATASOURCE_DB_CORE_USERNAME: ${DATASOURCE_DB_CORE_USERNAME}
+      DATASOURCE_DB_CORE_PASSWORD: ${DATASOURCE_DB_CORE_PASSWORD}
       TZ: Asia/Seoul
     command: [ "postgres", "-c", "log_statement=all" ]
     volumes:
