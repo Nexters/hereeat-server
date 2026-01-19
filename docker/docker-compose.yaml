@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   yogieat-api:
     image: ${IMAGE_FULL_URL}

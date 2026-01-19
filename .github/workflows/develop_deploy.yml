@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: DEV
     outputs:
-      image-tag: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_IMAGE_NAME }}:${{ steps.short-sha.outputs.sha }}
+      image-tag: ${{ steps.short-sha.outputs.image-tag }}
     strategy:
       matrix:
         java-version: [ "25" ]
@@ -52,7 +52,9 @@ jobs:
 
       - name: Get short SHA
         id: short-sha
-        run: echo "sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+        run: |
+          echo "sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          echo "image-tag=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_IMAGE_NAME }}:$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -124,7 +126,7 @@ jobs:
           debug: true
           script: |
             echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ env.DOCKERHUB_USERNAME }}" --password-stdin
-            docker compose up -d
+            IMAGE_FULL_URL=$IMAGE_FULL_URL DOCKERHUB_IMAGE_NAME=$DOCKERHUB_IMAGE_NAME docker compose up -d
             docker image prune -a -f
 
       - name: Discord notification for deployment
