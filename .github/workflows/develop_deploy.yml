@@ -2,7 +2,7 @@ name: develop Build And Deploy
 
 on:
   push:
-    branches: [ "develop" ]
+    branches: [ "chore/ci-cd" ]
 
 env:
   DOCKERHUB_USERNAME: yogieat
@@ -87,37 +87,36 @@ jobs:
         uses: actions/checkout@v5
 
       # 서버로 docker-compose 파일 전송
-      - name: Copy docker-compose file to EC2
+      - name: Copy docker-compose file to Server
         uses: burnett01/rsync-deployments@7.0.1
         with:
           switches: -avzr --delete
-          remote_host: ${{ secrets.EC2_HOST }}
-          remote_user: ${{ secrets.EC2_USERNAME }}
-          remote_key: ${{ secrets.EC2_PRIVATE_KEY }}
+          remote_host: ${{ secrets.SERVER_HOST }}
+          remote_user: ${{ secrets.SERVER_USERNAME }}
+          remote_key: ${{ secrets.SERVER_PRIVATE_KEY }}
           path: ./docker/docker-compose.yaml
           remote_path: /root
 
       # TODO: 서버로 Nginx 설정 파일 전송
-#      - name: Copy default.conf to EC2
+#      - name: Copy default.conf to Server
 #        uses: burnett01/rsync-deployments@7.0.1
 #        with:
 #          switches: -avzr --delete
-#          remote_host: ${{ secrets.EC2_HOST }}
-#          remote_user: ${{ secrets.EC2_USERNAME }}
-#          remote_key: ${{ secrets.EC2_PRIVATE_KEY }}
+#          remote_host: ${{ secrets.SERVER_HOST }}
+#          remote_user: ${{ secrets.SERVER_USERNAME }}
+#          remote_key: ${{ secrets.SERVER_PRIVATE_KEY }}
 #          path: ./nginx
 #          remote_path: /root
 
-      # EC2로 배포
-      - name: Deploy to EC2 Server
+      - name: Deploy to Instance Server
         uses: appleboy/ssh-action@v1.0.3
         env:
           IMAGE_FULL_URL: ${{ steps.metadata.outputs.tags }}
           DOCKERHUB_IMAGE_NAME: ${{ env.DOCKERHUB_IMAGE_NAME }}
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_PRIVATE_KEY }}
           envs: IMAGE_FULL_URL, DOCKERHUB_IMAGE_NAME # docker-compose.yml 에서 사용할 환경 변수
           debug: true
           script: |

@@ -8,6 +8,32 @@ services:
     environment:
       - TZ=Asia/Seoul
     network_mode: host
+    networks:
+      - yogieat-network
     env_file:
-      - ~/.env
+      - .env
+  yogieat-db:
+    image: postgis/postgis:15-3.3
+    container_name: yogieat-db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${DATASOURCE_DB_CORE_JDBC_URL}
+      POSTGRES_USER: ${DATASOURCE_DB_CORE_USERNAME}
+      POSTGRES_PASSWORD: ${DATASOURCE_DB_CORE_PASSWORD}
+      TZ: Asia/Seoul
+    command: [ "postgres", "-c", "log_statement=all" ]
+    volumes:
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
 #  TODO: Redis, etc.
+    networks:
+      - yogieat-network
+
+networks:
+  yogieat-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongodb_data:
