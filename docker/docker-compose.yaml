@@ -21,9 +21,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      DATASOURCE_DB_CORE_JDBC_URL: yogieat-db
-      DATASOURCE_DB_CORE_USERNAME: ${DATASOURCE_DB_CORE_USERNAME}
-      DATASOURCE_DB_CORE_PASSWORD: ${DATASOURCE_DB_CORE_PASSWORD}
+      POSTGRES_DB: yogieat
+      POSTGRES_USER: ${DATASOURCE_DB_CORE_USERNAME}
+      POSTGRES_PASSWORD: ${DATASOURCE_DB_CORE_PASSWORD}
       TZ: Asia/Seoul
     command: [ "postgres", "-c", "log_statement=all" ]
     volumes:
