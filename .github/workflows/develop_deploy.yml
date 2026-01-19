@@ -57,8 +57,8 @@ jobs:
       - name: Build and push API image
         uses: docker/build-push-action@v5
         with:
-          context: ./docker
-          target: yogieat-api
+          context: .
+          file: ./docker/Dockerfile
           push: true
           tags: |
             yogieat/${{ steps.metadata.outputs.tags }}
