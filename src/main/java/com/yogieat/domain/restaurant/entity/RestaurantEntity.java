@@ -23,25 +23,23 @@ public class RestaurantEntity extends BaseEntity {
     private Double rating;
     private String imageUrl;
     private String mapUrl;
-    // ex. largeCategory: 양식, mediumCategory: 이탈리안
-    private String largeCategory;
-    private String mediumCategory;
     @Column(columnDefinition = "TEXT")
     private String representativeReview; // 대표 리뷰 1건
     @Column(columnDefinition = "TEXT")
     private String description;
-    @Column
     private Point location; // 위도, 경도
+
+    // 매핑 필드
+    private Long categoryId; // nullable
 
     @Builder(access = AccessLevel.PRIVATE)
     private RestaurantEntity(
+            Long categoryId,
             String name,
             String address,
             Double rating,
             String imageUrl,
             String mapUrl,
-            String largeCategory,
-            String mediumCategory,
             String representativeReview,
             String description,
             Point location) {
@@ -50,8 +48,7 @@ public class RestaurantEntity extends BaseEntity {
         this.rating = rating;
         this.imageUrl = imageUrl;
         this.mapUrl = mapUrl;
-        this.largeCategory = largeCategory;
-        this.mediumCategory = mediumCategory;
+        this.categoryId = categoryId;
         this.representativeReview = representativeReview;
         this.description = description;
         this.location = location;
@@ -60,13 +57,12 @@ public class RestaurantEntity extends BaseEntity {
     public static Restaurant toDomain(RestaurantEntity entity) {
         return new Restaurant(
                 entity.getId(),
+                entity.getCategoryId(),
                 entity.getName(),
                 entity.getAddress(),
                 entity.getRating(),
                 entity.getImageUrl(),
                 entity.getMapUrl(),
-                entity.getLargeCategory(),
-                entity.getMediumCategory(),
                 entity.getRepresentativeReview(),
                 entity.getDescription(),
                 entity.location != null
