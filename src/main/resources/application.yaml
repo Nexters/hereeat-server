@@ -10,6 +10,7 @@ spring:
       - datasource.yaml
       - monitoring.yaml
       - ai.yaml
+      - client.yaml
   web.resources.add-mappings: false
 
 server:

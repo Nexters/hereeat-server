@@ -4,6 +4,7 @@ import com.yogieat.domain.common.GeoJson;
 
 public record Restaurant(
         Long id,
+        String externalId,
         Long categoryId,
         String name,
         String address,

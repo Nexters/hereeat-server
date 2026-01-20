@@ -29,11 +29,15 @@ public class RestaurantEntity extends BaseEntity {
     private String description;
     private Point location; // 위도, 경도
 
+    @Column(unique = true, nullable = false)
+    private String externalId; // Kakao Place ID
+
     // 매핑 필드
     private Long categoryId; // nullable
 
-    @Builder(access = AccessLevel.PRIVATE)
+    @Builder(access = AccessLevel.PUBLIC)
     private RestaurantEntity(
+            String externalId,
             Long categoryId,
             String name,
             String address,
@@ -43,6 +47,7 @@ public class RestaurantEntity extends BaseEntity {
             String representativeReview,
             String description,
             Point location) {
+        this.externalId = externalId;
         this.name = name;
         this.address = address;
         this.rating = rating;
@@ -57,6 +62,7 @@ public class RestaurantEntity extends BaseEntity {
     public static Restaurant toDomain(RestaurantEntity entity) {
         return new Restaurant(
                 entity.getId(),
+                entity.getExternalId(),
                 entity.getCategoryId(),
                 entity.getName(),
                 entity.getAddress(),

@@ -1,0 +1,22 @@
+kakao:
+  api:
+    base-url: https://dapi.kakao.com
+    api-key: ${KAKAO_API_KEY:}
+
+spring:
+  cloud:
+    discovery:
+      enabled: false
+    openfeign:
+      client:
+        config:
+          kakao-map-api:
+            connectTimeOut: 2100
+            readTimeout: 5000
+            loggerLevel: full
+  compression:
+    response:
+      enabled: false
+  httpclient:
+    max-connections: 2000
+    max-connections-per-route: 500
