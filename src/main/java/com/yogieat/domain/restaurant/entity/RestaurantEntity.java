@@ -18,7 +18,6 @@ import org.locationtech.jts.geom.Point;
 @Table(name = "t_restaurant")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RestaurantEntity extends BaseEntity {
-    private Long categoryId;
     private String name;
     private String address;
     private Double rating;
@@ -28,8 +27,10 @@ public class RestaurantEntity extends BaseEntity {
     private String representativeReview; // 대표 리뷰 1건
     @Column(columnDefinition = "TEXT")
     private String description;
-    @Column
     private Point location; // 위도, 경도
+
+    // 매핑 필드
+    private Long categoryId; // nullable
 
     @Builder(access = AccessLevel.PRIVATE)
     private RestaurantEntity(

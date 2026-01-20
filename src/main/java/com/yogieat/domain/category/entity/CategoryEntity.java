@@ -2,7 +2,6 @@ package com.yogieat.domain.category.entity;
 
 import com.yogieat.domain.category.domain.Category;
 import com.yogieat.global.common.entity.BaseEntity;
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -15,10 +14,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "t_category")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CategoryEntity extends BaseEntity {
-    @Column(nullable = false)
     private String largeCategory;
-
-    @Column(nullable = false)
     private String mediumCategory;
 
     @Builder(access = AccessLevel.PRIVATE)
