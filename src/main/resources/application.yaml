@@ -1,48 +1,20 @@
 spring:
+  threads:
+    virtual:
+      enabled: true
   application:
     name: yogieat
   config:
     import:
       - logging.yaml
+      - datasource.yaml
+      - monitoring.yaml
+      - ai.yaml
   web.resources.add-mappings: false
-  jpa:
-    hibernate:
-      ddl-auto: update
-    properties:
-      hibernate:
-        show_log: true
-        format_sql: true
 
-datasource:
-  db:
-    core:
-      driver-class-name: org.postgresql.Driver
-      jdbc-url: ${DATASOURCE_DB_CORE_JDBC_URL}
-      username: ${DATASOURCE_DB_CORE_USERNAME}
-      password: ${DATASOURCE_DB_CORE_PASSWORD}
-      pool-name: core-db-pool
-      maximum-pool-size: 10
-      connection-timeout: 1500
-      keepalive-time: 30000
-      validation-timeout: 1000
-      max-lifetime: 600000
-      data-source-properties:
-        rewriteBatchedStatements: true
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health
-      base-path: /actuator
-    jmx:
-      exposure:
-        exclude: "*"
-  health:
-    defaults:
-      enabled: true
-
-ai:
-  gemini:
-    api-key: ${AI_GEMINI_API_KEY}
-    model: ${AI_GEMINI_MODEL:gemini-2.5-flash}
+server:
+  tomcat:
+    max-connections: 20000
+    threads:
+      max: 600
+      min-spare: 100
