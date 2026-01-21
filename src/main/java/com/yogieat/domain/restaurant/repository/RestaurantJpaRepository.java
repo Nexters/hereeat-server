@@ -6,5 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface RestaurantJpaRepository extends JpaRepository<RestaurantEntity, Long> {
     boolean existsByExternalId(String externalId);
+    boolean existsByNameAndAddress(String name, String address);
     Optional<RestaurantEntity> findByExternalId(String externalId);
 }

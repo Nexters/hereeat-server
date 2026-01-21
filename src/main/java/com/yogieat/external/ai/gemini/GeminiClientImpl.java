@@ -2,12 +2,12 @@ package com.yogieat.external.ai.gemini;
 
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentResponse;
+import com.yogieat.global.config.ai.GeminiProperties;
 import com.yogieat.global.error.CustomException;
 import com.yogieat.global.error.ErrorCode;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -15,12 +15,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class GeminiClientImpl implements GeminiClient {
 
-    @Value("${ai.gemini.api-key}")
-    private String apiKey;
-
-    @Value("${ai.gemini.model:gemini-2.5-flash}")
-    private String model;
-
+    private final GeminiProperties geminiProperties;
     private final GeminiPromptBuilder promptBuilder;
     private final GeminiResponseParser responseParser;
 
@@ -30,13 +25,13 @@ public class GeminiClientImpl implements GeminiClient {
             log.info("Calling Gemini API for location: {}, category: {}", location, category);
 
             // Create Gemini client with API key
-            Client client = Client.builder().apiKey(apiKey).build();
+            Client client = Client.builder().apiKey(geminiProperties.apiKey()).build();
 
             // Build prompt using centralized builder
             String prompt = promptBuilder.buildRestaurantGenerationPrompt(location, category, count);
 
             // Call Gemini API
-            GenerateContentResponse response = client.models.generateContent(model, prompt, null);
+            GenerateContentResponse response = client.models.generateContent(geminiProperties.model(), prompt, null);
 
             String responseText = response.text();
             log.debug("Gemini API response: {}", responseText);

@@ -1,6 +1,7 @@
 package com.yogieat.domain.restaurant.repository;
 
 import com.yogieat.domain.common.GeoConverter;
+import com.yogieat.domain.restaurant.domain.CreateRestaurant;
 import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.domain.restaurant.entity.RestaurantEntity;
 import com.yogieat.domain.restaurant.service.RestaurantRepository;
@@ -24,22 +25,14 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     }
 
     @Override
-    public Restaurant save(Restaurant restaurant) {
-        // Convert domain to entity
-        RestaurantEntity entity = RestaurantEntity.builder()
-            .externalId(restaurant.externalId())
-            .categoryId(restaurant.categoryId())
-            .name(restaurant.name())
-            .address(restaurant.address())
-            .rating(restaurant.rating())
-            .imageUrl(restaurant.imageUrl())
-            .mapUrl(restaurant.mapUrl())
-            .representativeReview(restaurant.representativeReview())
-            .description(restaurant.description())
-            .location(restaurant.location() != null
-                ? geoConverter.geoJsonPointToJtsPoint(restaurant.location())
-                : null)
-            .build();
+    public boolean existsByNameAndAddress(String name, String address) {
+        return restaurantJpaRepository.existsByNameAndAddress(name, address);
+    }
+
+    @Override
+    public Restaurant save(CreateRestaurant createRestaurant) {
+        // Convert CreateRestaurant to entity using static factory method
+        RestaurantEntity entity = RestaurantEntity.from(createRestaurant, geoConverter);
 
         // Save and convert back to domain
         RestaurantEntity savedEntity = restaurantJpaRepository.save(entity);

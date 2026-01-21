@@ -14,10 +14,10 @@ public class RestaurantCollectionScheduler {
     private final RestaurantCollectionService collectionService;
 
     /**
-     * Daily restaurant collection at 2:00 AM KST
+     * Restaurant collection every 10 minutes (0, 10, 20, 30, 40, 50)
      * Cron: second minute hour day month weekday
      */
-    @Scheduled(cron = "0 0/10 * * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 */10 * * * *", zone = "Asia/Seoul")
     public void collectRestaurants() {
         log.info("Starting scheduled restaurant collection");
         long startTime = System.currentTimeMillis();

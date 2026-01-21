@@ -1,6 +1,8 @@
 package com.yogieat.domain.restaurant.entity;
 
+import com.yogieat.domain.common.GeoConverter;
 import com.yogieat.domain.common.GeoJson;
+import com.yogieat.domain.restaurant.domain.CreateRestaurant;
 import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.global.common.entity.BaseEntity;
 import jakarta.persistence.Column;
@@ -35,7 +37,7 @@ public class RestaurantEntity extends BaseEntity {
     // 매핑 필드
     private Long categoryId; // nullable
 
-    @Builder(access = AccessLevel.PUBLIC)
+    @Builder(access = AccessLevel.PRIVATE)
     private RestaurantEntity(
             String externalId,
             Long categoryId,
@@ -57,6 +59,32 @@ public class RestaurantEntity extends BaseEntity {
         this.representativeReview = representativeReview;
         this.description = description;
         this.location = location;
+    }
+
+    /**
+     * Static factory method to create RestaurantEntity from CreateRestaurant
+     * Encapsulates builder usage and prevents external access to builder
+     *
+     * @param createRestaurant Domain object for creating restaurant
+     * @param geoConverter Converter to transform GeoJson.Point to JTS Point
+     * @return RestaurantEntity instance
+     */
+    public static RestaurantEntity from(CreateRestaurant createRestaurant, GeoConverter geoConverter) {
+        return builder()
+                .externalId(createRestaurant.externalId())
+                .categoryId(createRestaurant.categoryId())
+                .name(createRestaurant.name())
+                .address(createRestaurant.address())
+                .rating(createRestaurant.rating())
+                .imageUrl(createRestaurant.imageUrl())
+                .mapUrl(createRestaurant.mapUrl())
+                .representativeReview(createRestaurant.representativeReview())
+                .description(createRestaurant.description())
+                .location(
+                        createRestaurant.location() != null
+                                ? geoConverter.geoJsonPointToJtsPoint(createRestaurant.location())
+                                : null)
+                .build();
     }
 
     public static Restaurant toDomain(RestaurantEntity entity) {
