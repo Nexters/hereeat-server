@@ -1,4 +1,4 @@
-package com.yogieat.domain.gathering.domain.value;
+package com.yogieat.domain.common;
 
 import lombok.Getter;
 

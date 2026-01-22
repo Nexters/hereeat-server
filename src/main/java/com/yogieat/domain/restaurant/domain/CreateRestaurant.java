@@ -1,7 +1,7 @@
 package com.yogieat.domain.restaurant.domain;
 
 import com.yogieat.domain.common.GeoJson;
-import com.yogieat.external.ai.gemini.RestaurantSuggestion;
+import com.yogieat.domain.common.Place;
 
 /**
  * DTO for creating a new Restaurant
@@ -17,6 +17,7 @@ public record CreateRestaurant(
         String mapUrl,
         String representativeReview,
         String description,
+        Place place,
         GeoJson.Point location
 ) {
     /**
@@ -32,13 +33,14 @@ public record CreateRestaurant(
      * @return CreateRestaurant instance
      */
     public static CreateRestaurant of(
-            RestaurantSuggestion suggestion,
+            SuggestionRestaurant suggestion,
             Long categoryId,
             String externalId,
             String mapUrl,
             GeoJson.Point location,
             Double rating,
-            String imageUrl
+            String imageUrl,
+            Place place
     ) {
         return new CreateRestaurant(
                 externalId,
@@ -50,6 +52,7 @@ public record CreateRestaurant(
                 mapUrl,
                 suggestion.representativeReview(),
                 suggestion.description(),
+                place,
                 location
         );
     }

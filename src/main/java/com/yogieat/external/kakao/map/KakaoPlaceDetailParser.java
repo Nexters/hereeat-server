@@ -58,7 +58,7 @@ public class KakaoPlaceDetailParser {
 
             // 3. Extract photos
             List<String> photoUrls = extractPhotos(panel);
-            String mainPhotoUrl = photoUrls.isEmpty() ? null : photoUrls.get(0);
+            String mainPhotoUrl = photoUrls.isEmpty() ? null : photoUrls.getFirst();
 
             return new KakaoPlaceDetailData(
                     confirmId,

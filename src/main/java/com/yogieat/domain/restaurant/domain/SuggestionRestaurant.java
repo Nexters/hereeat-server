@@ -1,6 +1,6 @@
-package com.yogieat.external.ai.gemini;
+package com.yogieat.domain.restaurant.domain;
 
-public record RestaurantSuggestion(
+public record SuggestionRestaurant(
     String name,
     String address,
     Double rating,

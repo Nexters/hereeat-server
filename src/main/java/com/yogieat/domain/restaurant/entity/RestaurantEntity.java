@@ -2,11 +2,15 @@ package com.yogieat.domain.restaurant.entity;
 
 import com.yogieat.domain.common.GeoConverter;
 import com.yogieat.domain.common.GeoJson;
+import com.yogieat.domain.common.Place;
 import com.yogieat.domain.restaurant.domain.CreateRestaurant;
 import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.global.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.util.List;
 import lombok.AccessLevel;
@@ -17,7 +21,26 @@ import org.locationtech.jts.geom.Point;
 
 @Getter
 @Entity
-@Table(name = "t_restaurant")
+@Table(
+    name = "t_restaurant",
+    indexes = {
+        @Index(
+            name = "idx_restaurant_place",
+            columnList = "place",
+            unique = false
+        ),
+        @Index(
+            name = "idx_restaurant_name_address",
+            columnList = "name, address",
+            unique = false
+        ),
+        @Index(
+            name = "idx_restaurant_category_id",
+            columnList = "category_id",
+            unique = false
+        )
+    }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RestaurantEntity extends BaseEntity {
     private String name;
@@ -29,6 +52,9 @@ public class RestaurantEntity extends BaseEntity {
     private String representativeReview; // 대표 리뷰 1건
     @Column(columnDefinition = "TEXT")
     private String description;
+    @Column(columnDefinition = "VARCHAR(30)")
+    @Enumerated(EnumType.STRING)
+    private Place place;
     private Point location; // 위도, 경도
 
     @Column(unique = true, nullable = false)
@@ -48,6 +74,7 @@ public class RestaurantEntity extends BaseEntity {
             String mapUrl,
             String representativeReview,
             String description,
+            Place place,
             Point location) {
         this.externalId = externalId;
         this.name = name;
@@ -58,6 +85,7 @@ public class RestaurantEntity extends BaseEntity {
         this.categoryId = categoryId;
         this.representativeReview = representativeReview;
         this.description = description;
+        this.place = place;
         this.location = location;
     }
 
@@ -80,6 +108,7 @@ public class RestaurantEntity extends BaseEntity {
                 .mapUrl(createRestaurant.mapUrl())
                 .representativeReview(createRestaurant.representativeReview())
                 .description(createRestaurant.description())
+                .place(createRestaurant.place())
                 .location(
                         createRestaurant.location() != null
                                 ? geoConverter.geoJsonPointToJtsPoint(createRestaurant.location())
@@ -99,6 +128,7 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getMapUrl(),
                 entity.getRepresentativeReview(),
                 entity.getDescription(),
+                entity.getPlace(),
                 entity.location != null
                     ? new GeoJson.Point(List.of(entity.location.getX(), entity.location.getY()))
                     : null

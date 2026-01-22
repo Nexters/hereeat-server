@@ -1,11 +1,13 @@
 package com.yogieat.domain.restaurant.service;
 
+import com.yogieat.domain.category.domain.value.LargeCategory;
 import com.yogieat.domain.category.service.CategoryService;
 import com.yogieat.domain.common.GeoJson;
-import com.yogieat.domain.gathering.domain.value.Place;
+import com.yogieat.domain.common.Place;
 import com.yogieat.domain.restaurant.domain.CreateRestaurant;
+import com.yogieat.domain.restaurant.domain.SuggestionRestaurant;
 import com.yogieat.external.ai.gemini.GeminiClient;
-import com.yogieat.external.ai.gemini.RestaurantSuggestion;
+import com.yogieat.external.ai.gemini.LocationCategoryKey;
 import com.yogieat.external.kakao.map.KaKaoPlaceDocument;
 import com.yogieat.external.kakao.map.KakaoPlaceClient;
 import com.yogieat.external.kakao.map.KakaoPlaceDetailClient;
@@ -14,7 +16,10 @@ import com.yogieat.external.kakao.map.KakaoPlaceMapper;
 import com.yogieat.external.kakao.map.KakaoRestaurantData;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,73 +40,110 @@ public class RestaurantCollectionService {
     private final RestaurantValidator restaurantValidator;
 
     /**
-     * Get location names from Place enum
-     * Uses Place enum as the source of truth for supported locations
+     * Place enum에서 지원하는 지역 목록
+     * Place enum을 지역 정보의 단일 진실 공급원(SSOT)으로 사용
      */
     private static final List<String> LOCATIONS = Arrays.stream(Place.values())
         .map(Place::getName)
         .toList();
 
-    private static final List<String> FOOD_CATEGORIES = List.of(
-        "한식", "일식", "중식", "양식"
-    );
-
-    private static final int RESTAURANTS_PER_REQUEST = 20;
-    private static final long RATE_LIMIT_DELAY_MS = 5000; // 5 seconds
+    /**
+     * LargeCategory enum에서 ANY를 제외한 음식 카테고리 목록
+     * displayName을 사용하여 Gemini 프롬프트에 활용
+     */
+    private static final List<String> FOOD_CATEGORIES = Arrays.stream(LargeCategory.values())
+        .filter(category -> category != LargeCategory.ANY)
+        .map(LargeCategory::getDisplayName)
+        .toList();
 
     /**
-     * Collect restaurants for all locations defined in Place enum
+     * Enum 변환 캐시: Place name → Place enum
+     * 매번 stream().filter()를 사용하지 않고 O(1) 조회
+     */
+    private static final Map<String, Place> PLACE_CACHE = Arrays.stream(Place.values())
+        .collect(Collectors.toMap(Place::getName, Function.identity()));
+
+    /**
+     * Enum 변환 캐시: LargeCategory displayName → LargeCategory enum
+     * 매번 stream().filter()를 사용하지 않고 O(1) 조회
+     */
+    private static final Map<String, LargeCategory> LARGE_CATEGORY_CACHE = Arrays.stream(LargeCategory.values())
+        .collect(Collectors.toMap(LargeCategory::getDisplayName, Function.identity()));
+
+    private static final int RESTAURANTS_PER_REQUEST = 20;
+    private static final long RATE_LIMIT_DELAY_MS = 5000; // Gemini API rate limit을 위한 지연 시간 (5초)
+
+    /**
+     * Place enum에 정의된 모든 지역에 대해 맛집 데이터 수집
+     *
+     * 배치 처리 최적화:
+     * - Gemini API 호출 1회로 모든 location × category 조합 처리
+     * - API 호출 10회 → 1회 (90% 감소)
+     * - 처리 시간 대폭 단축 (rate limit 대기 제거)
      */
     public void collectAllRegions() {
-        log.info("Starting restaurant collection for all locations: {}", LOCATIONS);
+        log.info("Starting batch restaurant collection for all locations: {}", LOCATIONS);
 
-        int totalProcessed = 0;
-        int totalSuccess = 0;
-        int totalFailed = 0;
+        try {
+            // 1. 배치 API 호출: 모든 location × category 조합을 한 번에 요청
+            Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
+                geminiClient.generateRestaurantsBatch(LOCATIONS, FOOD_CATEGORIES, RESTAURANTS_PER_REQUEST);
 
-        for (String location : LOCATIONS) {
-            for (String category : FOOD_CATEGORIES) {
+            log.info("Batch API call succeeded. Processing {} location-category combinations",
+                allSuggestions.size());
+
+            // 2. 각 location-category 조합별로 데이터 처리
+            int totalProcessed = 0;
+            int totalSuccess = 0;
+            int totalFailed = 0;
+
+            for (Map.Entry<LocationCategoryKey, List<SuggestionRestaurant>> entry : allSuggestions.entrySet()) {
+                LocationCategoryKey key = entry.getKey();
+                List<SuggestionRestaurant> suggestions = entry.getValue();
+
                 try {
-                    log.info("Processing location: {}, category: {}", location, category);
-                    int processed = collectRestaurantsForLocation(location, category);
+                    log.info("Processing location: {}, category: {}, suggestions: {}",
+                        key.location(), key.category(), suggestions.size());
+
+                    int processed = processRestaurantsForLocation(key.location(), key.category(), suggestions);
                     totalProcessed += processed;
                     totalSuccess++;
 
-                    // Rate limit handling: sleep after each Gemini API call
-                    Thread.sleep(RATE_LIMIT_DELAY_MS);
-
                 } catch (Exception e) {
-                    log.error("Failed to collect restaurants for location: {}, category: {}",
-                        location, category, e);
+                    log.error("Failed to process restaurants for location: {}, category: {}",
+                        key.location(), key.category(), e);
                     totalFailed++;
-                    // Continue with next location/category (partial failure handling)
+                    // 일부 실패 시에도 다음 조합 계속 처리
                 }
             }
-        }
 
-        log.info("Restaurant collection completed. Total: {}, Success: {}, Failed: {}, Restaurants: {}",
-            LOCATIONS.size() * FOOD_CATEGORIES.size(), totalSuccess, totalFailed, totalProcessed);
+            log.info("Batch collection completed. Total: {}, Success: {}, Failed: {}, Restaurants: {}",
+                allSuggestions.size(), totalSuccess, totalFailed, totalProcessed);
+
+        } catch (Exception e) {
+            log.error("Batch collection failed completely", e);
+            throw e;
+        }
     }
 
     /**
-     * Collect restaurants for a specific location and category
+     * 특정 지역과 카테고리에 대한 맛집 데이터 수집 (단일 API 호출용 - 레거시)
      *
-     * Data collection strategy:
-     * 1. Generate restaurant data using Gemini AI (name, address, rating, category, description, review)
-     * 2. Create or find category from Gemini-generated data (largeCategory, mediumCategory)
-     * 3. Optionally enrich with Kakao Place API (location, mapUrl, externalId)
-     * 4. Save all generated restaurants (even if Kakao enrichment fails)
-     *
-     * @param location Location name (from Place enum)
-     * @param category Food category for Gemini prompt (large category hint)
-     * @return Number of successfully saved restaurants
+     * @deprecated Use batch processing via collectAllRegions() for better performance
      */
+    @Deprecated
     @Transactional
     public int collectRestaurantsForLocation(String location, String category) {
         log.info("Collecting restaurants for: {} - {}", location, category);
 
+        // Convert location to Place enum for batch validation
+        Place place = getPlaceFromLocationName(location);
+
+        // Prepare validator cache: Load existing restaurants for this place (1 DB query instead of N)
+        restaurantValidator.prepareForBatchValidation(place);
+
         // 1. Call Gemini API to generate restaurant suggestions with full data (including category info)
-        List<RestaurantSuggestion> suggestions = geminiClient.generateRestaurants(
+        List<SuggestionRestaurant> suggestions = geminiClient.generateRestaurants(
             location, category, RESTAURANTS_PER_REQUEST
         );
 
@@ -109,8 +151,8 @@ public class RestaurantCollectionService {
 
         // 2. Process each suggestion (category creation + Gemini data + optional Kakao enrichment)
         int savedCount = 0;
-        for (RestaurantSuggestion suggestion : suggestions) {
-            boolean saved = processRestaurant(suggestion, location);
+        for (SuggestionRestaurant suggestion : suggestions) {
+            boolean saved = processRestaurant(suggestion, place, location);
             if (saved) {
                 savedCount++;
             }
@@ -122,31 +164,109 @@ public class RestaurantCollectionService {
         return savedCount;
     }
 
+    /**
+     * 배치에서 수집된 suggestions를 처리하여 저장
+     *
+     * 데이터 처리 전략:
+     * 1. Place enum 변환 및 캐시 준비
+     * 2. 카테고리 정보로 카테고리 조회 또는 생성 (대카테고리, 중카테고리)
+     * 3. Kakao Place API로 데이터 보강 (위치, 지도 URL, 외부 ID)
+     * 4. 모든 생성된 맛집 저장 (Kakao 보강 실패 시에도 저장)
+     *
+     * @param location 지역명 (Place enum에서 가져옴)
+     * @param category 음식 카테고리
+     * @param suggestions Gemini에서 생성된 레스토랑 목록
+     * @return 성공적으로 저장된 맛집 개수
+     */
+    @Transactional
+    protected int processRestaurantsForLocation(
+        String location,
+        String category,
+        List<SuggestionRestaurant> suggestions
+    ) {
+        log.info("Processing {} suggestions for: {} - {}", suggestions.size(), location, category);
+
+        // 1. location을 Place enum으로 변환 (배치 검증용)
+        Place place = getPlaceFromLocationName(location);
+
+        // 2. Validator 캐시 준비: 해당 Place의 기존 레스토랑 로드 (N번 → 1번 DB 쿼리)
+        restaurantValidator.prepareForBatchValidation(place);
+
+        // 3. 각 suggestion 처리 (카테고리 생성 + Gemini 데이터 + Kakao 데이터 보강)
+        int savedCount = 0;
+        for (SuggestionRestaurant suggestion : suggestions) {
+            boolean saved = processRestaurant(suggestion, place, location);
+            if (saved) {
+                savedCount++;
+            }
+        }
+
+        log.info("Saved {}/{} restaurants for {} - {}",
+            savedCount, suggestions.size(), location, category);
+
+        return savedCount;
+    }
+
+    /**
+     * Convert location name to Place enum using cache (O(1) lookup)
+     * @param locationName Location name from Place enum (e.g., "홍대입구역")
+     * @return Place enum
+     * @throws IllegalArgumentException if location name is not found
+     */
+    private Place getPlaceFromLocationName(String locationName) {
+        Place place = PLACE_CACHE.get(locationName);
+        if (place == null) {
+            throw new IllegalArgumentException(
+                "Unknown location name: " + locationName + ". Available locations: " + LOCATIONS
+            );
+        }
+        return place;
+    }
+
+    /**
+     * Convert largeCategory displayName to LargeCategory enum using cache (O(1) lookup)
+     * @param displayName Display name from LargeCategory enum (e.g., "한식")
+     * @return LargeCategory enum
+     * @throws IllegalArgumentException if displayName is not found
+     */
+    private LargeCategory getLargeCategoryFromDisplayName(String displayName) {
+        LargeCategory category = LARGE_CATEGORY_CACHE.get(displayName);
+        if (category == null) {
+            throw new IllegalArgumentException(
+                "Unknown large category: " + displayName + ". Available categories: " + FOOD_CATEGORIES
+            );
+        }
+        return category;
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected boolean processRestaurant(RestaurantSuggestion suggestion, String location) {
+    protected boolean processRestaurant(SuggestionRestaurant suggestion, Place restaurantPlace, String locationName) {
         try {
-            // 1. Find or create category from Gemini suggestion
+            // 1. largeCategory displayName을 LargeCategory enum으로 변환
+            LargeCategory largeCategory = getLargeCategoryFromDisplayName(suggestion.largeCategory());
+
+            // 2. Gemini suggestion으로부터 카테고리 조회 또는 생성
             Long categoryId = categoryService.findOrCreateCategory(
-                suggestion.largeCategory(),
+                largeCategory,
                 suggestion.mediumCategory()
             );
 
-            // 2. Initialize enrichment variables
+            // 3. 데이터 보강용 변수 초기화
             String externalId = null;
             String mapUrl = null;
             GeoJson.Point geoJsonLocation = null;
-            Double rating = suggestion.rating(); // Start with Gemini rating
+            Double rating = suggestion.rating(); // Gemini 평점으로 시작
             String imageUrl = null;
 
-            // 3. Try to enrich with Kakao Search API data (basic info)
+            // 4. Kakao Search API로 기본 정보 보강 시도
             Optional<KaKaoPlaceDocument> placeOpt = kakaoPlaceClient.searchPlace(
-                suggestion.name(), location
+                suggestion.name(), locationName
             );
 
             if (placeOpt.isPresent()) {
                 KaKaoPlaceDocument place = placeOpt.get();
 
-                // Enrich with Kakao search data
+                // 4-1. Kakao 검색 데이터로 보강
                 KakaoRestaurantData data = kakaoPlaceMapper.toDomainData(place);
                 externalId = data.externalId();
                 mapUrl = data.mapUrl();
@@ -156,18 +276,18 @@ public class RestaurantCollectionService {
 
                 log.debug("Enriched restaurant with Kakao search data: {} ({})", place.placeName(), place.id());
 
-                // 4. Try to enrich with Kakao Detail API (panel3) for rating and photos
+                // 5. Kakao Detail API (panel3)로 평점 및 사진 보강 시도
                 Optional<KakaoPlaceDetailData> detailOpt = kakaoPlaceDetailClient.fetchPlaceDetail(place.id());
                 if (detailOpt.isPresent()) {
                     KakaoPlaceDetailData detail = detailOpt.get();
 
-                    // Use panel3 rating if available (more accurate than Gemini)
+                    // 5-1. panel3 평점이 있으면 사용 (Gemini보다 정확)
                     if (detail.rating() != null && detail.rating() > 0) {
                         rating = detail.rating();
                         log.debug("Updated rating from panel3: {}", rating);
                     }
 
-                    // Use main photo URL if available
+                    // 5-2. 메인 사진 URL이 있으면 사용
                     if (detail.mainPhotoUrl() != null && !detail.mainPhotoUrl().isBlank()) {
                         imageUrl = detail.mainPhotoUrl();
                         log.debug("Added image URL from panel3: {}", imageUrl);
@@ -177,12 +297,12 @@ public class RestaurantCollectionService {
                 }
             } else {
                 log.info("Kakao place not found, saving with Gemini data only: {} in {}",
-                    suggestion.name(), location);
+                    suggestion.name(), locationName);
             }
 
-            // 5. Validate for duplicates before saving
+            // 6. 저장 전 중복 검증 (캐시 사용)
             RestaurantValidator.ValidationResult validationResult =
-                restaurantValidator.duplicateValidate(suggestion, externalId);
+                restaurantValidator.duplicateValidateWithCache(suggestion, externalId);
 
             if (!validationResult.isValid()) {
                 if (validationResult.isDuplicate()) {
@@ -195,7 +315,7 @@ public class RestaurantCollectionService {
                 return false;
             }
 
-            // 6. Create Restaurant using static factory method with Gemini + Kakao enrichment
+            // 7. Gemini + Kakao 보강 데이터로 Restaurant 생성
             CreateRestaurant createRestaurant = CreateRestaurant.of(
                 suggestion,
                 categoryId,
@@ -203,11 +323,15 @@ public class RestaurantCollectionService {
                 mapUrl,
                 geoJsonLocation,
                 rating,
-                imageUrl
+                imageUrl,
+                restaurantPlace
             );
 
-            // 7. Save through domain repository
+            // 8. 도메인 레포지토리를 통해 저장
             restaurantRepository.save(createRestaurant);
+
+            // 9. 같은 배치 내 중복 방지를 위해 캐시에 추가
+            restaurantValidator.addToCache(externalId, suggestion.name(), suggestion.address());
 
             log.info("Saved new restaurant: {} (Category: {}/{}, Rating: {}, Image: {})",
                 suggestion.name(), suggestion.largeCategory(), suggestion.mediumCategory(),
@@ -215,8 +339,8 @@ public class RestaurantCollectionService {
             return true;
 
         } catch (Exception e) {
-            log.error("Failed to process restaurant: {} in {}", suggestion.name(), location, e);
-            // Exception will rollback only this transaction (REQUIRES_NEW)
+            log.error("Failed to process restaurant: {} in {}", suggestion.name(), locationName, e);
+            // 예외 발생 시 이 트랜잭션만 롤백 (REQUIRES_NEW)
             return false;
         }
     }

@@ -1,6 +1,8 @@
 package com.yogieat.domain.restaurant.repository;
 
+import com.yogieat.domain.common.Place;
 import com.yogieat.domain.restaurant.entity.RestaurantEntity;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -8,4 +10,5 @@ public interface RestaurantJpaRepository extends JpaRepository<RestaurantEntity,
     boolean existsByExternalId(String externalId);
     boolean existsByNameAndAddress(String name, String address);
     Optional<RestaurantEntity> findByExternalId(String externalId);
+    List<RestaurantEntity> findByPlace(Place place);
 }

@@ -1,17 +1,15 @@
 package com.yogieat.domain.restaurant.repository;
 
 import com.yogieat.domain.common.GeoConverter;
+import com.yogieat.domain.common.Place;
 import com.yogieat.domain.restaurant.domain.CreateRestaurant;
 import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.domain.restaurant.entity.RestaurantEntity;
 import com.yogieat.domain.restaurant.service.RestaurantRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
-/**
- * Core implementation of RestaurantRepository
- * Bridges domain layer (Restaurant) and persistence layer (RestaurantEntity)
- */
 @Repository
 @RequiredArgsConstructor
 public class RestaurantCoreRepository implements RestaurantRepository {
@@ -37,5 +35,12 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         // Save and convert back to domain
         RestaurantEntity savedEntity = restaurantJpaRepository.save(entity);
         return RestaurantEntity.toDomain(savedEntity);
+    }
+
+    @Override
+    public List<Restaurant> findByPlace(Place place) {
+        return restaurantJpaRepository.findByPlace(place).stream()
+            .map(RestaurantEntity::toDomain)
+            .toList();
     }
 }

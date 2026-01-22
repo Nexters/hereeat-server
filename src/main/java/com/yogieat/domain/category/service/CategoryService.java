@@ -1,6 +1,7 @@
 package com.yogieat.domain.category.service;
 
 import com.yogieat.domain.category.domain.Category;
+import com.yogieat.domain.category.domain.value.LargeCategory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -9,7 +10,7 @@ import org.springframework.stereotype.Service;
 public class CategoryService {
     private final CategoryRepository categoryRepository;
 
-    public Long findOrCreateCategory(String largeCategory, String mediumCategory) {
+    public Long findOrCreateCategory(LargeCategory largeCategory, String mediumCategory) {
         return categoryRepository.findByLargeCategoryAndMediumCategory(largeCategory, mediumCategory)
             .map(Category::id)
             .orElseGet(() -> {
