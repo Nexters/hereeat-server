@@ -135,26 +135,26 @@ public class KakaoPlaceDetailParser {
     /**
      * panel3 응답에서 사진 추출 (최대 15장)
      * 우선순위:
-     * 1) /photos/photos[*] - POI 공식 사진
+     * 1) /menu/menus/photos[*] - 메뉴 블로그 사진
      * 2) /menu/yogiyo_menus/items[*] - 요기요 메뉴 사진
-     * 3) /menu/menus/photos[*] - 메뉴 블로그 사진
+     * 3) /photos/photos[*] - POI 공식 사진
      * 4) /blog_review/reviews[*].photos[*] - 블로그 리뷰 사진
      */
     private List<String> extractPhotos(JsonNode panel) {
         List<String> photoUrls = new ArrayList<>();
         Set<String> dedup = new HashSet<>();
 
-        // 1) POI 공식 사진 (최우선)
-        extractGlobalPhotos(panel, photoUrls, dedup);
+        // 1) 메뉴 블로그 사진 (최우선)
+        extractMenuPhotos(panel, photoUrls, dedup);
 
         // 2) 요기요 메뉴 사진
         if (photoUrls.size() < MAX_PHOTOS) {
             extractYogiyoMenuPhotos(panel, photoUrls, dedup);
         }
 
-        // 3) 메뉴 블로그 사진
+        // 3) POI 공식 사진
         if (photoUrls.size() < MAX_PHOTOS) {
-            extractMenuPhotos(panel, photoUrls, dedup);
+            extractGlobalPhotos(panel, photoUrls, dedup);
         }
 
         // 4) 블로그 리뷰 사진

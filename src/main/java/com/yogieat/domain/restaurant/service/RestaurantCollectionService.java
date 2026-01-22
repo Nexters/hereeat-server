@@ -16,6 +16,7 @@ import com.yogieat.external.kakao.map.KakaoPlaceMapper;
 import com.yogieat.external.kakao.map.KakaoRestaurantData;
 import com.yogieat.global.error.CustomException;
 import com.yogieat.global.error.ErrorCode;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -72,8 +73,10 @@ public class RestaurantCollectionService {
     private static final Map<String, LargeCategory> LARGE_CATEGORY_CACHE = Arrays.stream(LargeCategory.values())
         .collect(Collectors.toMap(LargeCategory::getDisplayName, Function.identity()));
 
-    private static final int RESTAURANTS_PER_REQUEST = 20;
+    private static final int RESTAURANTS_PER_REQUEST = 5;
     private static final long RATE_LIMIT_DELAY_MS = 5000; // Gemini API rate limit을 위한 지연 시간 (5초)
+    private static final int LOCATION_CATEGORY_BATCH_SIZE = 5; // 한 번에 처리할 location-category 조합 개수
+    private static final long BATCH_DELAY_MS = 10000; // 배치 간 휴식 시간 (10초)
 
     /**
      * Place enum에 정의된 모든 지역에 대해 맛집 데이터 수집
@@ -83,29 +86,55 @@ public class RestaurantCollectionService {
      * - API 호출 10회 → 1회 (90% 감소)
      * - 처리 시간 대폭 단축 (rate limit 대기 제거)
      */
+    @Transactional
     public void collectAllRegions() {
         try {
             // 1. 배치 API 호출: 모든 location × category 조합을 한 번에 요청
             Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
                 geminiClient.generateRestaurantsBatch(LOCATIONS, FOOD_CATEGORIES, RESTAURANTS_PER_REQUEST);
 
-            // 2. 각 location-category 조합별로 데이터 처리
+            // 2. 각 location-category 조합별로 데이터 처리 (페이징)
             int totalProcessed = 0;
             int totalSuccess = 0;
             int totalFailed = 0;
 
-            for (Map.Entry<LocationCategoryKey, List<SuggestionRestaurant>> entry : allSuggestions.entrySet()) {
-                LocationCategoryKey key = entry.getKey();
-                List<SuggestionRestaurant> suggestions = entry.getValue();
+            List<Map.Entry<LocationCategoryKey, List<SuggestionRestaurant>>> entries =
+                new ArrayList<>(allSuggestions.entrySet());
 
-                try {
-                    int processed = processRestaurantsForLocation(key.location(), key.category(), suggestions);
-                    totalProcessed += processed;
-                    totalSuccess++;
+            for (int i = 0; i < entries.size(); i += LOCATION_CATEGORY_BATCH_SIZE) {
+                int endIndex = Math.min(i + LOCATION_CATEGORY_BATCH_SIZE, entries.size());
+                List<Map.Entry<LocationCategoryKey, List<SuggestionRestaurant>>> batch =
+                    entries.subList(i, endIndex);
 
-                } catch (Exception e) {
-                    log.error("Failed: {} - {}", key.location(), key.category(), e);
-                    totalFailed++;
+                log.info("Processing batch {}/{}: {} location-category combinations",
+                    (i / LOCATION_CATEGORY_BATCH_SIZE) + 1,
+                    (entries.size() + LOCATION_CATEGORY_BATCH_SIZE - 1) / LOCATION_CATEGORY_BATCH_SIZE,
+                    batch.size());
+
+                for (Map.Entry<LocationCategoryKey, List<SuggestionRestaurant>> entry : batch) {
+                    LocationCategoryKey key = entry.getKey();
+                    List<SuggestionRestaurant> suggestions = entry.getValue();
+
+                    try {
+                        int processed = processRestaurantsForLocation(key.location(), key.category(), suggestions);
+                        totalProcessed += processed;
+                        totalSuccess++;
+
+                    } catch (Exception e) {
+                        log.error("Failed: {} - {}", key.location(), key.category(), e);
+                        totalFailed++;
+                    }
+                }
+
+                // 배치 간 휴식 (마지막 배치가 아닌 경우)
+                if (endIndex < entries.size()) {
+                    try {
+                        log.info("Batch completed. Waiting {} ms before next batch...", BATCH_DELAY_MS);
+                        Thread.sleep(BATCH_DELAY_MS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        log.warn("Thread interrupted during batch delay", e);
+                    }
                 }
             }
 
@@ -160,8 +189,8 @@ public class RestaurantCollectionService {
      * @param suggestions Gemini에서 생성된 레스토랑 목록
      * @return 성공적으로 저장된 맛집 개수
      */
-    @Transactional
-    protected int processRestaurantsForLocation(
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int processRestaurantsForLocation(
         String location,
         String category,
         List<SuggestionRestaurant> suggestions
@@ -178,6 +207,14 @@ public class RestaurantCollectionService {
             boolean saved = processRestaurant(suggestion, place, location);
             if (saved) {
                 savedCount++;
+            }
+
+            // API Rate Limit 방지를 위한 지연
+            try {
+                Thread.sleep(RATE_LIMIT_DELAY_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Thread interrupted during rate limit delay", e);
             }
         }
 
@@ -256,12 +293,17 @@ public class RestaurantCollectionService {
                 if (detailOpt.isPresent()) {
                     KakaoPlaceDetailData detail = detailOpt.get();
 
-                    // 5-1. panel3 평점이 있으면 사용 (Gemini보다 정확)
-                    if (detail.rating() != null && detail.rating() > 0) {
-                        rating = detail.rating();
+                    // 5-1. 필터링 체크: rating이 null이면 음식점이 아니거나 평점이 범위 밖
+                    if (detail.rating() == null) {
+                        log.info("Skipping restaurant due to filtering (non-restaurant or invalid rating): {} in {}",
+                            suggestion.name(), locationName);
+                        return false;
                     }
 
-                    // 5-2. 메인 사진 URL이 있으면 사용
+                    // 5-2. panel3 평점 사용 (Gemini보다 정확)
+                    rating = detail.rating();
+
+                    // 5-3. 메인 사진 URL이 있으면 사용
                     if (detail.mainPhotoUrl() != null && !detail.mainPhotoUrl().isBlank()) {
                         imageUrl = detail.mainPhotoUrl();
                     }
