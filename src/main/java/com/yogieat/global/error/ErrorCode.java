@@ -17,6 +17,19 @@ public enum ErrorCode {
 
 	// User
 	USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "해당 회원을 찾을 수 없습니다."),
+
+	// Gemini API
+	GEMINI_API_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "G001", "Gemini API 호출 실패"),
+	GEMINI_RESPONSE_PARSE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "G002", "Gemini 응답 파싱 실패"),
+
+	// Kakao API
+	KAKAO_API_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "K001", "Kakao API 호출 실패"),
+	KAKAO_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "K002", "Kakao API 요청 한도 초과"),
+
+	// Restaurant Collection
+	RESTAURANT_COLLECTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "R001", "식당 수집 작업 실패"),
+	INVALID_LOCATION_NAME(HttpStatus.BAD_REQUEST, "R002", "알 수 없는 지역명입니다"),
+	INVALID_CATEGORY_NAME(HttpStatus.BAD_REQUEST, "R003", "알 수 없는 카테고리명입니다"),
 	;
 
 	private final HttpStatus status;

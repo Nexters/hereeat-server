@@ -1,9 +1,11 @@
 package com.yogieat.domain.restaurant.domain;
 
 import com.yogieat.domain.common.GeoJson;
+import com.yogieat.domain.common.Place;
 
 public record Restaurant(
         Long id,
+        String externalId,
         Long categoryId,
         String name,
         String address,
@@ -12,6 +14,7 @@ public record Restaurant(
         String mapUrl,
         String representativeReview,
         String description,
+        Place place,
         GeoJson.Point location
 ){
 }

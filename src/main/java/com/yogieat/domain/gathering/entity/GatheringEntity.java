@@ -1,11 +1,13 @@
 package com.yogieat.domain.gathering.entity;
 
+import com.yogieat.domain.common.Place;
 import com.yogieat.domain.gathering.domain.Gathering;
-import com.yogieat.domain.gathering.domain.value.Place;
 import com.yogieat.domain.gathering.domain.value.TimeSlot;
 import com.yogieat.global.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import lombok.AccessLevel;
@@ -32,6 +34,7 @@ public class GatheringEntity extends BaseEntity {
     private TimeSlot timeSlot;
 
     @Column(name = "place")
+    @Enumerated(EnumType.STRING)
     private Place place;
 
     @Column(name = "head_count")

@@ -1,8 +1,10 @@
 package com.yogieat.domain.category.domain;
 
+import com.yogieat.domain.category.domain.value.LargeCategory;
+
 public record Category(
         Long id,
-        String largeCategory,
+        LargeCategory largeCategory,
         String mediumCategory
 ) {
 }

@@ -1,6 +1,6 @@
 package com.yogieat.domain.gathering.domain;
 
-import com.yogieat.domain.gathering.domain.value.Place;
+import com.yogieat.domain.common.Place;
 import com.yogieat.domain.gathering.domain.value.TimeSlot;
 import java.time.LocalDate;
 
