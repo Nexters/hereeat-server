@@ -9,8 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Parser for Kakao Place API panel3 response
- * Extracts detailed information including rating and photos
+ * 카카오 장소 API panel3 응답 파서
+ * 평점 및 사진을 포함한 상세 정보 추출
  */
 @Component
 @Slf4j
@@ -19,46 +19,63 @@ public class KakaoPlaceDetailParser {
     private static final int MAX_PHOTOS = 15;
 
     /**
-     * Parse panel3 response to extract detailed place information
+     * panel3 응답을 파싱하여 상세 장소 정보 추출
      *
-     * @param panel JSON response from panel3 API
-     * @param requestedPlaceId The place ID that was requested
-     * @return KakaoPlaceDetailData containing rating and photos
+     * @param panel panel3 API로부터의 JSON 응답
+     * @param requestedPlaceId 요청된 장소 ID
+     * @return 평점 및 사진을 포함한 KakaoPlaceDetailData
      */
-    public KakaoPlaceDetailData parse(JsonNode panel, String requestedPlaceId) {
+    public KakaoPlaceDetailData parser(JsonNode panel, String requestedPlaceId) {
         try {
-            // 1. Extract basic information
+            // 1. 음식점 카테고리 확인
+            String placeRestaurant = extractText(panel.at("/summary/category"), "name1");
+            if (!placeRestaurant.equals("음식점")) {
+                log.debug("Filtered out non-restaurant place: placeId={}", requestedPlaceId);
+                return KakaoPlaceDetailData.empty(requestedPlaceId);
+            }
+
+            // 2. confirm_id 기본 검증
             String confirmId = extractText(panel.at("/summary"), "confirm_id");
             if (confirmId == null || confirmId.isBlank()) {
                 log.warn("panel3 response missing confirm_id for placeId: {}", requestedPlaceId);
                 return KakaoPlaceDetailData.empty(requestedPlaceId);
             }
 
-            // Validate confirm_id matches requested place ID
+            // confirm_id가 요청한 장소 ID와 일치하는지 검증
             if (!requestedPlaceId.equals(confirmId)) {
                 log.warn("confirm_id mismatch: requested={}, response={}", requestedPlaceId, confirmId);
                 return KakaoPlaceDetailData.empty(requestedPlaceId);
             }
 
+            // 3. 평점 추출 및 필터링 (우선 처리)
+            Double rating = extractRating(panel);
+
+            // 평점이 3.0~5.0 사이가 아니면 필터링
+            if (rating == null || rating < 3.0 || rating > 5.0) {
+                log.debug("Filtered out place due to rating: placeId={}, rating={}", requestedPlaceId, rating);
+                return KakaoPlaceDetailData.empty(requestedPlaceId);
+            }
+
+            // 4. 필터링 통과 후 상세 데이터 파싱
             String placeName = extractText(panel.at("/summary"), "name");
 
-            // Address priority: road → disp → jibun
+            // 주소 우선순위: 도로명 → 표시용 → 지번
             JsonNode addr = panel.at("/summary/address");
             String addressRoad = extractText(addr, "road");
             String addressDisp = extractText(addr, "disp");
             String addressJibun = extractText(addr, "jibun");
             String finalAddress = firstNonBlank(addressRoad, addressDisp, addressJibun);
 
-            // Coordinates
+            // 좌표
             Double latitude = extractDouble(panel.at("/summary/point/lat"));
             Double longitude = extractDouble(panel.at("/summary/point/lon"));
 
-            // 2. Extract rating
-            Double rating = extractRating(panel);
-
-            // 3. Extract photos
+            // 5. 사진 추출
             List<String> photoUrls = extractPhotos(panel);
             String mainPhotoUrl = photoUrls.isEmpty() ? null : photoUrls.getFirst();
+
+            log.debug("Successfully parsed place: placeId={}, rating={}, photos={}",
+                    confirmId, rating, photoUrls.size());
 
             return new KakaoPlaceDetailData(
                     confirmId,
@@ -78,11 +95,11 @@ public class KakaoPlaceDetailParser {
     }
 
     /**
-     * Extract rating from panel3 response
-     * Priority: /kakaomap_review/score_set/average_score → /scoreInfo/scoreSum → /basicInfo/feedback/scoreSum
+     * panel3 응답에서 평점 추출
+     * 우선순위: /kakaomap_review/score_set/average_score → /scoreInfo/scoreSum → /basicInfo/feedback/scoreSum
      */
     private Double extractRating(JsonNode panel) {
-        // Try /kakaomap_review/score_set/average_score first (most reliable from actual reviews)
+        // 1. 먼저 /kakaomap_review/score_set/average_score 시도 (실제 리뷰에서 가장 신뢰할 수 있음)
         JsonNode kakaoReview = panel.at("/kakaomap_review/score_set");
         if (kakaoReview != null && !kakaoReview.isMissingNode()) {
             Double rating = extractDouble(kakaoReview.get("average_score"));
@@ -92,7 +109,7 @@ public class KakaoPlaceDetailParser {
             }
         }
 
-        // Fallback to /scoreInfo/scoreSum
+        // 2. /scoreInfo/scoreSum으로 대체
         JsonNode scoreInfo = panel.at("/scoreInfo");
         if (scoreInfo != null && !scoreInfo.isMissingNode()) {
             Double rating = extractDouble(scoreInfo.get("scoreSum"));
@@ -102,7 +119,7 @@ public class KakaoPlaceDetailParser {
             }
         }
 
-        // Fallback to /basicInfo/feedback/scoreSum
+        // 3. /basicInfo/feedback/scoreSum으로 대체
         JsonNode feedback = panel.at("/basicInfo/feedback");
         if (feedback != null && !feedback.isMissingNode()) {
             Double rating = extractDouble(feedback.get("scoreSum"));
@@ -116,25 +133,31 @@ public class KakaoPlaceDetailParser {
     }
 
     /**
-     * Extract photos from panel3 response (max 15 photos)
-     * Sources:
-     * 1) /menu/menus/photos[*]
-     * 2) /photos/photos[*]
-     * 3) /blog_review/reviews[*].photos[*]
+     * panel3 응답에서 사진 추출 (최대 15장)
+     * 우선순위:
+     * 1) /photos/photos[*] - POI 공식 사진
+     * 2) /menu/yogiyo_menus/items[*] - 요기요 메뉴 사진
+     * 3) /menu/menus/photos[*] - 메뉴 블로그 사진
+     * 4) /blog_review/reviews[*].photos[*] - 블로그 리뷰 사진
      */
     private List<String> extractPhotos(JsonNode panel) {
         List<String> photoUrls = new ArrayList<>();
         Set<String> dedup = new HashSet<>();
 
-        // 1) Menu photos
-        extractMenuPhotos(panel, photoUrls, dedup);
+        // 1) POI 공식 사진 (최우선)
+        extractGlobalPhotos(panel, photoUrls, dedup);
 
-        // 2) Global photos
+        // 2) 요기요 메뉴 사진
         if (photoUrls.size() < MAX_PHOTOS) {
-            extractGlobalPhotos(panel, photoUrls, dedup);
+            extractYogiyoMenuPhotos(panel, photoUrls, dedup);
         }
 
-        // 3) Blog review photos
+        // 3) 메뉴 블로그 사진
+        if (photoUrls.size() < MAX_PHOTOS) {
+            extractMenuPhotos(panel, photoUrls, dedup);
+        }
+
+        // 4) 블로그 리뷰 사진
         if (photoUrls.size() < MAX_PHOTOS) {
             extractBlogReviewPhotos(panel, photoUrls, dedup);
         }
@@ -142,26 +165,34 @@ public class KakaoPlaceDetailParser {
         return photoUrls;
     }
 
-    private void extractMenuPhotos(JsonNode panel, List<String> photoUrls, Set<String> dedup) {
-        JsonNode menus = panel.at("/menu/menus");
-        if (menus != null && menus.isArray()) {
-            for (JsonNode group : menus) {
+    private void extractGlobalPhotos(JsonNode panel, List<String> photoUrls, Set<String> dedup) {
+        JsonNode globalPhotos = panel.at("/photos/photos");
+        if (globalPhotos != null && globalPhotos.isArray()) {
+            for (JsonNode p : globalPhotos) {
                 if (photoUrls.size() >= MAX_PHOTOS) break;
-                JsonNode menuPhotos = group.path("photos");
-                if (menuPhotos != null && menuPhotos.isArray()) {
-                    for (JsonNode p : menuPhotos) {
-                        if (photoUrls.size() >= MAX_PHOTOS) break;
-                        addPhotoUrl(p, photoUrls, dedup);
-                    }
+                addPhotoUrl(p, photoUrls, dedup);
+            }
+        }
+    }
+
+    private void extractYogiyoMenuPhotos(JsonNode panel, List<String> photoUrls, Set<String> dedup) {
+        JsonNode yogiyoItems = panel.at("/menu/yogiyo_menus/items");
+        if (yogiyoItems != null && yogiyoItems.isArray()) {
+            for (JsonNode item : yogiyoItems) {
+                if (photoUrls.size() >= MAX_PHOTOS) break;
+                String photoUrl = extractText(item, "photo_url");
+                if (photoUrl != null && !photoUrl.isBlank() && !dedup.contains(photoUrl)) {
+                    photoUrls.add(photoUrl);
+                    dedup.add(photoUrl);
                 }
             }
         }
     }
 
-    private void extractGlobalPhotos(JsonNode panel, List<String> photoUrls, Set<String> dedup) {
-        JsonNode globalPhotos = panel.at("/photos/photos");
-        if (globalPhotos != null && globalPhotos.isArray()) {
-            for (JsonNode p : globalPhotos) {
+    private void extractMenuPhotos(JsonNode panel, List<String> photoUrls, Set<String> dedup) {
+        JsonNode menuPhotos = panel.at("/menu/menus/photos");
+        if (menuPhotos != null && menuPhotos.isArray()) {
+            for (JsonNode p : menuPhotos) {
                 if (photoUrls.size() >= MAX_PHOTOS) break;
                 addPhotoUrl(p, photoUrls, dedup);
             }
@@ -196,8 +227,7 @@ public class KakaoPlaceDetailParser {
         }
     }
 
-    // Utility methods
-
+    // 유틸리티 메서드
     private String extractText(JsonNode node, String field) {
         if (node == null || node.isMissingNode()) return null;
         JsonNode fieldNode = node.get(field);

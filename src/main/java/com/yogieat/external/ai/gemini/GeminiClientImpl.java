@@ -8,7 +8,6 @@ import com.yogieat.global.error.CustomException;
 import com.yogieat.global.error.ErrorCode;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,19 +26,19 @@ public class GeminiClientImpl implements GeminiClient {
         try {
             log.info("Calling Gemini API for location: {}, category: {}", location, category);
 
-            // Create Gemini client with API key
+            // 1. API 키로 Gemini 클라이언트 생성
             Client client = Client.builder().apiKey(geminiProperties.apiKey()).build();
 
-            // Build prompt using centralized builder
+            // 2. 중앙화된 빌더를 사용하여 프롬프트 생성
             String prompt = promptBuilder.buildRestaurantGenerationPrompt(location, category, count);
 
-            // Call Gemini API
+            // 3. Gemini API 호출
             GenerateContentResponse response = client.models.generateContent(geminiProperties.model(), prompt, null);
 
             String responseText = response.text();
             log.debug("Gemini API response: {}", responseText);
 
-            // Parse response using centralized parser
+            // 4. 중앙화된 파서를 사용하여 응답 파싱
             return responseParser.parseSuggestionRestaurants(responseText);
 
         } catch (CustomException e) {
@@ -57,38 +56,60 @@ public class GeminiClientImpl implements GeminiClient {
         List<String> categories,
         int countPerCombo
     ) {
+        long startTime = System.currentTimeMillis();
         try {
             log.info("Calling Gemini API batch for {} locations × {} categories = {} combinations",
                 locations.size(), categories.size(), locations.size() * categories.size());
 
-            // Create Gemini client with API key
+            // 1. API 키로 Gemini 클라이언트 생성
+            log.debug("Creating Gemini client...");
             Client client = Client.builder().apiKey(geminiProperties.apiKey()).build();
+            log.debug("Gemini client created successfully");
 
-            // Build batch prompt using centralized builder
+            // 2. 중앙화된 빌더를 사용하여 배치 프롬프트 생성
+            log.debug("Building batch prompt...");
             String prompt = promptBuilder.buildBatchRestaurantGenerationPrompt(locations, categories, countPerCombo);
+            log.info("Batch prompt generated: {} characters, {} locations, {} categories",
+                prompt.length(), locations, categories);
 
-            log.debug("Batch prompt: {}", prompt);
+            // 3. Gemini API 호출 (모든 조합을 단일 호출로 처리)
+            log.info("Calling Gemini API with model: {}...", geminiProperties.model());
+            log.warn("This may take a long time for batch requests. Please wait...");
 
-            // Call Gemini API (single call for all combinations)
             GenerateContentResponse response = client.models.generateContent(geminiProperties.model(), prompt, null);
 
-            String responseText = response.text();
-            log.debug("Gemini API batch response length: {} characters", Objects.requireNonNull(responseText).length());
+            long apiCallDuration = System.currentTimeMillis() - startTime;
+            log.info("Gemini API call completed in {} ms ({} seconds)", apiCallDuration, apiCallDuration / 1000);
 
-            // Parse batch response using centralized parser
+            String responseText = response.text();
+            if (responseText == null) {
+                log.error("Gemini API returned null response text");
+                throw new CustomException(ErrorCode.GEMINI_API_ERROR);
+            }
+
+            log.info("Gemini API batch response received: {} characters", responseText.length());
+            log.debug("Response preview (first 500 chars): {}",
+                responseText.length() > 500 ? responseText.substring(0, 500) + "..." : responseText);
+
+            // 4. 중앙화된 파서를 사용하여 응답 파싱
+            log.debug("Parsing batch response...");
             Map<LocationCategoryKey, List<SuggestionRestaurant>> result =
                 responseParser.parseBatchSuggestionRestaurants(responseText);
 
-            log.info("Batch API call succeeded: {} location-category combinations processed",
-                result.size());
+            long totalDuration = System.currentTimeMillis() - startTime;
+            log.info("Batch API call succeeded: {} location-category combinations processed in {} ms ({} seconds)",
+                result.size(), totalDuration, totalDuration / 1000);
 
             return result;
 
         } catch (CustomException e) {
-            log.error("Custom exception during batch Gemini API call", e);
+            long duration = System.currentTimeMillis() - startTime;
+            log.error("Custom exception during batch Gemini API call after {} ms: {}", duration, e.getMessage(), e);
             throw e;
         } catch (Exception e) {
-            log.error("Batch Gemini API call failed", e);
+            long duration = System.currentTimeMillis() - startTime;
+            log.error("Batch Gemini API call failed after {} ms: {} - {}",
+                duration, e.getClass().getSimpleName(), e.getMessage(), e);
             throw new CustomException(ErrorCode.GEMINI_API_ERROR);
         }
     }

@@ -14,6 +14,8 @@ import com.yogieat.external.kakao.map.KakaoPlaceDetailClient;
 import com.yogieat.external.kakao.map.KakaoPlaceDetailData;
 import com.yogieat.external.kakao.map.KakaoPlaceMapper;
 import com.yogieat.external.kakao.map.KakaoRestaurantData;
+import com.yogieat.global.error.CustomException;
+import com.yogieat.global.error.ErrorCode;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -82,15 +84,10 @@ public class RestaurantCollectionService {
      * - 처리 시간 대폭 단축 (rate limit 대기 제거)
      */
     public void collectAllRegions() {
-        log.info("Starting batch restaurant collection for all locations: {}", LOCATIONS);
-
         try {
             // 1. 배치 API 호출: 모든 location × category 조합을 한 번에 요청
             Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
                 geminiClient.generateRestaurantsBatch(LOCATIONS, FOOD_CATEGORIES, RESTAURANTS_PER_REQUEST);
-
-            log.info("Batch API call succeeded. Processing {} location-category combinations",
-                allSuggestions.size());
 
             // 2. 각 location-category 조합별로 데이터 처리
             int totalProcessed = 0;
@@ -102,27 +99,22 @@ public class RestaurantCollectionService {
                 List<SuggestionRestaurant> suggestions = entry.getValue();
 
                 try {
-                    log.info("Processing location: {}, category: {}, suggestions: {}",
-                        key.location(), key.category(), suggestions.size());
-
                     int processed = processRestaurantsForLocation(key.location(), key.category(), suggestions);
                     totalProcessed += processed;
                     totalSuccess++;
 
                 } catch (Exception e) {
-                    log.error("Failed to process restaurants for location: {}, category: {}",
-                        key.location(), key.category(), e);
+                    log.error("Failed: {} - {}", key.location(), key.category(), e);
                     totalFailed++;
-                    // 일부 실패 시에도 다음 조합 계속 처리
                 }
             }
 
-            log.info("Batch collection completed. Total: {}, Success: {}, Failed: {}, Restaurants: {}",
-                allSuggestions.size(), totalSuccess, totalFailed, totalProcessed);
+            log.info("Batch completed: {} saved, {} success, {} failed",
+                totalProcessed, totalSuccess, totalFailed);
 
         } catch (Exception e) {
-            log.error("Batch collection failed completely", e);
-            throw e;
+            log.error("Batch collection failed", e);
+            throw new CustomException(ErrorCode.RESTAURANT_COLLECTION_FAILED);
         }
     }
 
@@ -134,22 +126,13 @@ public class RestaurantCollectionService {
     @Deprecated
     @Transactional
     public int collectRestaurantsForLocation(String location, String category) {
-        log.info("Collecting restaurants for: {} - {}", location, category);
-
-        // Convert location to Place enum for batch validation
         Place place = getPlaceFromLocationName(location);
-
-        // Prepare validator cache: Load existing restaurants for this place (1 DB query instead of N)
         restaurantValidator.prepareForBatchValidation(place);
 
-        // 1. Call Gemini API to generate restaurant suggestions with full data (including category info)
         List<SuggestionRestaurant> suggestions = geminiClient.generateRestaurants(
             location, category, RESTAURANTS_PER_REQUEST
         );
 
-        log.info("Gemini generated {} suggestions for {} - {}", suggestions.size(), location, category);
-
-        // 2. Process each suggestion (category creation + Gemini data + optional Kakao enrichment)
         int savedCount = 0;
         for (SuggestionRestaurant suggestion : suggestions) {
             boolean saved = processRestaurant(suggestion, place, location);
@@ -158,8 +141,7 @@ public class RestaurantCollectionService {
             }
         }
 
-        log.info("Saved {}/{} restaurants for {} - {}",
-            savedCount, suggestions.size(), location, category);
+        log.info("Saved {}/{} for {} - {}", savedCount, suggestions.size(), location, category);
 
         return savedCount;
     }
@@ -184,8 +166,6 @@ public class RestaurantCollectionService {
         String category,
         List<SuggestionRestaurant> suggestions
     ) {
-        log.info("Processing {} suggestions for: {} - {}", suggestions.size(), location, category);
-
         // 1. location을 Place enum으로 변환 (배치 검증용)
         Place place = getPlaceFromLocationName(location);
 
@@ -201,40 +181,37 @@ public class RestaurantCollectionService {
             }
         }
 
-        log.info("Saved {}/{} restaurants for {} - {}",
-            savedCount, suggestions.size(), location, category);
+        log.info("Saved {}/{} for {} - {}", savedCount, suggestions.size(), location, category);
 
         return savedCount;
     }
 
     /**
-     * Convert location name to Place enum using cache (O(1) lookup)
-     * @param locationName Location name from Place enum (e.g., "홍대입구역")
+     * location 이름을 Place enum으로 변환 (캐시 사용, O(1) 조회)
+     * @param locationName Place enum의 location 이름 (예: "홍대입구역")
      * @return Place enum
-     * @throws IllegalArgumentException if location name is not found
+     * @throws CustomException 알 수 없는 location 이름인 경우
      */
     private Place getPlaceFromLocationName(String locationName) {
         Place place = PLACE_CACHE.get(locationName);
         if (place == null) {
-            throw new IllegalArgumentException(
-                "Unknown location name: " + locationName + ". Available locations: " + LOCATIONS
-            );
+            log.error("Unknown location name: {}. Available: {}", locationName, LOCATIONS);
+            throw new CustomException(ErrorCode.INVALID_LOCATION_NAME);
         }
         return place;
     }
 
     /**
-     * Convert largeCategory displayName to LargeCategory enum using cache (O(1) lookup)
-     * @param displayName Display name from LargeCategory enum (e.g., "한식")
+     * largeCategory displayName을 LargeCategory enum으로 변환 (캐시 사용, O(1) 조회)
+     * @param displayName LargeCategory enum의 displayName (예: "한식")
      * @return LargeCategory enum
-     * @throws IllegalArgumentException if displayName is not found
+     * @throws CustomException 알 수 없는 카테고리 이름인 경우
      */
     private LargeCategory getLargeCategoryFromDisplayName(String displayName) {
         LargeCategory category = LARGE_CATEGORY_CACHE.get(displayName);
         if (category == null) {
-            throw new IllegalArgumentException(
-                "Unknown large category: " + displayName + ". Available categories: " + FOOD_CATEGORIES
-            );
+            log.error("Unknown large category: {}. Available: {}", displayName, FOOD_CATEGORIES);
+            throw new CustomException(ErrorCode.INVALID_CATEGORY_NAME);
         }
         return category;
     }
@@ -274,8 +251,6 @@ public class RestaurantCollectionService {
                     List.of(data.location().getX(), data.location().getY())
                 );
 
-                log.debug("Enriched restaurant with Kakao search data: {} ({})", place.placeName(), place.id());
-
                 // 5. Kakao Detail API (panel3)로 평점 및 사진 보강 시도
                 Optional<KakaoPlaceDetailData> detailOpt = kakaoPlaceDetailClient.fetchPlaceDetail(place.id());
                 if (detailOpt.isPresent()) {
@@ -284,38 +259,33 @@ public class RestaurantCollectionService {
                     // 5-1. panel3 평점이 있으면 사용 (Gemini보다 정확)
                     if (detail.rating() != null && detail.rating() > 0) {
                         rating = detail.rating();
-                        log.debug("Updated rating from panel3: {}", rating);
                     }
 
                     // 5-2. 메인 사진 URL이 있으면 사용
                     if (detail.mainPhotoUrl() != null && !detail.mainPhotoUrl().isBlank()) {
                         imageUrl = detail.mainPhotoUrl();
-                        log.debug("Added image URL from panel3: {}", imageUrl);
                     }
-                } else {
-                    log.debug("panel3 data not available for placeId: {}", place.id());
                 }
             } else {
-                log.info("Kakao place not found, saving with Gemini data only: {} in {}",
-                    suggestion.name(), locationName);
+                log.warn("Kakao place not found for: {} in {}", suggestion.name(), locationName);
             }
 
-            // 6. 저장 전 중복 검증 (캐시 사용)
+            // 6. externalId가 null이면 저장하지 않음 (Kakao 데이터 필수)
+            if (externalId == null || externalId.isBlank()) {
+                log.warn("Skipping restaurant due to missing externalId: {} in {}",
+                    suggestion.name(), locationName);
+                return false;
+            }
+
+            // 7. 저장 전 중복 검증 (캐시 사용)
             RestaurantValidator.ValidationResult validationResult =
                 restaurantValidator.duplicateValidateWithCache(suggestion, externalId);
 
             if (!validationResult.isValid()) {
-                if (validationResult.isDuplicate()) {
-                    log.debug("Duplicate restaurant detected: {} - {}",
-                        suggestion.name(), validationResult.reason());
-                } else {
-                    log.warn("Invalid restaurant data: {} - {}",
-                        suggestion.name(), validationResult.reason());
-                }
                 return false;
             }
 
-            // 7. Gemini + Kakao 보강 데이터로 Restaurant 생성
+            // 8. Gemini + Kakao 보강 데이터로 Restaurant 생성
             CreateRestaurant createRestaurant = CreateRestaurant.of(
                 suggestion,
                 categoryId,
@@ -327,15 +297,12 @@ public class RestaurantCollectionService {
                 restaurantPlace
             );
 
-            // 8. 도메인 레포지토리를 통해 저장
+            // 9. 도메인 레포지토리를 통해 저장
             restaurantRepository.save(createRestaurant);
 
-            // 9. 같은 배치 내 중복 방지를 위해 캐시에 추가
+            // 10. 같은 배치 내 중복 방지를 위해 캐시에 추가
             restaurantValidator.addToCache(externalId, suggestion.name(), suggestion.address());
 
-            log.info("Saved new restaurant: {} (Category: {}/{}, Rating: {}, Image: {})",
-                suggestion.name(), suggestion.largeCategory(), suggestion.mediumCategory(),
-                rating, imageUrl != null ? "Yes" : "No");
             return true;
 
         } catch (Exception e) {

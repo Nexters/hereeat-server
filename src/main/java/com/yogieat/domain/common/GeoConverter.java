@@ -13,7 +13,7 @@ public class GeoConverter {
             new GeometryFactory(new PrecisionModel(), 4326);
 
     /**
-     * Convert GeoJson.Point to JTS Point
+     * GeoJson.Point를 JTS Point로 변환
      */
     public Point geoJsonPointToJtsPoint(GeoJson.Point point) {
         List<Double> coords = point.getCoordinates();
@@ -22,12 +22,12 @@ public class GeoConverter {
     }
 
     /**
-     * Create JTS Point from string coordinates (longitude, latitude)
-     * Commonly used for converting external API coordinates (e.g., Kakao Maps)
+     * 문자열 좌표(경도, 위도)로부터 JTS Point 생성
+     * 외부 API 좌표 변환에 주로 사용 (예: 카카오맵)
      *
-     * @param longitude X coordinate (경도)
-     * @param latitude Y coordinate (위도)
-     * @return JTS Point with SRID 4326 (WGS84)
+     * @param longitude X 좌표 (경도)
+     * @param latitude Y 좌표 (위도)
+     * @return SRID 4326 (WGS84)을 사용하는 JTS Point
      */
     public Point createPointFromCoordinates(String longitude, String latitude) {
         double lon = Double.parseDouble(longitude);
@@ -36,11 +36,11 @@ public class GeoConverter {
     }
 
     /**
-     * Create JTS Point from double coordinates (longitude, latitude)
+     * double 좌표(경도, 위도)로부터 JTS Point 생성
      *
-     * @param longitude X coordinate (경도)
-     * @param latitude Y coordinate (위도)
-     * @return JTS Point with SRID 4326 (WGS84)
+     * @param longitude X 좌표 (경도)
+     * @param latitude Y 좌표 (위도)
+     * @return SRID 4326 (WGS84)을 사용하는 JTS Point
      */
     public Point createPointFromCoordinates(double longitude, double latitude) {
         return GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude));

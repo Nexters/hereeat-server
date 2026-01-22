@@ -20,12 +20,12 @@ public class GeminiResponseParser {
     private final ObjectMapper objectMapper;
 
     /**
-     * Parse Gemini response text to list of SuggestionRestaurant
-     * Handles markdown code blocks and malformed JSON
+     * Gemini 응답 텍스트를 SuggestionRestaurant 리스트로 파싱
+     * 마크다운 코드 블록과 잘못된 JSON 처리
      *
-     * @param responseText Raw response from Gemini API
-     * @return List of parsed restaurant suggestions
-     * @throws CustomException if parsing fails
+     * @param responseText Gemini API로부터의 원시 응답
+     * @return 파싱된 맛집 제안 리스트
+     * @throws CustomException 파싱 실패 시
      */
     public List<SuggestionRestaurant> parseSuggestionRestaurants(String responseText) {
         try {
@@ -46,24 +46,24 @@ public class GeminiResponseParser {
     }
 
     /**
-     * Parse batch Gemini response to map of location-category combinations
-     * Handles nested JSON structure: { "location": { "category": [...] } }
+     * 배치 Gemini 응답을 장소-카테고리 조합의 맵으로 파싱
+     * 중첩된 JSON 구조 처리: { "location": { "category": [...] } }
      *
-     * @param responseText Raw response from Gemini API
-     * @return Map of LocationCategoryKey to list of restaurant suggestions
-     * @throws CustomException if parsing fails
+     * @param responseText Gemini API로부터의 원시 응답
+     * @return LocationCategoryKey에 대한 맛집 제안 리스트의 맵
+     * @throws CustomException 파싱 실패 시
      */
     public Map<LocationCategoryKey, List<SuggestionRestaurant>> parseBatchSuggestionRestaurants(String responseText) {
         try {
             String cleanedJson = cleanJsonResponse(responseText);
 
-            // Parse nested structure: Map<Location, Map<Category, List<SuggestionRestaurant>>>
+            // 1. 중첩 구조 파싱: Map<Location, Map<Category, List<SuggestionRestaurant>>>
             Map<String, Map<String, List<SuggestionRestaurant>>> nestedMap = objectMapper.readValue(
                 cleanedJson,
                 new TypeReference<Map<String, Map<String, List<SuggestionRestaurant>>>>() {}
             );
 
-            // Flatten to Map<LocationCategoryKey, List<SuggestionRestaurant>>
+            // 2. Map<LocationCategoryKey, List<SuggestionRestaurant>>로 평탄화
             Map<LocationCategoryKey, List<SuggestionRestaurant>> result = new HashMap<>();
             int totalCount = 0;
 
@@ -92,23 +92,23 @@ public class GeminiResponseParser {
     }
 
     /**
-     * Clean JSON response by removing markdown code blocks
+     * 마크다운 코드 블록을 제거하여 JSON 응답 정리
      *
-     * @param jsonResponse Raw JSON response (may contain ```json or ``` markers)
-     * @return Cleaned JSON string
+     * @param jsonResponse 원시 JSON 응답 (```json 또는 ``` 마커를 포함할 수 있음)
+     * @return 정리된 JSON 문자열
      */
     private String cleanJsonResponse(String jsonResponse) {
         String cleaned = jsonResponse.trim();
 
-        // Remove ```json opening
+        // ```json 시작 부분 제거
         if (cleaned.startsWith("```json")) {
             cleaned = cleaned.substring(7);
         }
-        // Remove ``` opening
+        // ``` 시작 부분 제거
         if (cleaned.startsWith("```")) {
             cleaned = cleaned.substring(3);
         }
-        // Remove ``` closing
+        // ``` 종료 부분 제거
         if (cleaned.endsWith("```")) {
             cleaned = cleaned.substring(0, cleaned.length() - 3);
         }

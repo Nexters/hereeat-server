@@ -14,8 +14,8 @@ public class RestaurantCollectionScheduler {
     private final RestaurantCollectionService collectionService;
 
     /**
-     * Restaurant collection every 10 minutes (0, 10, 20, 30, 40, 50)
-     * Cron: second minute hour day month weekday
+     * 10분마다 맛집 수집 (0, 10, 20, 30, 40, 50분)
+     * Cron: 초 분 시 일 월 요일
      */
     @Scheduled(cron = "0 */10 * * * *", zone = "Asia/Seoul")
     public void collectRestaurants() {
@@ -31,7 +31,7 @@ public class RestaurantCollectionScheduler {
 
         } catch (Exception e) {
             log.error("Restaurant collection failed", e);
-            // Consider adding monitoring/alerting here
+            // 여기에 모니터링/알림 추가 고려
         }
     }
 }

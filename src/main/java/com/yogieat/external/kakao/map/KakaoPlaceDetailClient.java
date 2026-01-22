@@ -10,13 +10,13 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
- * Client for Kakao Place API panel3 endpoint
- * Fetches detailed place information including rating and photos
+ * 카카오 장소 API panel3 엔드포인트 클라이언트
+ * 평점 및 사진을 포함한 상세 장소 정보를 가져옴
  *
- * Responsibilities:
- * - HTTP communication with panel3 API
- * - Error handling and logging
- * - Delegates parsing to KakaoPlaceDetailParser (SRP)
+ * 책임:
+ * - panel3 API와의 HTTP 통신
+ * - 에러 처리 및 로깅
+ * - KakaoPlaceDetailParser로 파싱 위임 (단일 책임 원칙)
  */
 @Component
 @Slf4j
@@ -26,8 +26,8 @@ public class KakaoPlaceDetailClient {
     private final RestClient restClient;
 
     /**
-     * Constructor with dependency injection
-     * @Qualifier is needed to specify which RestClient bean to inject
+     * 의존성 주입을 사용한 생성자
+     * @Qualifier는 주입할 RestClient 빈을 지정하기 위해 필요
      */
     public KakaoPlaceDetailClient(
             KakaoPlaceDetailParser parser,
@@ -37,10 +37,10 @@ public class KakaoPlaceDetailClient {
     }
 
     /**
-     * Fetch detailed place information from panel3 API
+     * panel3 API로부터 상세 장소 정보 조회
      *
-     * @param placeId Kakao place ID
-     * @return Optional containing detail data, empty if API call fails
+     * @param placeId 카카오 장소 ID
+     * @return 상세 데이터를 포함한 Optional, API 호출 실패 시 empty
      */
     public Optional<KakaoPlaceDetailData> fetchPlaceDetail(String placeId) {
         if (placeId == null || placeId.isBlank()) {
@@ -62,7 +62,7 @@ public class KakaoPlaceDetailClient {
                 return Optional.empty();
             }
 
-            KakaoPlaceDetailData detailData = parser.parse(panel, placeId);
+            KakaoPlaceDetailData detailData = parser.parser(panel, placeId);
 
             if (detailData.confirmId() == null) {
                 log.warn("Failed to parse valid detail data for placeId: {}", placeId);
