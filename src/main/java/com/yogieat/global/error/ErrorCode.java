@@ -39,6 +39,9 @@ public enum ErrorCode {
 	// Participant
 	PARTICIPANT_DISLIKES_EXCEEDED(HttpStatus.BAD_REQUEST, "P001", "비선호 음식은 최대 1개까지 입력 가능합니다"),
 	PARTICIPANT_PREFERENCES_EXCEEDED(HttpStatus.BAD_REQUEST, "P002", "선호 음식은 최대 3개까지 입력 가능합니다"),
+
+	// Lock
+	LOCK_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "L001", "락 획득 시간이 초과되었습니다"),
 	;
 
 	private final HttpStatus status;

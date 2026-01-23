@@ -1,27 +1,27 @@
 package com.yogieat.global.util;
 
+import com.yogieat.global.error.CustomException;
+import com.yogieat.global.error.ErrorCode;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
  * 엔티티별 동시성 제어를 위한 범용 Lock Manager
- *
- * <p>ConcurrentHashMap을 사용하여 각 엔티티 ID마다 독립적인 ReentrantLock을 관리합니다.
- *
- * <p>사용 예시:
- *
- * <pre>
+ * ConcurrentHashMap을 사용하여 각 엔티티 ID마다 독립적인 ReentrantLock을 관리합니다.
+ * 사용 예시:
  * lockManager.executeWithLock(entityId, () -> {
  *     // 동시성 제어가 필요한 로직
  *     return result;
  * });
- * </pre>
  */
 @Component
 @Slf4j
 public class LockManager {
+
+    private static final long LOCK_TIMEOUT_SECONDS = 5L;
 
     private final ConcurrentHashMap<Long, ReentrantLock> locks = new ConcurrentHashMap<>();
 
@@ -41,25 +41,38 @@ public class LockManager {
     }
 
     /**
-     * 락을 사용하여 작업 실행 (자동 락 획득/해제)
+     * 락을 사용하여 작업 실행 (자동 락 획득/해제, 타임아웃 적용)
      *
      * @param entityId 엔티티 ID
      * @param task 실행할 작업
      * @param <T> 반환 타입
      * @return 작업 실행 결과
+     * @throws CustomException 락 획득 타임아웃 시
      */
     public <T> T executeWithLock(Long entityId, Task<T> task) {
         ReentrantLock lock = getLock(entityId);
 
-        log.debug("Attempting to acquire lock for entity: {}", entityId);
-        lock.lock(); // 락 획득 (대기)
+        log.debug("Attempting to acquire lock for entity: {} with timeout: {}s", entityId, LOCK_TIMEOUT_SECONDS);
 
+        boolean acquired = false;
         try {
+            acquired = lock.tryLock(LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!acquired) {
+                log.warn("Failed to acquire lock for entity: {} within {}s", entityId, LOCK_TIMEOUT_SECONDS);
+                throw new CustomException(ErrorCode.LOCK_TIMEOUT);
+            }
+
             log.debug("Lock acquired for entity: {}", entityId);
             return task.execute();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Lock acquisition interrupted for entity: {}", entityId);
+            throw new CustomException(ErrorCode.LOCK_TIMEOUT);
         } finally {
-            lock.unlock();
-            log.debug("Lock released for entity: {}", entityId);
+            if (acquired) {
+                lock.unlock();
+                log.debug("Lock released for entity: {}", entityId);
+            }
         }
     }
 
@@ -71,7 +84,6 @@ public class LockManager {
 
     /**
      * 메모리 누수 방지: 삭제된 엔티티의 락 정리 (선택적) 스케줄러로 주기적으로 호출하거나, 엔티티 삭제 시 호출
-     *
      * @param entityId 삭제된 엔티티 ID
      */
     public void removeLock(Long entityId) {
@@ -81,7 +93,6 @@ public class LockManager {
 
     /**
      * 현재 관리 중인 락 개수 (모니터링용)
-     *
      * @return 현재 관리 중인 락의 개수
      */
     public int getLockCount() {
