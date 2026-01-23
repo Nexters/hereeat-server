@@ -64,7 +64,8 @@ public class GatheringEntity extends BaseEntity {
                 entity.getScheduledDate(),
                 entity.getTimeSlot(),
                 entity.getPlace(),
-                entity.getHeadCount()
+                entity.getHeadCount(),
+                entity.getDeletedAt()
         );
     }
 }
