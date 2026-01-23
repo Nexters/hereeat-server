@@ -35,6 +35,10 @@ public enum ErrorCode {
 	GATHERING_NOT_FOUND(HttpStatus.NOT_FOUND, "GA001", "해당 모임을 찾을 수 없습니다"),
 	GATHERING_DELETED(HttpStatus.BAD_REQUEST, "GA002", "이미 삭제된 모임입니다"),
 	GATHERING_FULL(HttpStatus.BAD_REQUEST, "GA003", "모임 인원이 가득 찼습니다"),
+
+	// Participant
+	PARTICIPANT_DISLIKES_EXCEEDED(HttpStatus.BAD_REQUEST, "P001", "비선호 음식은 최대 1개까지 입력 가능합니다"),
+	PARTICIPANT_PREFERENCES_EXCEEDED(HttpStatus.BAD_REQUEST, "P002", "선호 음식은 최대 3개까지 입력 가능합니다"),
 	;
 
 	private final HttpStatus status;
