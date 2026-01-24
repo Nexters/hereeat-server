@@ -30,6 +30,18 @@ public enum ErrorCode {
 	RESTAURANT_COLLECTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "R001", "식당 수집 작업 실패"),
 	INVALID_LOCATION_NAME(HttpStatus.BAD_REQUEST, "R002", "알 수 없는 지역명입니다"),
 	INVALID_CATEGORY_NAME(HttpStatus.BAD_REQUEST, "R003", "알 수 없는 카테고리명입니다"),
+
+	// Gathering
+	GATHERING_NOT_FOUND(HttpStatus.NOT_FOUND, "GA001", "해당 모임을 찾을 수 없습니다"),
+	GATHERING_DELETED(HttpStatus.BAD_REQUEST, "GA002", "이미 삭제된 모임입니다"),
+	GATHERING_FULL(HttpStatus.BAD_REQUEST, "GA003", "모임 인원이 가득 찼습니다"),
+
+	// Participant
+	PARTICIPANT_DISLIKES_EXCEEDED(HttpStatus.BAD_REQUEST, "P001", "비선호 음식은 최대 1개까지 입력 가능합니다"),
+	PARTICIPANT_PREFERENCES_EXCEEDED(HttpStatus.BAD_REQUEST, "P002", "선호 음식은 최대 3개까지 입력 가능합니다"),
+
+	// Lock
+	LOCK_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "L001", "락 획득 시간이 초과되었습니다"),
 	;
 
 	private final HttpStatus status;
