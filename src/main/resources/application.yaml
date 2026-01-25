@@ -11,6 +11,7 @@ spring:
       - monitoring.yaml
       - ai.yaml
       - client.yaml
+      - swagger.yaml
   web.resources.add-mappings: false
 
 server:

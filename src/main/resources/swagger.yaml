@@ -1,0 +1,48 @@
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  default-consumes-media-type: application/json;charset=UTF-8
+  default-produces-media-type: application/json;charset=UTF-8
+  use-fqn: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui
+    disable-swagger-default-url: true
+    display-request-duration: true
+    tags-sorter: alpha
+    operations-sorter: alpha
+    try-it-out-enabled: true
+    doc-expansion: none
+    persist-authorization: true
+    syntax-highlight:
+      theme: agate
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+swagger:
+  domain: http://localhost:8080
+  user: yogieat
+  password: yogieat1234
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+swagger:
+  domain: ${SERVER_DOMAIN}
+  user: yogieat
+  password: yogieat1234
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+swagger:
+  domain: ${SERVER_DOMAIN}
+  user: ${SWAGGER_USER}
+  password: ${SWAGGER_PASSWORD}
+---
