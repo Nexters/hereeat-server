@@ -69,7 +69,7 @@ public class ParticipantFacade {
 
                     log.info("Successfully participated in gathering: {}", gathering.id());
 
-                    return ParticipantResult.Create.of(participant);
+                    return ParticipantResult.Create.of(gathering, participant);
                 });
     }
 }
