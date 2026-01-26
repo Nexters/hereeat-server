@@ -30,7 +30,8 @@ public class GatheringEntity extends BaseEntity {
     @Column(name = "scheduled_date")
     private LocalDate scheduledDate;
 
-    @Column(name = "time_slot")
+    @Column(name = "time_slot", columnDefinition = "VARCHAR(20)")
+    @Enumerated(EnumType.STRING)
     private TimeSlot timeSlot;
 
     @Column(name = "place")

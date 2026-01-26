@@ -137,7 +137,7 @@ public class RecommendationService {
                         scored.agreementRate(),
                         RecommendStatus.COMPLETED,
                         i + 1, // rank: 1, 2, 3,
-                        scored.totalScore()
+                        top3.get(i).totalScore()
                 ));
             }
 
