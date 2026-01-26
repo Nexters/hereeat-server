@@ -2,8 +2,7 @@ package com.yogieat.domain.category.service;
 
 import com.yogieat.domain.category.domain.Category;
 import com.yogieat.domain.category.domain.value.LargeCategory;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -23,8 +22,7 @@ public class CategoryService {
     }
 
     @Cacheable("categories")
-    public Map<Long, Category> findAllAsMap() {
-        return categoryRepository.findAll().stream()
-            .collect(Collectors.toMap(Category::id, category -> category));
+    public List<Category> findAll() {
+        return categoryRepository.findAll();
     }
 }

@@ -3,6 +3,7 @@ package com.yogieat.domain.participant.service;
 import com.yogieat.domain.participant.domain.Participant;
 import com.yogieat.domain.participant.domain.value.DistanceRange;
 import com.yogieat.domain.participant.domain.value.Role;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -39,5 +40,16 @@ public class ParticipantService {
      */
     public long countByGatheringId(Long gatheringId) {
         return participantRepository.countByGatheringId(gatheringId);
+    }
+
+
+    /**
+     * 특정 모임의 참여자 목록 조회
+     *
+     * @param gatheringId 모임 ID
+     * @return 참여자 목록
+     */
+    public List<Participant> findByGatheringId(Long gatheringId) {
+        return participantRepository.findByGatheringId(gatheringId);
     }
 }

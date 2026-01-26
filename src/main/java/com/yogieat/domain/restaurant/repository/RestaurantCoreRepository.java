@@ -7,6 +7,7 @@ import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.domain.restaurant.entity.RestaurantEntity;
 import com.yogieat.domain.restaurant.service.RestaurantRepository;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -42,5 +43,19 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         return restaurantJpaRepository.findByRegion(region).stream()
             .map(RestaurantEntity::toDomain)
             .toList();
+    }
+
+
+    @Override
+    public Optional<Restaurant> findById(Long id) {
+        return restaurantJpaRepository.findById(id)
+                .map(RestaurantEntity::toDomain);
+    }
+
+    @Override
+    public List<Restaurant> findByIds(List<Long> ids) {
+        return restaurantJpaRepository.findByIdIn(ids).stream()
+                .map(RestaurantEntity::toDomain)
+                .toList();
     }
 }

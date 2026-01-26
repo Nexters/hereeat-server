@@ -55,7 +55,8 @@ public class RecommendationService {
             }
 
             // 4. Category 조회 및 캐싱 (Spring Cache 적용)
-            Map<Long, Category> categoryMap = categoryService.findAllAsMap();
+            Map<Long, Category> categoryMap = categoryService.findAll().stream()
+                    .collect(Collectors.toMap(Category::id, category -> category));
 
             // 5. DistanceRange 다수결 결정
             DistanceRange majorityRange = determineMajorityDistanceRange(participants);

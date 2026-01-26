@@ -11,4 +11,5 @@ public interface RestaurantJpaRepository extends JpaRepository<RestaurantEntity,
     boolean existsByNameAndAddress(String name, String address);
     Optional<RestaurantEntity> findByExternalId(String externalId);
     List<RestaurantEntity> findByRegion(Region region);
+    List<RestaurantEntity> findByIdIn(List<Long> ids);
 }
