@@ -34,6 +34,25 @@ public class GatheringValidator {
     }
 
     /**
+     * Gathering 존재 여부 및 삭제 여부 검증 (accessKey 기반)
+     *
+     * @param accessKey 검증할 모임 접근 키
+     * @return 검증된 Gathering 도메인
+     * @throws CustomException GATHERING_NOT_FOUND - 모임이 존재하지 않을 때
+     * @throws CustomException GATHERING_DELETED - 모임이 삭제되었을 때
+     */
+    public Gathering validateGatheringExistsByAccessKey(String accessKey) {
+        Gathering gathering = gatheringRepository.findByAccessKey(accessKey)
+                .orElseThrow(() -> new CustomException(ErrorCode.GATHERING_NOT_FOUND));
+
+        if (gathering.isDeleted()) {
+            throw new CustomException(ErrorCode.GATHERING_DELETED);
+        }
+
+        return gathering;
+    }
+
+    /**
      * Gathering 참여 인원이 가득 찼는지 검증
      *
      * @param gathering 검증할 모임
@@ -41,7 +60,7 @@ public class GatheringValidator {
      * @throws CustomException GATHERING_FULL - 참여 인원이 가득 찼을 때
      */
     public void validateGatheringNotFull(Gathering gathering, long currentParticipantCount) {
-        if (currentParticipantCount >= gathering.headCount()) {
+        if (currentParticipantCount >= gathering.peopleCount()) {
             throw new CustomException(ErrorCode.GATHERING_FULL);
         }
     }

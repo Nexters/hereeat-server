@@ -3,6 +3,7 @@ package com.yogieat.domain.participant.repository;
 import com.yogieat.domain.participant.domain.Participant;
 import com.yogieat.domain.participant.entity.ParticipantEntity;
 import com.yogieat.domain.participant.service.ParticipantRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -21,5 +22,13 @@ public class ParticipantCoreRepository implements ParticipantRepository {
     @Override
     public long countByGatheringId(Long gatheringId) {
         return participantJpaRepository.countByGatheringId(gatheringId);
+    }
+
+    @Override
+    public List<Participant> findByGatheringId(Long gatheringId) {
+        List<ParticipantEntity> entities = participantJpaRepository.findByGatheringId(gatheringId);
+        return entities.stream()
+                .map(ParticipantEntity::toDomain)
+                .toList();
     }
 }

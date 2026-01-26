@@ -3,7 +3,7 @@ package com.yogieat.domain.restaurant.service;
 import com.yogieat.domain.category.domain.value.LargeCategory;
 import com.yogieat.domain.category.service.CategoryService;
 import com.yogieat.domain.common.GeoJson;
-import com.yogieat.domain.common.Place;
+import com.yogieat.domain.common.Region;
 import com.yogieat.domain.restaurant.domain.CreateRestaurant;
 import com.yogieat.domain.restaurant.domain.SuggestionRestaurant;
 import com.yogieat.external.ai.gemini.GeminiClient;
@@ -46,8 +46,8 @@ public class RestaurantCollectionService {
      * Place enum에서 지원하는 지역 목록
      * Place enum을 지역 정보의 단일 진실 공급원(SSOT)으로 사용
      */
-    private static final List<String> LOCATIONS = Arrays.stream(Place.values())
-        .map(Place::getName)
+    private static final List<String> LOCATIONS = Arrays.stream(Region.values())
+        .map(Region::getName)
         .toList();
 
     /**
@@ -63,8 +63,8 @@ public class RestaurantCollectionService {
      * Enum 변환 캐시: Place name → Place enum
      * 매번 stream().filter()를 사용하지 않고 O(1) 조회
      */
-    private static final Map<String, Place> PLACE_CACHE = Arrays.stream(Place.values())
-        .collect(Collectors.toMap(Place::getName, Function.identity()));
+    private static final Map<String, Region> PLACE_CACHE = Arrays.stream(Region.values())
+        .collect(Collectors.toMap(Region::getName, Function.identity()));
 
     /**
      * Enum 변환 캐시: LargeCategory displayName → LargeCategory enum
@@ -155,8 +155,8 @@ public class RestaurantCollectionService {
     @Deprecated
     @Transactional
     public int collectRestaurantsForLocation(String location, String category) {
-        Place place = getPlaceFromLocationName(location);
-        restaurantValidator.prepareForBatchValidation(place);
+        Region region = getRegionFromLocationName(location);
+        restaurantValidator.prepareForBatchValidation(region);
 
         List<SuggestionRestaurant> suggestions = geminiClient.generateRestaurants(
             location, category, RESTAURANTS_PER_REQUEST
@@ -164,7 +164,7 @@ public class RestaurantCollectionService {
 
         int savedCount = 0;
         for (SuggestionRestaurant suggestion : suggestions) {
-            boolean saved = processRestaurant(suggestion, place, location);
+            boolean saved = processRestaurant(suggestion, region, location);
             if (saved) {
                 savedCount++;
             }
@@ -196,15 +196,15 @@ public class RestaurantCollectionService {
         List<SuggestionRestaurant> suggestions
     ) {
         // 1. location을 Place enum으로 변환 (배치 검증용)
-        Place place = getPlaceFromLocationName(location);
+        Region region = getRegionFromLocationName(location);
 
         // 2. Validator 캐시 준비: 해당 Place의 기존 레스토랑 로드 (N번 → 1번 DB 쿼리)
-        restaurantValidator.prepareForBatchValidation(place);
+        restaurantValidator.prepareForBatchValidation(region);
 
         // 3. 각 suggestion 처리 (카테고리 생성 + Gemini 데이터 + Kakao 데이터 보강)
         int savedCount = 0;
         for (SuggestionRestaurant suggestion : suggestions) {
-            boolean saved = processRestaurant(suggestion, place, location);
+            boolean saved = processRestaurant(suggestion, region, location);
             if (saved) {
                 savedCount++;
             }
@@ -229,13 +229,13 @@ public class RestaurantCollectionService {
      * @return Place enum
      * @throws CustomException 알 수 없는 location 이름인 경우
      */
-    private Place getPlaceFromLocationName(String locationName) {
-        Place place = PLACE_CACHE.get(locationName);
-        if (place == null) {
+    private Region getRegionFromLocationName(String locationName) {
+        Region region = PLACE_CACHE.get(locationName);
+        if (region == null) {
             log.error("Unknown location name: {}. Available: {}", locationName, LOCATIONS);
             throw new CustomException(ErrorCode.INVALID_LOCATION_NAME);
         }
-        return place;
+        return region;
     }
 
     /**
@@ -254,7 +254,7 @@ public class RestaurantCollectionService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected boolean processRestaurant(SuggestionRestaurant suggestion, Place restaurantPlace, String locationName) {
+    protected boolean processRestaurant(SuggestionRestaurant suggestion, Region restaurantRegion, String locationName) {
         try {
             // 1. largeCategory displayName을 LargeCategory enum으로 변환
             LargeCategory largeCategory = getLargeCategoryFromDisplayName(suggestion.largeCategory());
@@ -336,7 +336,7 @@ public class RestaurantCollectionService {
                 geoJsonLocation,
                 rating,
                 imageUrl,
-                restaurantPlace
+                    restaurantRegion
             );
 
             // 9. 도메인 레포지토리를 통해 저장

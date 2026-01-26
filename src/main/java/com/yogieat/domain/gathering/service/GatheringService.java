@@ -21,6 +21,17 @@ public class GatheringService {
     }
 
     /**
+     * Gathering 존재 여부 및 삭제 여부 검증 (accessKey 기반)
+     * GatheringValidator에게 위임
+     *
+     * @param accessKey 검증할 모임 접근 키
+     * @return 검증된 Gathering 도메인
+     */
+    public Gathering validateGatheringExistsByAccessKey(String accessKey) {
+        return gatheringValidator.validateGatheringExistsByAccessKey(accessKey);
+    }
+
+    /**
      * Gathering 참여 인원이 가득 찼는지 검증
      * GatheringValidator에게 위임
      *

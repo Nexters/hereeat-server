@@ -1,7 +1,7 @@
 package com.yogieat.domain.restaurant.repository;
 
 import com.yogieat.domain.common.GeoConverter;
-import com.yogieat.domain.common.Place;
+import com.yogieat.domain.common.Region;
 import com.yogieat.domain.restaurant.domain.CreateRestaurant;
 import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.domain.restaurant.entity.RestaurantEntity;
@@ -38,8 +38,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     }
 
     @Override
-    public List<Restaurant> findByPlace(Place place) {
-        return restaurantJpaRepository.findByPlace(place).stream()
+    public List<Restaurant> findByRegion(Region region) {
+        return restaurantJpaRepository.findByRegion(region).stream()
             .map(RestaurantEntity::toDomain)
             .toList();
     }

@@ -4,19 +4,19 @@ import java.util.List;
 
 public record ParticipantCommand() {
     public record Create(
-            Long gatheringId,
+            String accessKey,
             Double distance,
             List<String> dislikes,
             List<String> preferences
     ) {
         public static Create of(
-                Long gatheringId,
+                String accessKey,
                 Double distance,
                 List<String> dislikes,
                 List<String> preferences
         ) {
             return new Create(
-                    gatheringId,
+                    accessKey,
                     distance,
                     dislikes,
                     preferences

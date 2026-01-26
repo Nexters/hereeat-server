@@ -4,6 +4,7 @@ import com.yogieat.domain.category.domain.Category;
 import com.yogieat.domain.category.domain.value.LargeCategory;
 import com.yogieat.domain.category.entity.CategoryEntity;
 import com.yogieat.domain.category.service.CategoryRepository;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -24,5 +25,13 @@ public class CategoryCoreRepository implements CategoryRepository {
         CategoryEntity entity = CategoryEntity.of(category.largeCategory(), category.mediumCategory());
         CategoryEntity savedEntity = categoryJpaRepository.save(entity);
         return CategoryEntity.toDomain(savedEntity);
+    }
+
+    @Override
+    public List<Category> findAll() {
+        List<CategoryEntity> entities = categoryJpaRepository.findAll();
+        return entities.stream()
+                .map(CategoryEntity::toDomain)
+                .toList();
     }
 }

@@ -1,6 +1,6 @@
 package com.yogieat.domain.restaurant.service;
 
-import com.yogieat.domain.common.Place;
+import com.yogieat.domain.common.Region;
 import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.domain.restaurant.domain.SuggestionRestaurant;
 import java.util.HashSet;
@@ -29,12 +29,12 @@ public class RestaurantValidator {
      * 주어진 장소에 대한 기존 맛집 데이터를 로드하여 배치 검증을 준비
      * DB 쿼리 횟수를 장소당 N번에서 1번으로 감소
      *
-     * @param place 맛집 데이터를 로드할 장소
+     * @param region 맛집 데이터를 로드할 장소
      */
-    public void prepareForBatchValidation(Place place) {
-        log.info("Preparing batch validation cache for place: {}", place.getName());
+    public void prepareForBatchValidation(Region region) {
+        log.info("Preparing batch validation cache for place: {}", region.getName());
 
-        List<Restaurant> existingRestaurants = restaurantRepository.findByPlace(place);
+        List<Restaurant> existingRestaurants = restaurantRepository.findByRegion(region);
 
         cachedExternalIds.clear();
         cachedNameAddressPairs.clear();
