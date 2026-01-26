@@ -8,17 +8,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class RecommendationEventListener {
     private final RecommendationService recommendationService;
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleGatheringFullEvent(GatheringFullEvent event) {
-        log.info("Received GatheringFullEvent for gathering: {}", event.getGatheringId());
-
         try {
             recommendationService.processRecommendation(event.getGatheringId(), event.getPlace());
             log.info("Successfully processed recommendation for gathering: {}", event.getGatheringId());
@@ -26,7 +24,6 @@ public class RecommendationEventListener {
         } catch (Exception e) {
             log.error("Failed to process recommendation for gathering: {}",
                       event.getGatheringId(), e);
-            // 예외는 AsyncExceptionHandler에서 처리됨
         }
     }
 }

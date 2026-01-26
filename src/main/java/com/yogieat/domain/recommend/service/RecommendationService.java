@@ -131,8 +131,7 @@ public class RecommendationService {
             List<RecommendResult> results = new ArrayList<>();
             for (int i = 0; i < top3.size(); i++) {
                 ScoredRestaurant scored = top3.get(i);
-                results.add(new RecommendResult(
-                        null,
+                results.add(RecommendResult.Create.of(
                         gatheringId,
                         scored.restaurant().id(),
                         scored.agreementRate(),
@@ -220,8 +219,7 @@ public class RecommendationService {
     }
 
     private void saveFailedResult(Long gatheringId) {
-        RecommendResult failedResult = new RecommendResult(
-                null,
+        RecommendResult failedResult = RecommendResult.Create.of(
                 gatheringId,
                 null,
                 0.0,

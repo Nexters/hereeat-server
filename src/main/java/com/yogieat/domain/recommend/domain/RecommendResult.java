@@ -13,4 +13,23 @@ public record RecommendResult(
         // 추천 점수
         Double score
 ) {
+    // Create
+    public record Create(
+            Long gatheringId,
+            Long restaurantId,
+            Double agreementRate,
+            RecommendStatus status,
+            Integer rank,
+            Double score
+    ) {
+        // static factory method
+        public static RecommendResult of(Long gatheringId,
+                                  Long restaurantId,
+                                  Double agreementRate,
+                                  RecommendStatus status,
+                                  Integer rank,
+                                  Double score) {
+            return new RecommendResult(null, gatheringId, restaurantId, agreementRate, status, rank, score);
+        }
+    }
 }
