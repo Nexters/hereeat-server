@@ -1,6 +1,10 @@
 package com.yogieat.domain.gathering.service;
 
+import com.yogieat.domain.gathering.controller.request.CreateGatheringRequest;
+import com.yogieat.domain.gathering.controller.response.CreateGatheringResponse;
 import com.yogieat.domain.gathering.domain.Gathering;
+import jakarta.transaction.Transactional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -8,6 +12,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class GatheringService {
     private final GatheringValidator gatheringValidator;
+    private final GatheringRepository gatheringRepository;
 
     /**
      * Gathering 존재 여부 및 삭제 여부 검증
@@ -41,4 +46,32 @@ public class GatheringService {
     public void validateGatheringNotFull(Gathering gathering, long currentParticipantCount) {
         gatheringValidator.validateGatheringNotFull(gathering, currentParticipantCount);
     }
+
+    @Transactional
+    public CreateGatheringResponse createGathering(CreateGatheringRequest request) {
+        gatheringValidator.validateCreate(request);
+
+        String accessKey = createAccessKey();
+        Gathering gathering = new Gathering(
+                null,
+                accessKey,
+                null,
+                request.scheduledDate(),
+                request.timeSlot(),
+                request.region(),
+                request.peopleCount(),
+                null
+        );
+
+        gatheringRepository.save(gathering);
+        return new CreateGatheringResponse(accessKey);
+    }
+
+    private String createAccessKey() {
+        return UUID.randomUUID()
+                .toString().
+                replace("-", "")
+                .substring(0, 12);
+    }
+
 }

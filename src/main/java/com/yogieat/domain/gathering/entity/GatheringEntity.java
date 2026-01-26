@@ -57,6 +57,17 @@ public class GatheringEntity extends BaseEntity {
         this.peopleCount = peopleCount;
     }
 
+    public static GatheringEntity from(Gathering gathering) {
+        return GatheringEntity.builder()
+                .accessKey(gathering.accessKey())
+                .title(gathering.title())
+                .scheduledDate(gathering.scheduledDate())
+                .timeSlot(gathering.timeSlot())
+                .region(gathering.region())
+                .peopleCount(gathering.peopleCount())
+                .build();
+    }
+
     public static Gathering toDomain(GatheringEntity entity) {
         return new Gathering(
                 entity.getId(),
