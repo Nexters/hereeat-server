@@ -6,11 +6,13 @@ import com.yogieat.domain.participant.domain.Participant;
 import com.yogieat.domain.participant.domain.command.ParticipantCommand;
 import com.yogieat.domain.participant.domain.result.ParticipantResult;
 import com.yogieat.domain.participant.domain.value.DistanceRange;
+import com.yogieat.domain.recommend.event.GatheringFullEvent;
 import com.yogieat.global.util.LockManager;
 import com.yogieat.global.util.StringUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,6 +22,7 @@ public class ParticipantFacade {
     private final ParticipantService participantService;
     private final GatheringService gatheringService;
     private final LockManager lockManager;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ParticipantResult.Create participate(ParticipantCommand.Create command) {
@@ -51,6 +54,18 @@ public class ParticipantFacade {
                     Participant participant =
                             participantService.create(
                                     command.gatheringId(), distanceRange, preferences, dislikes);
+
+                    // 7. 인원 충족 시 이벤트 발행
+                    if (currentParticipantCount + 1 == gathering.headCount()) {
+                        log.info("Gathering is full. Publishing GatheringFullEvent for gathering: {}",
+                                 command.gatheringId());
+                        eventPublisher.publishEvent(new GatheringFullEvent(
+                                this,
+                                gathering.id(),
+                                gathering.place(),
+                                gathering.headCount()
+                        ));
+                    }
 
                     log.info("Successfully participated in gathering: {}", command.gatheringId());
 
