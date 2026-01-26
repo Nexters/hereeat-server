@@ -28,17 +28,17 @@ public class ParticipantFacade {
     public ParticipantResult.Create participate(ParticipantCommand.Create command) {
         // Gathering별 락을 사용하여 동시성 제어
         return lockManager.executeWithLock(
-                command.gatheringId(),
+                command.accessKey(),
                 () -> {
-                    log.info("Processing participation for gathering: {}", command.gatheringId());
+                    log.info("Processing participation for gathering: {}", command.accessKey());
 
-                    // 1. Gathering 존재 여부 및 삭제 여부 검증
+                    // 1. Gathering 존재 여부 및 삭제 여부 검증 (accessKey 기반)
                     Gathering gathering =
-                            gatheringService.validateGatheringExists(command.gatheringId());
+                            gatheringService.validateGatheringExistsByAccessKey(command.accessKey());
 
                     // 2. 현재 참여자 수 조회 (락으로 보호됨)
                     long currentParticipantCount =
-                            participantService.countByGatheringId(command.gatheringId());
+                            participantService.countByGatheringId(gathering.id());
 
                     // 3. Gathering 참여 인원 초과 검증
                     gatheringService.validateGatheringNotFull(gathering, currentParticipantCount);
@@ -53,12 +53,12 @@ public class ParticipantFacade {
                     // 6. 참여자 생성 및 저장
                     Participant participant =
                             participantService.create(
-                                    command.gatheringId(), distanceRange, preferences, dislikes);
+                                    gathering.id(), distanceRange, preferences, dislikes);
 
                     // 7. 인원 충족 시 이벤트 발행
                     if (currentParticipantCount + 1 == gathering.peopleCount()) {
                         log.info("Gathering is full. Publishing GatheringFullEvent for gathering: {}",
-                                 command.gatheringId());
+                                 gathering.id());
                         eventPublisher.publishEvent(new GatheringFullEvent(
                                 this,
                                 gathering.id(),
@@ -67,7 +67,7 @@ public class ParticipantFacade {
                         ));
                     }
 
-                    log.info("Successfully participated in gathering: {}", command.gatheringId());
+                    log.info("Successfully participated in gathering: {}", gathering.id());
 
                     return ParticipantResult.Create.of(participant);
                 });

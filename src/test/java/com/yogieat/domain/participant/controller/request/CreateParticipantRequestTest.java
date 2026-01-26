@@ -15,18 +15,18 @@ class CreateParticipantRequestTest {
     @DisplayName("정상적인 요청은 생성에 성공한다")
     void validRequest_shouldCreateSuccessfully() {
         // Given
-        Long gatheringId = 1L;
+        String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = List.of("치킨", "피자", "햄버거");
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(gatheringId, distance, dislikes, preferences);
+                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
-        assertThat(request.gatheringId()).isEqualTo(gatheringId);
+        assertThat(request.accessKey()).isEqualTo(accessKey);
         assertThat(request.distance()).isEqualTo(distance);
         assertThat(request.dislikes()).hasSize(1);
         assertThat(request.preferences()).hasSize(3);
@@ -36,14 +36,14 @@ class CreateParticipantRequestTest {
     @DisplayName("dislikes가 null이면 생성에 성공한다")
     void dislikesNull_shouldCreateSuccessfully() {
         // Given
-        Long gatheringId = 1L;
+        String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = null;
         List<String> preferences = List.of("치킨");
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(gatheringId, distance, dislikes, preferences);
+                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -54,14 +54,14 @@ class CreateParticipantRequestTest {
     @DisplayName("preferences가 null이면 생성에 성공한다")
     void preferencesNull_shouldCreateSuccessfully() {
         // Given
-        Long gatheringId = 1L;
+        String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = null;
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(gatheringId, distance, dislikes, preferences);
+                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -72,14 +72,14 @@ class CreateParticipantRequestTest {
     @DisplayName("dislikes가 빈 리스트이면 생성에 성공한다")
     void dislikesEmpty_shouldCreateSuccessfully() {
         // Given
-        Long gatheringId = 1L;
+        String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of();
         List<String> preferences = List.of("치킨");
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(gatheringId, distance, dislikes, preferences);
+                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -90,14 +90,14 @@ class CreateParticipantRequestTest {
     @DisplayName("preferences가 빈 리스트이면 생성에 성공한다")
     void preferencesEmpty_shouldCreateSuccessfully() {
         // Given
-        Long gatheringId = 1L;
+        String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = List.of();
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(gatheringId, distance, dislikes, preferences);
+                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -108,14 +108,14 @@ class CreateParticipantRequestTest {
     @DisplayName("dislikes가 1개이면 생성에 성공한다")
     void dislikesOne_shouldCreateSuccessfully() {
         // Given
-        Long gatheringId = 1L;
+        String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = List.of("치킨");
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(gatheringId, distance, dislikes, preferences);
+                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -126,14 +126,14 @@ class CreateParticipantRequestTest {
     @DisplayName("dislikes가 2개 이상이면 예외가 발생한다")
     void dislikesExceeded_shouldThrowException() {
         // Given
-        Long gatheringId = 1L;
+        String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파", "마늘");
         List<String> preferences = List.of("치킨");
 
         // When & Then
         assertThatThrownBy(
-                        () -> new CreateParticipantRequest(gatheringId, distance, dislikes, preferences))
+                        () -> new CreateParticipantRequest(accessKey, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }
@@ -142,14 +142,14 @@ class CreateParticipantRequestTest {
     @DisplayName("preferences가 3개이면 생성에 성공한다")
     void preferencesThree_shouldCreateSuccessfully() {
         // Given
-        Long gatheringId = 1L;
+        String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = List.of("치킨", "피자", "햄버거");
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(gatheringId, distance, dislikes, preferences);
+                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -160,14 +160,14 @@ class CreateParticipantRequestTest {
     @DisplayName("preferences가 4개 이상이면 예외가 발생한다")
     void preferencesExceeded_shouldThrowException() {
         // Given
-        Long gatheringId = 1L;
+        String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = List.of("치킨", "피자", "햄버거", "파스타");
 
         // When & Then
         assertThatThrownBy(
-                        () -> new CreateParticipantRequest(gatheringId, distance, dislikes, preferences))
+                        () -> new CreateParticipantRequest(accessKey, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_PREFERENCES_EXCEEDED);
     }
@@ -176,14 +176,14 @@ class CreateParticipantRequestTest {
     @DisplayName("dislikes 2개, preferences 4개 모두 초과하면 dislikes 예외가 먼저 발생한다")
     void bothExceeded_shouldThrowDislikesExceptionFirst() {
         // Given
-        Long gatheringId = 1L;
+        String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파", "마늘");
         List<String> preferences = List.of("치킨", "피자", "햄버거", "파스타");
 
         // When & Then
         assertThatThrownBy(
-                        () -> new CreateParticipantRequest(gatheringId, distance, dislikes, preferences))
+                        () -> new CreateParticipantRequest(accessKey, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }

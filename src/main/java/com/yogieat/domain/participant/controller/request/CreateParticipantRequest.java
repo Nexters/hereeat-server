@@ -8,8 +8,8 @@ import java.util.List;
 
 @Schema(description = "모임 참여 요청 정보")
 public record CreateParticipantRequest(
-        @Schema(description = "모임 ID", example = "1")
-        Long gatheringId,
+        @Schema(description = "모임 accessKey", example = "access-key")
+        String accessKey,
         @Schema(description = "허용 거리 (km)", example = "0.5")
         Double distance,
         @Schema(description = "참여자 불호 음식 목록", example = "[\"중식\"]")
@@ -35,13 +35,13 @@ public record CreateParticipantRequest(
     }
 
     public static CreateParticipantRequest of(
-            Long gatheringId,
+            String accessKey,
             Double distance,
             List<String> dislikes,
             List<String> preferences
     ) {
         return new CreateParticipantRequest(
-                gatheringId,
+                accessKey,
                 distance,
                 dislikes,
                 preferences
@@ -50,7 +50,7 @@ public record CreateParticipantRequest(
 
     public ParticipantCommand.Create toCommand() {
         return ParticipantCommand.Create.of(
-                gatheringId,
+                accessKey,
                 distance,
                 dislikes,
                 preferences
