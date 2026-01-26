@@ -3,12 +3,18 @@ package com.yogieat.domain.participant.controller.request;
 import com.yogieat.domain.participant.domain.command.ParticipantCommand;
 import com.yogieat.global.error.CustomException;
 import com.yogieat.global.error.ErrorCode;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
+@Schema(description = "모임 참여 요청 정보")
 public record CreateParticipantRequest(
+        @Schema(description = "모임 ID", example = "1")
         Long gatheringId,
+        @Schema(description = "허용 거리 (km)", example = "0.5")
         Double distance,
+        @Schema(description = "참여자 불호 음식 목록", example = "[\"중식\"]")
         List<String> dislikes,
+        @Schema(description = "참여자 선호 음식 목록", example = "[\"한식\", \"일식\"]")
         List<String> preferences
 ) {
     private static final int MAX_DISLIKES_SIZE = 1;
