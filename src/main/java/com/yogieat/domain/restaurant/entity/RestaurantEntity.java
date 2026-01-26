@@ -2,7 +2,7 @@ package com.yogieat.domain.restaurant.entity;
 
 import com.yogieat.domain.common.GeoConverter;
 import com.yogieat.domain.common.GeoJson;
-import com.yogieat.domain.common.Place;
+import com.yogieat.domain.common.Region;
 import com.yogieat.domain.restaurant.domain.CreateRestaurant;
 import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.global.common.entity.BaseEntity;
@@ -25,8 +25,8 @@ import org.locationtech.jts.geom.Point;
     name = "t_restaurant",
     indexes = {
         @Index(
-            name = "idx_restaurant_place",
-            columnList = "place",
+            name = "idx_restaurant_region",
+            columnList = "region",
             unique = false
         ),
         @Index(
@@ -54,7 +54,7 @@ public class RestaurantEntity extends BaseEntity {
     private String description;
     @Column(columnDefinition = "VARCHAR(30)")
     @Enumerated(EnumType.STRING)
-    private Place place;
+    private Region region;
     private Point location; // 위도, 경도
 
     @Column(unique = true, nullable = false)
@@ -74,7 +74,7 @@ public class RestaurantEntity extends BaseEntity {
             String mapUrl,
             String representativeReview,
             String description,
-            Place place,
+            Region region,
             Point location) {
         this.externalId = externalId;
         this.name = name;
@@ -85,7 +85,7 @@ public class RestaurantEntity extends BaseEntity {
         this.categoryId = categoryId;
         this.representativeReview = representativeReview;
         this.description = description;
-        this.place = place;
+        this.region = region;
         this.location = location;
     }
 
@@ -108,7 +108,7 @@ public class RestaurantEntity extends BaseEntity {
                 .mapUrl(createRestaurant.mapUrl())
                 .representativeReview(createRestaurant.representativeReview())
                 .description(createRestaurant.description())
-                .place(createRestaurant.place())
+                .region(createRestaurant.region())
                 .location(
                         createRestaurant.location() != null
                                 ? geoConverter.geoJsonPointToJtsPoint(createRestaurant.location())
@@ -128,7 +128,7 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getMapUrl(),
                 entity.getRepresentativeReview(),
                 entity.getDescription(),
-                entity.getPlace(),
+                entity.getRegion(),
                 entity.location != null
                     ? new GeoJson.Point(List.of(entity.location.getX(), entity.location.getY()))
                     : null

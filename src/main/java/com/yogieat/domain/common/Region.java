@@ -4,14 +4,14 @@ import java.util.List;
 import lombok.Getter;
 
 @Getter
-public enum Place {
+public enum Region {
     HONGIK_UNIV("홍대입구역", new GeoJson.Point(List.of(126.92378, 37.55684))),
     GANGNAM("강남역", new GeoJson.Point(List.of(127.0276, 37.4979))),;
 
     private final String name;
     private final GeoJson.Point coordinatesStandard;
 
-    Place(String name, GeoJson.Point coordinatesStandard) {
+    Region(String name, GeoJson.Point coordinatesStandard) {
         this.name = name;
         this.coordinatesStandard = coordinatesStandard;
     }

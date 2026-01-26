@@ -1,19 +1,19 @@
 package com.yogieat.domain.recommend.event;
 
-import com.yogieat.domain.common.Place;
+import com.yogieat.domain.common.Region;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
 @Getter
 public class GatheringFullEvent extends ApplicationEvent {
     private final Long gatheringId;
-    private final Place place;
-    private final Integer headCount;
+    private final Region region;
+    private final Integer peopleCount;
 
-    public GatheringFullEvent(Object source, Long gatheringId, Place place, Integer headCount) {
+    public GatheringFullEvent(Object source, Long gatheringId, Region region, Integer peopleCount) {
         super(source);
         this.gatheringId = gatheringId;
-        this.place = place;
-        this.headCount = headCount;
+        this.region = region;
+        this.peopleCount = peopleCount;
     }
 }

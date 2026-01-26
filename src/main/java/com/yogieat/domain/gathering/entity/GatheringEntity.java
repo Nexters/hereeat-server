@@ -1,6 +1,6 @@
 package com.yogieat.domain.gathering.entity;
 
-import com.yogieat.domain.common.Place;
+import com.yogieat.domain.common.Region;
 import com.yogieat.domain.gathering.domain.Gathering;
 import com.yogieat.domain.gathering.domain.value.TimeSlot;
 import com.yogieat.global.common.entity.BaseEntity;
@@ -34,12 +34,12 @@ public class GatheringEntity extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private TimeSlot timeSlot;
 
-    @Column(name = "place")
+    @Column(name = "region")
     @Enumerated(EnumType.STRING)
-    private Place place;
+    private Region region;
 
-    @Column(name = "head_count")
-    private Integer headCount;
+    @Column(name = "people_count")
+    private Integer peopleCount;
 
     @Builder(access = AccessLevel.PRIVATE)
     public GatheringEntity(
@@ -47,14 +47,14 @@ public class GatheringEntity extends BaseEntity {
             String title,
             LocalDate scheduledDate,
             TimeSlot timeSlot,
-            Place place,
-            int headCount) {
+            Region region,
+            int peopleCount) {
         this.accessKey = accessKey;
         this.title = title;
         this.scheduledDate = scheduledDate;
         this.timeSlot = timeSlot;
-        this.place = place;
-        this.headCount = headCount;
+        this.region = region;
+        this.peopleCount = peopleCount;
     }
 
     public static Gathering toDomain(GatheringEntity entity) {
@@ -64,8 +64,8 @@ public class GatheringEntity extends BaseEntity {
                 entity.getTitle(),
                 entity.getScheduledDate(),
                 entity.getTimeSlot(),
-                entity.getPlace(),
-                entity.getHeadCount(),
+                entity.getRegion(),
+                entity.getPeopleCount(),
                 entity.getDeletedAt()
         );
     }

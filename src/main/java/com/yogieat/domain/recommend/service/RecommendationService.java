@@ -3,7 +3,7 @@ package com.yogieat.domain.recommend.service;
 import com.yogieat.domain.category.domain.Category;
 import com.yogieat.domain.category.service.CategoryService;
 import com.yogieat.domain.common.GeoJson;
-import com.yogieat.domain.common.Place;
+import com.yogieat.domain.common.Region;
 import com.yogieat.domain.participant.domain.Participant;
 import com.yogieat.domain.participant.domain.value.DistanceRange;
 import com.yogieat.domain.participant.service.ParticipantRepository;
@@ -31,7 +31,7 @@ public class RecommendationService {
     private final RecommendResultRepository recommendResultRepository;
 
     @Transactional
-    public void processRecommendation(Long gatheringId, Place place) {
+    public void processRecommendation(Long gatheringId, Region region) {
         try {
             log.info("Processing recommendation for gathering: {}", gatheringId);
 
@@ -48,7 +48,7 @@ public class RecommendationService {
             }
 
             // 3. Restaurant 조회
-            List<Restaurant> restaurants = restaurantRepository.findByPlace(place);
+            List<Restaurant> restaurants = restaurantRepository.findByRegion(region);
             if (restaurants.isEmpty()) {
                 saveFailedResult(gatheringId);
                 return;
@@ -63,8 +63,8 @@ public class RecommendationService {
             // 6. 선호도/불호 사전 집계 (성능 최적화: O(P×3) 한 번으로 O(R×P×3) 제거)
             Map<String, PreferenceScore> preferenceScoreMap = aggregatePreferenceScores(participants);
 
-            // 7. Place별 중심 좌표
-            GeoJson.Point centerPoint = place.getCoordinatesStandard();
+            // 7. Region별 중심 좌표
+            GeoJson.Point centerPoint = region.getCoordinatesStandard();
 
             // 8. 각 Restaurant 점수 계산 (Top-K 최적화: PriorityQueue 사용)
             // Min-heap으로 상위 3개만 유지 (O(R log 3) = O(R))

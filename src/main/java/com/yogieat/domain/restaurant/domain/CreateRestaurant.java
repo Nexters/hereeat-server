@@ -1,7 +1,7 @@
 package com.yogieat.domain.restaurant.domain;
 
 import com.yogieat.domain.common.GeoJson;
-import com.yogieat.domain.common.Place;
+import com.yogieat.domain.common.Region;
 
 /**
  * DTO for creating a new Restaurant
@@ -17,7 +17,7 @@ public record CreateRestaurant(
         String mapUrl,
         String representativeReview,
         String description,
-        Place place,
+        Region region,
         GeoJson.Point location
 ) {
     /**
@@ -40,7 +40,7 @@ public record CreateRestaurant(
             GeoJson.Point location,
             Double rating,
             String imageUrl,
-            Place place
+            Region region
     ) {
         return new CreateRestaurant(
                 externalId,
@@ -52,7 +52,7 @@ public record CreateRestaurant(
                 mapUrl,
                 suggestion.representativeReview(),
                 suggestion.description(),
-                place,
+			region,
                 location
         );
     }

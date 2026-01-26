@@ -18,7 +18,7 @@ public class RecommendationEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleGatheringFullEvent(GatheringFullEvent event) {
         try {
-            recommendationService.processRecommendation(event.getGatheringId(), event.getPlace());
+            recommendationService.processRecommendation(event.getGatheringId(), event.getRegion());
             log.info("Successfully processed recommendation for gathering: {}", event.getGatheringId());
 
         } catch (Exception e) {

@@ -41,7 +41,7 @@ public class GatheringValidator {
      * @throws CustomException GATHERING_FULL - 참여 인원이 가득 찼을 때
      */
     public void validateGatheringNotFull(Gathering gathering, long currentParticipantCount) {
-        if (currentParticipantCount >= gathering.headCount()) {
+        if (currentParticipantCount >= gathering.peopleCount()) {
             throw new CustomException(ErrorCode.GATHERING_FULL);
         }
     }

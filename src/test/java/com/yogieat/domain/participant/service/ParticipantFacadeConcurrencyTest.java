@@ -40,9 +40,9 @@ class ParticipantFacadeConcurrencyTest {
     }
 
     @Test
-    @DisplayName("동시에 10명이 참여 시도 시 headCount(4)를 초과하지 않는다")
-    void concurrentParticipation_shouldNotExceedHeadCount() throws InterruptedException {
-        // Given: headCount=4인 모임 생성
+    @DisplayName("동시에 10명이 참여 시도 시 peopleCount(4)를 초과하지 않는다")
+    void concurrentParticipation_shouldNotExceedpeopleCount() throws InterruptedException {
+        // Given: peopleCount=4인 모임 생성
         GatheringEntity gathering = GatheringFixture.create("Test Gathering", 4);
         gatheringRepository.save(gathering);
 
@@ -136,8 +136,8 @@ class ParticipantFacadeConcurrencyTest {
         assertThat(participantRepository.countByGatheringId(gathering2.getId())).isEqualTo(1);
     }
 
-    private GatheringEntity createGathering(String title, int headCount) {
-        GatheringEntity gathering = GatheringFixture.create(title, headCount);
+    private GatheringEntity createGathering(String title, int peopleCount) {
+        GatheringEntity gathering = GatheringFixture.create(title, peopleCount);
         return gatheringRepository.save(gathering);
     }
 

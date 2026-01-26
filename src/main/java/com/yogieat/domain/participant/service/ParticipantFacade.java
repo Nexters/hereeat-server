@@ -56,14 +56,14 @@ public class ParticipantFacade {
                                     command.gatheringId(), distanceRange, preferences, dislikes);
 
                     // 7. 인원 충족 시 이벤트 발행
-                    if (currentParticipantCount + 1 == gathering.headCount()) {
+                    if (currentParticipantCount + 1 == gathering.peopleCount()) {
                         log.info("Gathering is full. Publishing GatheringFullEvent for gathering: {}",
                                  command.gatheringId());
                         eventPublisher.publishEvent(new GatheringFullEvent(
                                 this,
                                 gathering.id(),
-                                gathering.place(),
-                                gathering.headCount()
+                                gathering.region(),
+                                gathering.peopleCount()
                         ));
                     }
 
