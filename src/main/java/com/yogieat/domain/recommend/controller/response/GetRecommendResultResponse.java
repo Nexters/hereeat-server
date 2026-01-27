@@ -1,5 +1,6 @@
 package com.yogieat.domain.recommend.controller.response;
 
+import com.yogieat.domain.recommend.domain.result.RecommendResultResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +18,7 @@ public record GetRecommendResultResponse(
         @Schema(description = "의견 일치율 (%)", example = "85.5")
         Double agreementRate
 ) {
-    public static GetRecommendResultResponse from(com.yogieat.domain.recommend.domain.result.RecommendResultResult.Get result) {
+    public static GetRecommendResultResponse from(RecommendResultResult.Get result) {
         List<RankingRecommendResultResponse> rankings = result.rankings().stream()
                 .map(RankingRecommendResultResponse::from)
                 .toList();
