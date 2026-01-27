@@ -20,3 +20,8 @@ server:
     threads:
       max: 600
       min-spare: 100
+
+cors:
+  allowed-origins:
+    - http://localhost:5173
+    - https://dev.yogieat.com
