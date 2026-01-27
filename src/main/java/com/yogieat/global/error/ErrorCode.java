@@ -30,6 +30,8 @@ public enum ErrorCode {
 	RESTAURANT_COLLECTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "R001", "식당 수집 작업 실패"),
 	INVALID_LOCATION_NAME(HttpStatus.BAD_REQUEST, "R002", "알 수 없는 지역명입니다"),
 	INVALID_CATEGORY_NAME(HttpStatus.BAD_REQUEST, "R003", "알 수 없는 카테고리명입니다"),
+	CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "R005", "해당 카테고리를 찾을 수 없습니다"),
+	RESTAURANT_NOT_FOUND(HttpStatus.NOT_FOUND, "R004", "해당 맛집을 찾을 수 없습니다"),
 
 	// Gathering
 	GATHERING_NOT_FOUND(HttpStatus.NOT_FOUND, "GA001", "해당 모임을 찾을 수 없습니다"),
@@ -46,6 +48,10 @@ public enum ErrorCode {
 
 	// Lock
 	LOCK_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "L001", "락 획득 시간이 초과되었습니다"),
+
+	// Recommend
+	INVALID_CATEGORY_AGGREGATION(HttpStatus.BAD_REQUEST, "REC001", "카테고리 집계 데이터가 올바르지 않습니다"),
+	INVALID_PREFERENCE_SCORE(HttpStatus.BAD_REQUEST, "REC002", "선호도 점수 상태가 올바르지 않습니다"),
 	;
 
 	private final HttpStatus status;

@@ -2,17 +2,18 @@ package com.yogieat.domain.category.service;
 
 import com.yogieat.domain.category.domain.Category;
 import com.yogieat.domain.category.domain.value.LargeCategory;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class CategoryService {
     private final CategoryRepository categoryRepository;
 
+    @Transactional
     public Long findOrCreateCategory(LargeCategory largeCategory, String mediumCategory) {
         return categoryRepository.findByLargeCategoryAndMediumCategory(largeCategory, mediumCategory)
             .map(Category::id)
@@ -22,9 +23,9 @@ public class CategoryService {
             });
     }
 
+    @Transactional(readOnly = true)
     @Cacheable("categories")
-    public Map<Long, Category> findAllAsMap() {
-        return categoryRepository.findAll().stream()
-            .collect(Collectors.toMap(Category::id, category -> category));
+    public List<Category> findAll() {
+        return categoryRepository.findAll();
     }
 }

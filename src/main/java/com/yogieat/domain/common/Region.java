@@ -5,7 +5,7 @@ import lombok.Getter;
 
 @Getter
 public enum Region {
-    HONGIK_UNIV("홍대입구역", new GeoJson.Point(List.of(126.92378, 37.55684))),
+    HONGDAE("홍대입구역", new GeoJson.Point(List.of(126.92378, 37.55684))),
     GANGNAM("강남역", new GeoJson.Point(List.of(127.0276, 37.4979))),;
 
     private final String name;
