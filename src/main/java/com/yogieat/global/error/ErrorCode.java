@@ -35,6 +35,10 @@ public enum ErrorCode {
 	GATHERING_NOT_FOUND(HttpStatus.NOT_FOUND, "GA001", "해당 모임을 찾을 수 없습니다"),
 	GATHERING_DELETED(HttpStatus.BAD_REQUEST, "GA002", "이미 삭제된 모임입니다"),
 	GATHERING_FULL(HttpStatus.BAD_REQUEST, "GA003", "모임 인원이 가득 찼습니다"),
+    GATHERING_PEOPLE_COUNT_REQUIRED(HttpStatus.BAD_REQUEST, "GA004", "모임 인원 수는 필수입니다"),
+    GATHERING_PEOPLE_COUNT_OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "GA005", "모임 인원 수는 1 이상 10 이하여야 합니다"),
+    GATHERING_SCHEDULED_DATE_REQUIRED(HttpStatus.BAD_REQUEST, "GA006", "모임 날짜는 필수입니다"),
+    GATHERING_SCHEDULED_DATE_PAST(HttpStatus.BAD_REQUEST, "GA007", "과거 날짜로는 모임을 생성할 수 없습니다"),
 
 	// Participant
 	PARTICIPANT_DISLIKES_EXCEEDED(HttpStatus.BAD_REQUEST, "P001", "비선호 음식은 최대 1개까지 입력 가능합니다"),

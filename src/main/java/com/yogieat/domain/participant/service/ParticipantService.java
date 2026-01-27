@@ -29,8 +29,6 @@ public class ParticipantService {
         return participantRepository.save(participant);
     }
 
-
-
     /**
      * 특정 모임의 현재 참여자 수 조회
      *
