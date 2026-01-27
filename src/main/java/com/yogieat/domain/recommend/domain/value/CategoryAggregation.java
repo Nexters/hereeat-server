@@ -1,5 +1,7 @@
 package com.yogieat.domain.recommend.domain.value;
 
+import com.yogieat.global.error.CustomException;
+import com.yogieat.global.error.ErrorCode;
 import java.util.Map;
 
 /**
@@ -10,11 +12,8 @@ public record CategoryAggregation(
         Map<String, Integer> dislikes
 ) {
     public CategoryAggregation {
-        if (preferences == null) {
-            throw new IllegalArgumentException("Preferences cannot be null");
-        }
-        if (dislikes == null) {
-            throw new IllegalArgumentException("Dislikes cannot be null");
+        if (preferences == null || dislikes == null) {
+            throw new CustomException(ErrorCode.INVALID_CATEGORY_AGGREGATION);
         }
     }
 

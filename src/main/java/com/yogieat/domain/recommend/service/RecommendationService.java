@@ -6,6 +6,7 @@ import com.yogieat.domain.common.GeoJson;
 import com.yogieat.domain.common.Region;
 import com.yogieat.domain.participant.domain.Participant;
 import com.yogieat.domain.participant.domain.value.DistanceRange;
+import com.yogieat.domain.participant.service.ParticipantAnalyzer;
 import com.yogieat.domain.participant.service.ParticipantRepository;
 import com.yogieat.domain.recommend.domain.RecommendResult;
 import com.yogieat.domain.recommend.domain.RecommendStatus;
@@ -29,6 +30,7 @@ public class RecommendationService {
     private final RestaurantRepository restaurantRepository;
     private final CategoryService categoryService;
     private final RecommendResultRepository recommendResultRepository;
+    private final ParticipantAnalyzer participantAnalyzer;
 
     @Transactional
     public void processRecommendation(Long gatheringId, Region region) {
@@ -59,7 +61,7 @@ public class RecommendationService {
                     .collect(Collectors.toMap(Category::id, category -> category));
 
             // 5. DistanceRange 다수결 결정
-            DistanceRange majorityRange = determineMajorityDistanceRange(participants);
+            DistanceRange majorityRange = participantAnalyzer.determineMajorityDistanceRange(participants);
 
             // 6. 선호도/불호 사전 집계 (성능 최적화: O(P×3) 한 번으로 O(R×P×3) 제거)
             Map<String, PreferenceScore> preferenceScoreMap = aggregatePreferenceScores(participants);
@@ -147,16 +149,6 @@ public class RecommendationService {
             log.error("Failed to process recommendation for gathering: {}", gatheringId, e);
             saveFailedResult(gatheringId);
         }
-    }
-
-    private DistanceRange determineMajorityDistanceRange(List<Participant> participants) {
-        Map<DistanceRange, Long> rangeCount = participants.stream()
-                .collect(Collectors.groupingBy(Participant::distanceRange, Collectors.counting()));
-
-        return rangeCount.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(DistanceRange.ANY);
     }
 
     /**

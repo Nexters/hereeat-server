@@ -6,12 +6,14 @@ import com.yogieat.domain.participant.domain.value.Role;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class ParticipantService {
     private final ParticipantRepository participantRepository;
 
+    @Transactional
     public Participant create(
             Long gatheringId,
             DistanceRange distanceRange,
@@ -38,6 +40,7 @@ public class ParticipantService {
      * @param gatheringId 모임 ID
      * @return 참여자 수
      */
+    @Transactional(readOnly = true)
     public long countByGatheringId(Long gatheringId) {
         return participantRepository.countByGatheringId(gatheringId);
     }
@@ -49,6 +52,7 @@ public class ParticipantService {
      * @param gatheringId 모임 ID
      * @return 참여자 목록
      */
+    @Transactional(readOnly = true)
     public List<Participant> findByGatheringId(Long gatheringId) {
         return participantRepository.findByGatheringId(gatheringId);
     }

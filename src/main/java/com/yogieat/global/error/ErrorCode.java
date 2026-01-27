@@ -44,6 +44,10 @@ public enum ErrorCode {
 
 	// Lock
 	LOCK_TIMEOUT(HttpStatus.REQUEST_TIMEOUT, "L001", "락 획득 시간이 초과되었습니다"),
+
+	// Recommend
+	INVALID_CATEGORY_AGGREGATION(HttpStatus.BAD_REQUEST, "REC001", "카테고리 집계 데이터가 올바르지 않습니다"),
+	INVALID_PREFERENCE_SCORE(HttpStatus.BAD_REQUEST, "REC002", "선호도 점수 상태가 올바르지 않습니다"),
 	;
 
 	private final HttpStatus status;

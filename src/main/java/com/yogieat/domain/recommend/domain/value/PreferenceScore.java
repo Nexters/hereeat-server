@@ -1,5 +1,8 @@
 package com.yogieat.domain.recommend.domain.value;
 
+import com.yogieat.global.error.CustomException;
+import com.yogieat.global.error.ErrorCode;
+
 /**
  * 카테고리별 선호도 점수를 미리 집계한 값 객체
  * 참여자들의 선호도를 한 번에 집계하여 Restaurant 점수 계산 시 재사용
@@ -10,7 +13,7 @@ public record PreferenceScore(
 ) {
     public PreferenceScore {
         if (totalPreferenceScore < 0 && dislikeCount == 0) {
-            throw new IllegalArgumentException("Invalid preference score state");
+            throw new CustomException(ErrorCode.INVALID_PREFERENCE_SCORE);
         }
     }
 

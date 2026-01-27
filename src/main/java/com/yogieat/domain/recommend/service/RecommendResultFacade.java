@@ -6,6 +6,7 @@ import com.yogieat.domain.gathering.domain.Gathering;
 import com.yogieat.domain.gathering.service.GatheringService;
 import com.yogieat.domain.participant.domain.Participant;
 import com.yogieat.domain.participant.domain.value.DistanceRange;
+import com.yogieat.domain.participant.service.ParticipantAnalyzer;
 import com.yogieat.domain.participant.service.ParticipantService;
 import com.yogieat.domain.recommend.domain.RecommendResult;
 import com.yogieat.domain.recommend.domain.result.RecommendResultResult;
@@ -14,8 +15,9 @@ import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.domain.restaurant.service.RestaurantService;
 import com.yogieat.global.error.CustomException;
 import com.yogieat.global.error.ErrorCode;
-import com.yogieat.global.util.StringUtils;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -32,11 +34,10 @@ public class RecommendResultFacade {
     private final RestaurantService restaurantService;
     private final CategoryService categoryService;
     private final ParticipantService participantService;
+    private final ParticipantAnalyzer participantAnalyzer;
 
     @Transactional(readOnly = true)
     public RecommendResultResult.Get getRecommendResults(String accessKey) {
-        log.info("Fetching recommend results for accessKey: {}", accessKey);
-
         // 1. accessKey로 Gathering 조회
         Gathering gathering = gatheringService.validateGatheringExistsByAccessKey(accessKey);
 
@@ -57,25 +58,26 @@ public class RecommendResultFacade {
         List<Participant> participants = participantService.findByGatheringId(gathering.id());
 
         // 4. 다수결 DistanceRange 결정
-        DistanceRange majorityDistanceRange = determineMajorityDistanceRange(participants);
+        DistanceRange majorityDistanceRange = participantAnalyzer.determineMajorityDistanceRange(participants);
 
         // 5. 카테고리별 선호도/불호 집계
-        CategoryAggregation aggregation = aggregateCategoryPreferences(participants);
+        CategoryAggregation aggregation = participantAnalyzer.aggregateCategoryPreferences(participants);
 
-        // 6. Restaurant 정보와 Category 정보를 조합하여 Result 생성
+        // 6. Restaurant 정보와 Category 정보 조회 및 캐싱
         List<Long> restaurantIds = recommendResults.stream()
                 .map(RecommendResult::restaurantId)
                 .toList();
         Map<Long, Restaurant> restaurantMap = restaurantService.findByIds(restaurantIds).stream()
                 .collect(Collectors.toMap(Restaurant::id, Function.identity()));
         Map<Long, Category> categoryMap = categoryService.findAll().stream()
-                .collect(Collectors.toMap(Category::id, category -> category));
+                .collect(Collectors.toMap(Category::id, Function.identity()));
 
+        // 7. Result 생성
         List<RecommendResultResult.Ranking> rankings = recommendResults.stream()
                 .map(result -> buildRankingResult(result, restaurantMap, categoryMap, majorityDistanceRange))
                 .toList();
 
-        // 7. 평균 의견 일치율 계산
+        // 8. 평균 의견 일치율 계산
         double averageAgreementRate = recommendResults.stream()
                 .mapToDouble(RecommendResult::agreementRate)
                 .average()
@@ -103,7 +105,6 @@ public class RecommendResultFacade {
         }
 
         Category category = categoryMap.get(restaurant.categoryId());
-
         if (category == null) {
             throw new CustomException(ErrorCode.CATEGORY_NOT_FOUND);
         }
@@ -122,43 +123,7 @@ public class RecommendResultFacade {
                 restaurant.location(),
                 category.largeCategory(),
                 category.mediumCategory(),
-                majorityDistanceRange,
-                result.agreementRate()
+                majorityDistanceRange
         );
-    }
-
-    private DistanceRange determineMajorityDistanceRange(List<Participant> participants) {
-        Map<DistanceRange, Long> rangeCount = participants.stream()
-                .collect(Collectors.groupingBy(Participant::distanceRange, Collectors.counting()));
-
-        return rangeCount.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(DistanceRange.ANY);
-    }
-
-    private CategoryAggregation aggregateCategoryPreferences(List<Participant> participants) {
-        Map<String, Integer> preferences = new HashMap<>();
-        Map<String, Integer> dislikes = new HashMap<>();
-
-        for (Participant participant : participants) {
-            // 선호도 집계
-            List<String> prefList = StringUtils.splitByComma(participant.preferences());
-            for (String pref : prefList) {
-                if (!pref.equals("상관없음")) {
-                    preferences.merge(pref, 1, Integer::sum);
-                }
-            }
-
-            // 불호 집계
-            List<String> dislikeList = StringUtils.splitByComma(participant.dislikes());
-            for (String dislike : dislikeList) {
-                if (!dislike.equals("상관없음")) {
-                    dislikes.merge(dislike, 1, Integer::sum);
-                }
-            }
-        }
-
-        return CategoryAggregation.of(preferences, dislikes);
     }
 }

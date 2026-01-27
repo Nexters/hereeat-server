@@ -45,8 +45,7 @@ public record RecommendResultResult() {
             GeoJson.Point location,
             LargeCategory largeCategory,
             String mediumCategory,
-            DistanceRange majorityDistanceRange,
-            Double agreementRate
+            DistanceRange majorityDistanceRange
     ) {
         public static Ranking of(
                 Integer rank,
@@ -62,8 +61,7 @@ public record RecommendResultResult() {
                 GeoJson.Point location,
                 LargeCategory largeCategory,
                 String mediumCategory,
-                DistanceRange majorityDistanceRange,
-                Double agreementRate
+                DistanceRange majorityDistanceRange
         ) {
             return new Ranking(
                     rank,
@@ -79,8 +77,7 @@ public record RecommendResultResult() {
                     location,
                     largeCategory,
                     mediumCategory,
-                    majorityDistanceRange,
-                    agreementRate
+                    majorityDistanceRange
             );
         }
     }
