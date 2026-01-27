@@ -45,7 +45,6 @@ public class RecommendResultFacade {
         List<RecommendResult> recommendResults = recommendResultService.findByGatheringId(gathering.id());
 
         if (recommendResults.isEmpty()) {
-            log.warn("No recommend results found for gathering: {}", gathering.id());
             return RecommendResultResult.Get.of(
                     Collections.emptyList(),
                     Collections.emptyMap(),
@@ -82,9 +81,6 @@ public class RecommendResultFacade {
                 .mapToDouble(RecommendResult::agreementRate)
                 .average()
                 .orElse(0.0);
-
-        log.info("Successfully fetched {} recommend results with average agreement rate: {}%",
-                rankings.size(), averageAgreementRate);
 
         return RecommendResultResult.Get.of(
                 rankings,

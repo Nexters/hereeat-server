@@ -6,8 +6,10 @@ import java.util.Map;
 
 @Schema(description = "추천 결과 조회 응답 정보")
 public record GetRecommendResultResponse(
-        @Schema(description = "추천 결과 랭킹 리스트 (상위 3개)")
-        List<RankingRecommendResultResponse> results,
+        @Schema(description = "1위 추천 결과")
+        RankingRecommendResultResponse topRecommendation,
+        @Schema(description = "2, 3위 추천 결과 리스트")
+        List<RankingRecommendResultResponse> otherCandidates,
         @Schema(description = "카테고리별 선호도 집계", example = "{\"KOREAN\": 3, \"WESTERN\": 2}")
         Map<String, Integer> preferences,
         @Schema(description = "카테고리별 불호 집계", example = "{\"CHINESE\": 1}")
@@ -20,8 +22,15 @@ public record GetRecommendResultResponse(
                 .map(RankingRecommendResultResponse::from)
                 .toList();
 
+        // 1등과 나머지 후보 분리
+        RankingRecommendResultResponse topRecommendation = rankings.isEmpty() ? null : rankings.get(0);
+        List<RankingRecommendResultResponse> otherCandidates = rankings.size() > 1
+                ? rankings.subList(1, rankings.size())
+                : List.of();
+
         return new GetRecommendResultResponse(
-                rankings,
+                topRecommendation,
+                otherCandidates,
                 result.preferences(),
                 result.dislikes(),
                 result.averageAgreementRate()

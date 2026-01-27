@@ -1,5 +1,6 @@
 package com.yogieat.domain.participant.service;
 
+import com.yogieat.domain.category.domain.value.LargeCategory;
 import com.yogieat.domain.participant.domain.Participant;
 import com.yogieat.domain.participant.domain.value.DistanceRange;
 import com.yogieat.domain.recommend.domain.value.CategoryAggregation;
@@ -59,7 +60,12 @@ public class ParticipantAnalyzer {
             List<String> prefList = StringUtils.splitByComma(participant.preferences());
             for (String pref : prefList) {
                 if (!pref.equals("상관없음")) {
-                    preferences.merge(pref, 1, Integer::sum);
+                    // 한글 displayName을 enum name으로 변환
+                    LargeCategory category =
+                        LargeCategory.fromDisplayName(pref);
+                    if (category != null) {
+                        preferences.merge(category.name(), 1, Integer::sum);
+                    }
                 }
             }
 
@@ -67,7 +73,12 @@ public class ParticipantAnalyzer {
             List<String> dislikeList = StringUtils.splitByComma(participant.dislikes());
             for (String dislike : dislikeList) {
                 if (!dislike.equals("상관없음")) {
-                    dislikes.merge(dislike, 1, Integer::sum);
+                    // 한글 displayName을 enum name으로 변환
+                    LargeCategory category =
+                        LargeCategory.fromDisplayName(dislike);
+                    if (category != null) {
+                        dislikes.merge(category.name(), 1, Integer::sum);
+                    }
                 }
             }
         }
