@@ -39,7 +39,7 @@ public class RecommendResultFacade {
     @Transactional(readOnly = true)
     public RecommendResultResult.Get getRecommendResults(String accessKey) {
         // 1. accessKey로 Gathering 조회
-        Gathering gathering = gatheringService.validateGatheringExistsByAccessKey(accessKey);
+        Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
 
         // 2. gatheringId로 RecommendResult 목록 조회 (rank 순서대로)
         List<RecommendResult> recommendResults = recommendResultService.findByGatheringId(gathering.id());
