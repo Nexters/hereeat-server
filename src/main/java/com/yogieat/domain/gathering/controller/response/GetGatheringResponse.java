@@ -18,7 +18,7 @@ public record GetGatheringResponse(
         LocalDate scheduledDate,
         @Schema(description = "모임 시간대", example = "LUNCH")
         TimeSlot timeSlot,
-        @Schema(description = "모임 지역", example = "SEOUL")
+        @Schema(description = "모임 지역", example = "HONGDAE")
         Region region,
         @Schema(description = "모임 인원 수", example = "5")
         Integer peopleCount
