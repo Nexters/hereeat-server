@@ -2,37 +2,18 @@ package com.yogieat.domain.gathering.service;
 
 import com.yogieat.domain.gathering.controller.request.CreateGatheringRequest;
 import com.yogieat.domain.gathering.domain.Gathering;
+import com.yogieat.global.error.CustomException;
+import com.yogieat.global.error.ErrorCode;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class GatheringService {
     private final GatheringValidator gatheringValidator;
     private final GatheringRepository gatheringRepository;
-
-    /**
-     * Gathering 존재 여부 및 삭제 여부 검증
-     * GatheringValidator에게 위임
-     *
-     * @param gatheringId 검증할 모임 ID
-     * @return 검증된 Gathering 도메인
-     */
-    public Gathering validateGatheringExists(Long gatheringId) {
-        return gatheringValidator.validateGatheringExists(gatheringId);
-    }
-
-    /**
-     * Gathering 존재 여부 및 삭제 여부 검증 (accessKey 기반)
-     * GatheringValidator에게 위임
-     *
-     * @param accessKey 검증할 모임 접근 키
-     * @return 검증된 Gathering 도메인
-     */
-    public Gathering validateGatheringExistsByAccessKey(String accessKey) {
-        return gatheringValidator.validateGatheringExistsByAccessKey(accessKey);
-    }
 
     /**
      * Gathering 참여 인원이 가득 찼는지 검증
@@ -68,11 +49,18 @@ public class GatheringService {
         return gatheringRepository.save(gathering);
     }
 
+    @Transactional(readOnly = true)
+    public Gathering getGatheringByAccessKey(String accessKey) {
+        Gathering gathering = gatheringRepository.findByAccessKey(accessKey)
+                .orElseThrow(() -> new CustomException(ErrorCode.GATHERING_NOT_FOUND));
+        gatheringValidator.validateGatheringNotDeleted(gathering);
+        return gathering;
+    }
+
     private String createAccessKey() {
         return UUID.randomUUID()
                 .toString()
                 .replace("-", "")
                 .substring(0, 12);
     }
-
 }

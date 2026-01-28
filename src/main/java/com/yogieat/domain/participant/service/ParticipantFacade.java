@@ -34,7 +34,7 @@ public class ParticipantFacade {
 
                     // 1. Gathering 존재 여부 및 삭제 여부 검증 (accessKey 기반)
                     Gathering gathering =
-                            gatheringService.validateGatheringExistsByAccessKey(command.accessKey());
+                            gatheringService.getGatheringByAccessKey(command.accessKey());
 
                     // 2. 현재 참여자 수 조회 (락으로 보호됨)
                     long currentParticipantCount =
