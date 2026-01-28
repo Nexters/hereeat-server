@@ -45,3 +45,6 @@ out/
 .env
 .*.env
 .env.*
+
+src/main/generated
+.*-database
