@@ -3,8 +3,10 @@ package com.yogieat.domain.gathering.controller;
 import com.yogieat.domain.gathering.controller.request.CreateGatheringRequest;
 import com.yogieat.domain.gathering.controller.response.CreateGatheringResponse;
 import com.yogieat.domain.gathering.controller.response.GetGatheringResponse;
+import com.yogieat.domain.gathering.controller.response.GetParticipantCountResponse;
 import com.yogieat.domain.gathering.service.GatheringFacade;
 import com.yogieat.domain.gathering.service.GatheringService;
+import com.yogieat.domain.participant.service.ParticipantService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,6 +26,7 @@ public class GatheringController {
 
     private final GatheringFacade gatheringFacade;
     private final GatheringService gatheringService;
+    private final ParticipantService participantService;
 
     // 모임 생성 API
     @Operation(summary = "모임 생성", description = "사용자가 모임을 생성합니다.")
@@ -43,5 +46,14 @@ public class GatheringController {
         return GetGatheringResponse.from(
                 gatheringService.getGatheringByAccessKey(accessKey)
         );
+    }
+
+    // 모임 참여 현황 조회 API
+    @Operation(summary = "모임 참여자 현황 조회", description = "모임의 참여자 현황을 조회합니다.")
+    @GetMapping("/{accessKey}/capacity")
+    public GetParticipantCountResponse getParticipantStatus(
+            @PathVariable String accessKey
+    ) {
+        return gatheringService.getGatheringParticipantStatus(accessKey);
     }
 }

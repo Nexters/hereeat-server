@@ -1,7 +1,9 @@
 package com.yogieat.domain.gathering.service;
 
 import com.yogieat.domain.gathering.controller.request.CreateGatheringRequest;
+import com.yogieat.domain.gathering.controller.response.GetParticipantCountResponse;
 import com.yogieat.domain.gathering.domain.Gathering;
+import com.yogieat.domain.participant.service.ParticipantService;
 import com.yogieat.global.error.CustomException;
 import com.yogieat.global.error.ErrorCode;
 import java.util.UUID;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GatheringService {
     private final GatheringValidator gatheringValidator;
     private final GatheringRepository gatheringRepository;
+    private final ParticipantService participantService;
 
     /**
      * Gathering 참여 인원이 가득 찼는지 검증
@@ -32,6 +35,7 @@ public class GatheringService {
      * @param request 모임 생성 요청
      * @return 생성된 Gathering
      */
+    @Transactional
     public Gathering create(CreateGatheringRequest request) {
         gatheringValidator.validateCreate(request);
 
@@ -55,6 +59,17 @@ public class GatheringService {
                 .orElseThrow(() -> new CustomException(ErrorCode.GATHERING_NOT_FOUND));
         gatheringValidator.validateGatheringNotDeleted(gathering);
         return gathering;
+    }
+
+    @Transactional(readOnly = true)
+    public GetParticipantCountResponse getGatheringParticipantStatus(String accessKey) {
+        Gathering gathering = getGatheringByAccessKey(accessKey);
+
+        long currentCount = participantService.countByGatheringId(gathering.id());
+        return new GetParticipantCountResponse(
+                currentCount,
+                gathering.peopleCount()
+        );
     }
 
     private String createAccessKey() {
