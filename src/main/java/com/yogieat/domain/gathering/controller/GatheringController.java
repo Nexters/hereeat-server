@@ -49,7 +49,8 @@ public class GatheringController {
     }
 
     // 모임 참여 현황 조회 API
-    @GetMapping("/{accessKey}/participants")
+    @Operation(summary = "모임 참여자 현황 조회", description = "모임의 참여자 현황을 조회합니다.")
+    @GetMapping("/{accessKey}/capacity")
     public GetParticipantCountResponse getParticipantStatus(
             @PathVariable String accessKey
     ) {
