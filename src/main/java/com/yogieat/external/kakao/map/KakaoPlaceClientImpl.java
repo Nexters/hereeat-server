@@ -28,7 +28,7 @@ public class KakaoPlaceClientImpl implements KakaoPlaceClient {
                 .body(KakaoSearchResponse.class);
 
             if (response != null && !response.documents().isEmpty()) {
-                KaKaoPlaceDocument document = response.documents().get(0);
+                KaKaoPlaceDocument document = response.documents().getFirst();
                 log.debug("Found place: {}", document.placeName());
                 return Optional.of(document);
             }

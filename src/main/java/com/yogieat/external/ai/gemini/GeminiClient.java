@@ -19,6 +19,7 @@ public interface GeminiClient {
     Map<LocationCategoryKey, List<SuggestionRestaurant>> generateRestaurantsBatch(
         List<String> locations,
         List<String> categories,
+        String restaurantNames,
         int countPerCombo
     );
 }

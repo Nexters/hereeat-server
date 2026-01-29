@@ -1,6 +1,6 @@
 package com.yogieat.domain.restaurant.scheduler;
 
-import com.yogieat.domain.restaurant.service.RestaurantCollectionService;
+import com.yogieat.domain.restaurant.service.RestaurantCollectionProcessor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,14 +12,14 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class RestaurantCollectionScheduler {
 
-    private final RestaurantCollectionService collectionService;
+    private final RestaurantCollectionProcessor collectionProcessor;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
     /**
-     * 30분마다 맛집 수집 (0, 30분)
+     * 1시간 마다 맛집 수집
      * Cron: 초 분 시 일 월 요일
      */
-    @Scheduled(cron = "0 */30 * * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
     public void collectRestaurants() {
         // 중복 실행 방지: 이전 배치가 아직 실행 중이면 스킵
         if (!isRunning.compareAndSet(false, true)) {
@@ -31,7 +31,7 @@ public class RestaurantCollectionScheduler {
         long startTime = System.currentTimeMillis();
 
         try {
-            collectionService.collectAllRegions();
+            collectionProcessor.collectAllRegions();
 
             long duration = System.currentTimeMillis() - startTime;
             log.info("Restaurant collection completed successfully in {} ms ({} minutes)",

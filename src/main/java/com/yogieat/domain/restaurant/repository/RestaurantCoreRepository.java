@@ -39,6 +39,13 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     }
 
     @Override
+    public List<Restaurant> findAll() {
+        return restaurantJpaRepository.findAll().stream()
+                .map(RestaurantEntity::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<Restaurant> findByRegion(Region region) {
         return restaurantJpaRepository.findByRegion(region).stream()
             .map(RestaurantEntity::toDomain)

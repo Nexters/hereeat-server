@@ -34,6 +34,7 @@ public record CreateRestaurant(
      */
     public static CreateRestaurant of(
             SuggestionRestaurant suggestion,
+            String placeName,
             Long categoryId,
             String externalId,
             String mapUrl,
@@ -45,7 +46,7 @@ public record CreateRestaurant(
         return new CreateRestaurant(
                 externalId,
                 categoryId,
-                suggestion.name(),
+                placeName,
                 suggestion.address(),
                 rating,  // Use enriched rating if available
                 imageUrl,  // Use Kakao image if available

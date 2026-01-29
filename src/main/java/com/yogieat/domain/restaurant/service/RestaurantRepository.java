@@ -10,7 +10,9 @@ public interface RestaurantRepository {
     boolean existsByExternalId(String externalId);
     boolean existsByNameAndAddress(String name, String address);
     Restaurant save(CreateRestaurant createRestaurant);
+    List<Restaurant> findAll();
     List<Restaurant> findByRegion(Region region);
     Optional<Restaurant> findById(Long id);
     List<Restaurant> findByIds(List<Long> ids);
+
 }
