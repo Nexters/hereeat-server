@@ -65,9 +65,9 @@ public class GatheringService {
     public GetParticipantCountResponse getGatheringParticipantStatus(String accessKey) {
         Gathering gathering = getGatheringByAccessKey(accessKey);
 
-        long currentPeopleCount = participantService.countByGatheringId(gathering.id());
+        long currentCount = participantService.countByGatheringId(gathering.id());
         return new GetParticipantCountResponse(
-                currentPeopleCount,
+                currentCount,
                 gathering.peopleCount()
         );
     }
