@@ -62,7 +62,7 @@ public class KakaoPlaceDetailClient {
                 return Optional.empty();
             }
 
-            KakaoPlaceDetailData detailData = parser.parser(panel, placeId);
+            KakaoPlaceDetailData detailData = parser.parse(panel, placeId);
 
             if (detailData.confirmId() == null) {
                 log.warn("Failed to parse valid detail data for placeId: {}", placeId);

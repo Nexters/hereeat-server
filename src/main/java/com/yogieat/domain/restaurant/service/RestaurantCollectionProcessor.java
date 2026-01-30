@@ -278,6 +278,7 @@ public class RestaurantCollectionProcessor {
             Double rating = suggestion.rating(); // Gemini 평점으로 시작
             String imageUrl = null;
             String placeName = null;
+            String representativeReview = null;
 
             // 4. Kakao Search API로 기본 정보 보강 시도
             Optional<KaKaoPlaceDocument> placeOpt = kakaoPlaceClient.searchPlace(
@@ -324,6 +325,11 @@ public class RestaurantCollectionProcessor {
                     if (detail.mainPhotoUrl() != null && !detail.mainPhotoUrl().isBlank()) {
                         imageUrl = detail.mainPhotoUrl();
                     }
+
+                    // 5-4. 대표 리뷰가 있으면 사용
+                    if (detail.representativeReview() != null && !detail.representativeReview().isBlank()) {
+                        representativeReview = detail.representativeReview();
+                    }
                 }
             } else {
                 log.warn("Kakao place not found for: {} in {}", suggestion.name(), locationName);
@@ -354,7 +360,8 @@ public class RestaurantCollectionProcessor {
                 geoJsonLocation,
                 rating,
                 imageUrl,
-                    restaurantRegion
+                representativeReview,
+                restaurantRegion
             );
 
             // 9. 도메인 레포지토리를 통해 저장

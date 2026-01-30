@@ -22,8 +22,8 @@ public class RestaurantValidator {
     private final RestaurantRepository restaurantRepository;
 
     // 배치 검증 캐시
-    private Set<String> cachedExternalIds = new HashSet<>();
-    private Set<String> cachedNameAddressPairs = new HashSet<>();
+    private final Set<String> cachedExternalIds = new HashSet<>();
+    private final Set<String> cachedNameAddressPairs = new HashSet<>();
 
     /**
      * 주어진 장소에 대한 기존 맛집 데이터를 로드하여 배치 검증을 준비

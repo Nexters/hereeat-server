@@ -20,18 +20,6 @@ public record CreateRestaurant(
         Region region,
         GeoJson.Point location
 ) {
-    /**
-     * Create a CreateRestaurant from Gemini suggestion with optional Kakao enrichment
-     *
-     * @param suggestion Gemini-generated restaurant suggestion
-     * @param categoryId Category ID
-     * @param externalId Kakao place ID (nullable)
-     * @param mapUrl Kakao map URL (nullable)
-     * @param location GPS coordinates from Kakao (nullable)
-     * @param rating Final rating (Gemini or enriched from Kakao panel3)
-     * @param imageUrl Main image URL from Kakao panel3 (nullable)
-     * @return CreateRestaurant instance
-     */
     public static CreateRestaurant of(
             SuggestionRestaurant suggestion,
             String placeName,
@@ -41,6 +29,7 @@ public record CreateRestaurant(
             GeoJson.Point location,
             Double rating,
             String imageUrl,
+            String representativeReview,
             Region region
     ) {
         return new CreateRestaurant(
@@ -51,7 +40,7 @@ public record CreateRestaurant(
                 rating,  // Use enriched rating if available
                 imageUrl,  // Use Kakao image if available
                 mapUrl,
-                suggestion.representativeReview(),
+                representativeReview != null ? representativeReview : suggestion.representativeReview(),  // Use Kakao review if available
                 suggestion.description(),
 			region,
                 location
