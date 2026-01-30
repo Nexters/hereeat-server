@@ -54,6 +54,7 @@ public class GeminiClientImpl implements GeminiClient {
     public Map<LocationCategoryKey, List<SuggestionRestaurant>> generateRestaurantsBatch(
         List<String> locations,
         List<String> categories,
+        String restaurantNames,
         int countPerCombo
     ) {
         long startTime = System.currentTimeMillis();
@@ -68,7 +69,7 @@ public class GeminiClientImpl implements GeminiClient {
 
             // 2. 중앙화된 빌더를 사용하여 배치 프롬프트 생성
             log.debug("Building batch prompt...");
-            String prompt = promptBuilder.buildBatchRestaurantGenerationPrompt(locations, categories, countPerCombo);
+            String prompt = promptBuilder.buildBatchRestaurantGenerationPrompt(locations, categories, restaurantNames, countPerCombo);
             log.info("Batch prompt generated: {} characters, {} locations, {} categories",
                 prompt.length(), locations, categories);
 

@@ -5,6 +5,7 @@ import com.yogieat.domain.category.service.CategoryService;
 import com.yogieat.domain.common.GeoJson;
 import com.yogieat.domain.common.Region;
 import com.yogieat.domain.restaurant.domain.CreateRestaurant;
+import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.domain.restaurant.domain.SuggestionRestaurant;
 import com.yogieat.external.ai.gemini.GeminiClient;
 import com.yogieat.external.ai.gemini.LocationCategoryKey;
@@ -32,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class RestaurantCollectionService {
+public class RestaurantCollectionProcessor {
 
     private final GeminiClient geminiClient;
     private final KakaoPlaceClient kakaoPlaceClient;
@@ -76,11 +77,10 @@ public class RestaurantCollectionService {
     private static final int RESTAURANTS_PER_REQUEST = 5;
     private static final long RATE_LIMIT_DELAY_MS = 5000; // Gemini API rate limit을 위한 지연 시간 (5초)
     private static final int LOCATION_CATEGORY_BATCH_SIZE = 5; // 한 번에 처리할 location-category 조합 개수
-    private static final long BATCH_DELAY_MS = 10000; // 배치 간 휴식 시간 (10초)
+    private static final long BATCH_DELAY_MS = 15000; // 배치 간 휴식 시간 (10초)
 
     /**
      * Place enum에 정의된 모든 지역에 대해 맛집 데이터 수집
-     *
      * 배치 처리 최적화:
      * - Gemini API 호출 1회로 모든 location × category 조합 처리
      * - API 호출 10회 → 1회 (90% 감소)
@@ -89,9 +89,15 @@ public class RestaurantCollectionService {
     @Transactional
     public void collectAllRegions() {
         try {
+            List<Restaurant> restaurants = restaurantRepository.findAll();
+
+            String restaurantNames = restaurants.stream()
+                .map(Restaurant::name)
+                .collect(Collectors.joining(", "));
+
             // 1. 배치 API 호출: 모든 location × category 조합을 한 번에 요청
             Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
-                geminiClient.generateRestaurantsBatch(LOCATIONS, FOOD_CATEGORIES, RESTAURANTS_PER_REQUEST);
+                geminiClient.generateRestaurantsBatch(LOCATIONS, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
 
             // 2. 각 location-category 조합별로 데이터 처리 (페이징)
             int totalProcessed = 0;
@@ -271,6 +277,8 @@ public class RestaurantCollectionService {
             GeoJson.Point geoJsonLocation = null;
             Double rating = suggestion.rating(); // Gemini 평점으로 시작
             String imageUrl = null;
+            String placeName = null;
+            String representativeReview = null;
 
             // 4. Kakao Search API로 기본 정보 보강 시도
             Optional<KaKaoPlaceDocument> placeOpt = kakaoPlaceClient.searchPlace(
@@ -283,7 +291,16 @@ public class RestaurantCollectionService {
                 // 4-1. Kakao 검색 데이터로 보강
                 KakaoRestaurantData data = kakaoPlaceMapper.toDomainData(place);
                 externalId = data.externalId();
-                mapUrl = data.mapUrl();
+                String originalMapUrl = data.mapUrl();
+                if (originalMapUrl.startsWith("https:")) {
+                    mapUrl = originalMapUrl;
+                } else if (originalMapUrl.startsWith("http:")) {
+                    mapUrl = "https:" + originalMapUrl.substring("http:".length());
+                } else if (originalMapUrl.startsWith("//")) {
+                    mapUrl = "https:" + originalMapUrl;
+                } else {
+                    mapUrl = originalMapUrl;
+                }
                 geoJsonLocation = new GeoJson.Point(
                     List.of(data.location().getX(), data.location().getY())
                 );
@@ -302,10 +319,16 @@ public class RestaurantCollectionService {
 
                     // 5-2. panel3 평점 사용 (Gemini보다 정확)
                     rating = detail.rating();
+                    placeName = detail.placeName();
 
                     // 5-3. 메인 사진 URL이 있으면 사용
                     if (detail.mainPhotoUrl() != null && !detail.mainPhotoUrl().isBlank()) {
                         imageUrl = detail.mainPhotoUrl();
+                    }
+
+                    // 5-4. 대표 리뷰가 있으면 사용
+                    if (detail.representativeReview() != null && !detail.representativeReview().isBlank()) {
+                        representativeReview = detail.representativeReview();
                     }
                 }
             } else {
@@ -330,13 +353,15 @@ public class RestaurantCollectionService {
             // 8. Gemini + Kakao 보강 데이터로 Restaurant 생성
             CreateRestaurant createRestaurant = CreateRestaurant.of(
                 suggestion,
+                placeName,
                 categoryId,
                 externalId,
                 mapUrl,
                 geoJsonLocation,
                 rating,
                 imageUrl,
-                    restaurantRegion
+                representativeReview,
+                restaurantRegion
             );
 
             // 9. 도메인 레포지토리를 통해 저장

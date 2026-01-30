@@ -25,11 +25,11 @@ public class KakaoPlaceDetailParser {
      * @param requestedPlaceId 요청된 장소 ID
      * @return 평점 및 사진을 포함한 KakaoPlaceDetailData
      */
-    public KakaoPlaceDetailData parser(JsonNode panel, String requestedPlaceId) {
+    public KakaoPlaceDetailData parse(JsonNode panel, String requestedPlaceId) {
         try {
             // 1. 음식점 카테고리 확인
             String placeRestaurant = extractText(panel.at("/summary/category"), "name1");
-            if (!placeRestaurant.equals("음식점")) {
+            if (placeRestaurant == null || !"음식점".equals(placeRestaurant)) {
                 log.debug("Filtered out non-restaurant place: placeId={}", requestedPlaceId);
                 return KakaoPlaceDetailData.empty(requestedPlaceId);
             }
@@ -74,8 +74,11 @@ public class KakaoPlaceDetailParser {
             List<String> photoUrls = extractPhotos(panel);
             String mainPhotoUrl = photoUrls.isEmpty() ? null : photoUrls.getFirst();
 
-            log.debug("Successfully parsed place: placeId={}, rating={}, photos={}",
-                    confirmId, rating, photoUrls.size());
+            // 6. 대표 리뷰 추출
+            String representativeReview = extractRepresentativeReview(panel);
+
+            log.debug("Successfully parsed place: placeId={}, rating={}, photos={}, review={}",
+                    confirmId, rating, photoUrls.size(), representativeReview != null);
 
             return new KakaoPlaceDetailData(
                     confirmId,
@@ -85,7 +88,8 @@ public class KakaoPlaceDetailParser {
                     longitude,
                     rating,
                     mainPhotoUrl,
-                    photoUrls
+                    photoUrls,
+                    representativeReview
             );
 
         } catch (Exception e) {
@@ -130,6 +134,80 @@ public class KakaoPlaceDetailParser {
         }
 
         return null;
+    }
+
+    /**
+     * panel3 응답에서 대표 리뷰 추출
+     * 우선순위:
+     * 1) kakaomap_review/reviews - star_rating이 가장 높고 최근 리뷰
+     * 2) blog_review/reviews[0] - 블로그 리뷰 첫 번째
+     */
+    private String extractRepresentativeReview(JsonNode panel) {
+        // 1. 카카오맵 리뷰에서 추출
+        JsonNode kakaoReviews = panel.at("/kakaomap_review/reviews");
+        if (kakaoReviews != null && kakaoReviews.isArray() && !kakaoReviews.isEmpty()) {
+            String bestReview = findBestReview(kakaoReviews);
+            if (bestReview != null && !bestReview.isBlank()) {
+                log.debug("Extracted representative review from kakaomap_review");
+                return bestReview;
+            }
+        }
+
+        // 2. 블로그 리뷰에서 추출
+        JsonNode blogReviews = panel.at("/blog_review/reviews");
+        if (blogReviews != null && blogReviews.isArray() && !blogReviews.isEmpty()) {
+            JsonNode firstBlogReview = blogReviews.get(0);
+            String contents = extractText(firstBlogReview, "contents");
+            if (contents != null && !contents.isBlank()) {
+                log.debug("Extracted representative review from blog_review");
+                return contents;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 리뷰 배열에서 star_rating이 가장 높고 최근 리뷰의 contents 찾기
+     */
+    private String findBestReview(JsonNode reviews) {
+        int maxRating = 0;
+        String latestReviewContents = null;
+        String latestRegisteredAt = null;
+
+        for (JsonNode review : reviews) {
+            // star_rating 추출
+            JsonNode ratingNode = review.get("star_rating");
+            if (ratingNode == null || !ratingNode.isNumber()) {
+                continue;
+            }
+            int rating = ratingNode.asInt();
+
+            // contents 추출
+            String contents = extractText(review, "contents");
+            if (contents == null || contents.isBlank()) {
+                continue;
+            }
+
+            // registered_at 추출
+            String registeredAt = extractText(review, "registered_at");
+
+            // 더 높은 평점을 찾은 경우
+            if (rating > maxRating) {
+                maxRating = rating;
+                latestReviewContents = contents;
+                latestRegisteredAt = registeredAt;
+            }
+            // 같은 평점이면 더 최근 리뷰 선택
+            else if (rating == maxRating && registeredAt != null && latestRegisteredAt != null) {
+                if (registeredAt.compareTo(latestRegisteredAt) > 0) {
+                    latestReviewContents = contents;
+                    latestRegisteredAt = registeredAt;
+                }
+            }
+        }
+
+        return latestReviewContents;
     }
 
     /**

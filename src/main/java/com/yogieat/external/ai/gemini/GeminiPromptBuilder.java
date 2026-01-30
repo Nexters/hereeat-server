@@ -39,12 +39,14 @@ public class GeminiPromptBuilder {
         ]
 
         각 식당에 대해:
-        1. 실제로 존재하는 유명한 식당을 추천해주세요
-        2. rating은 4.0~5.0 사이의 적절한 평점을 부여하세요 (소수점 첫째자리까지)
-        3. largeCategory는 "%%s"를 기반으로 설정하세요
-        4. mediumCategory는 해당 식당의 구체적인 음식 종류를 지정하세요
-        5. description은 식당의 특징과 인기메뉴를 구체적으로 설명해주세요
-        6. representativeReview는 긍정적이고 구체적인 경험을 담은 리뷰를 작성해주세요
+        1. 실제로 존재하는 유명한 식당을 추천해주세요.
+        2. 중복 방지: 이미 존재하는 맛집 이름 목록과
+             - 지점명(예: 강남점/본점), 띄어쓰기, 특수문자, 대소문자 차이만 있는 경우도 "중복"으로 간주하고 제외하세요.
+        3. rating은 3.0~5.0 사이의 적절한 평점을 부여하세요 (소수점 첫째자리까지)
+        4. largeCategory는 요청한 카테고리를 기반으로 설정하세요
+        5. mediumCategory는 해당 식당의 구체적인 음식 종류를 지정하세요
+        6. description은 식당의 특징과 인기메뉴를 구체적으로 설명해주세요
+        7. representativeReview는 긍정적이고 구체적인 경험을 담은 리뷰를 작성해주세요
 
         설명 없이 JSON 배열만 반환하세요.
         """,
@@ -58,6 +60,7 @@ public class GeminiPromptBuilder {
         지역: %%s
         카테고리: %%s
         각 지역-카테고리 조합당 %%d개씩 추천
+        이미 존재하는 맛집 이름들을 제회: %%s (중복 방지용)
 
         다음 JSON 형식으로만 응답해주세요:
         {
@@ -77,12 +80,14 @@ public class GeminiPromptBuilder {
         }
 
         각 식당에 대해:
-        1. 실제로 존재하는 유명한 식당을 추천해주세요
-        2. rating은 4.0~5.0 사이의 적절한 평점을 부여하세요 (소수점 첫째자리까지)
-        3. largeCategory는 요청한 카테고리를 기반으로 설정하세요
-        4. mediumCategory는 해당 식당의 구체적인 음식 종류를 지정하세요
-        5. description은 식당의 특징과 인기메뉴를 구체적으로 설명해주세요
-        6. representativeReview는 긍정적이고 구체적인 경험을 담은 리뷰를 작성해주세요
+        1. 실제로 존재하는 유명한 식당을 추천해주세요.
+        2. 중복 방지: 이미 존재하는 맛집 이름 목록과
+             - 지점명(예: 강남점/본점), 띄어쓰기, 특수문자, 대소문자 차이만 있는 경우도 "중복"으로 간주하고 제외하세요.
+        3. rating은 3.0~5.0 사이의 적절한 평점을 부여하세요 (소수점 첫째자리까지)
+        4. largeCategory는 요청한 카테고리를 기반으로 설정하세요
+        5. mediumCategory는 해당 식당의 구체적인 음식 종류를 지정하세요
+        6. description은 식당의 특징과 인기메뉴를 구체적으로 설명해주세요
+        7. representativeReview는 긍정적이고 구체적인 경험을 담은 리뷰를 작성해주세요
 
         설명 없이 JSON 객체만 반환하세요.
         """,
@@ -114,12 +119,14 @@ public class GeminiPromptBuilder {
      *
      * @param locations 장소명 리스트 (예: ["홍대입구역", "강남역"])
      * @param categories 음식 카테고리 리스트 (예: ["한식", "중식", "일식"])
+     * @param restaurantNames 기존 맛집 이름들 (중복 방지용)
      * @param countPerCombo 장소-카테고리 조합당 맛집 개수
      * @return 포맷팅된 배치 프롬프트 문자열
      */
     public String buildBatchRestaurantGenerationPrompt(
         List<String> locations,
         List<String> categories,
+        String restaurantNames,
         int countPerCombo
     ) {
         String locationsStr = String.join(", ", locations);
@@ -129,7 +136,8 @@ public class GeminiPromptBuilder {
             BATCH_RESTAURANT_GENERATION_TEMPLATE,
             locationsStr,
             categoriesStr,
-            countPerCombo
+            countPerCombo,
+            restaurantNames
         );
     }
 }

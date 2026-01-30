@@ -14,7 +14,8 @@ public record KakaoPlaceDetailData(
         Double longitude,
         Double rating,
         String mainPhotoUrl,
-        List<String> photoUrls
+        List<String> photoUrls,
+        String representativeReview
 ) {
     /**
      * Create a minimal detail data when panel3 call fails
@@ -28,7 +29,8 @@ public record KakaoPlaceDetailData(
                 null,
                 null,
                 null,
-                List.of()
+                List.of(),
+                null
         );
     }
 }

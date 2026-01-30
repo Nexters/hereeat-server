@@ -17,23 +17,23 @@ public class KakaoPlaceClientImpl implements KakaoPlaceClient {
     public Optional<KaKaoPlaceDocument> searchPlace(String placeName, String region) {
         try {
             log.debug("Searching Kakao Place API for: {} in {}", placeName, region);
-
+            String searchPlaceName = placeName.split(" ")[0];
             KakaoSearchResponse response = kakaoRestClient.get()
                 .uri(uriBuilder -> uriBuilder
                     .path("/v2/local/search/keyword.json")
-                    .queryParam("query", placeName + " " + region)
+                    .queryParam("query", searchPlaceName + " " + region)
                     .queryParam("size", 1)
                     .build())
                 .retrieve()
                 .body(KakaoSearchResponse.class);
 
             if (response != null && !response.documents().isEmpty()) {
-                KaKaoPlaceDocument document = response.documents().get(0);
+                KaKaoPlaceDocument document = response.documents().getFirst();
                 log.debug("Found place: {}", document.placeName());
                 return Optional.of(document);
             }
 
-            log.warn("No place found for: {} in {}", placeName, region);
+            log.warn("No place found for: {} in {}", searchPlaceName, region);
             return Optional.empty();
 
         } catch (Exception e) {
