@@ -10,3 +10,6 @@ management:
   health:
     defaults:
       enabled: true
+  tracing:
+    sampling:
+      probability: 1.0  # 100% sampling for development (default is 0.1)
