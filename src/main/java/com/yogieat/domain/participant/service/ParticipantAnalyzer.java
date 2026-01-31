@@ -60,9 +60,9 @@ public class ParticipantAnalyzer {
             List<String> prefList = StringUtils.splitByComma(participant.preferences());
             for (String pref : prefList) {
                 if (!pref.equals("상관없음")) {
-                    // 한글 displayName을 enum name으로 변환
+                    // displayName 또는 enum name을 LargeCategory로 변환
                     LargeCategory category =
-                        LargeCategory.fromDisplayName(pref);
+                        LargeCategory.fromString(pref);
                     if (category != null) {
                         preferences.merge(category.name(), 1, Integer::sum);
                     }
@@ -73,9 +73,9 @@ public class ParticipantAnalyzer {
             List<String> dislikeList = StringUtils.splitByComma(participant.dislikes());
             for (String dislike : dislikeList) {
                 if (!dislike.equals("상관없음")) {
-                    // 한글 displayName을 enum name으로 변환
+                    // displayName 또는 enum name을 LargeCategory로 변환
                     LargeCategory category =
-                        LargeCategory.fromDisplayName(dislike);
+                        LargeCategory.fromString(dislike);
                     if (category != null) {
                         dislikes.merge(category.name(), 1, Integer::sum);
                     }

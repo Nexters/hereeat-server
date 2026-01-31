@@ -76,11 +76,11 @@ public class RecommendResultFacade {
                 .map(result -> buildRankingResult(result, restaurantMap, categoryMap, majorityDistanceRange))
                 .toList();
 
-        // 8. 평균 의견 일치율 계산
-        double averageAgreementRate = recommendResults.stream()
+        // 8. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
+        double averageAgreementRate = Math.round(recommendResults.stream()
                 .mapToDouble(RecommendResult::agreementRate)
                 .average()
-                .orElse(0.0);
+                .orElse(0.0) * 100.0) / 100.0;
 
         return RecommendResultResult.Get.of(
                 rankings,

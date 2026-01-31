@@ -66,6 +66,9 @@ public class RecommendationService {
             // 6. 선호도/불호 사전 집계 (성능 최적화: O(P×3) 한 번으로 O(R×P×3) 제거)
             Map<String, PreferenceScore> preferenceScoreMap = aggregatePreferenceScores(participants);
 
+            // 6-1. 선호 카테고리 추출 (필터링용)
+            Set<String> preferredCategories = extractPreferredCategories(participants);
+
             // 7. Region별 중심 좌표
             GeoJson.Point centerPoint = region.getCoordinatesStandard();
 
@@ -86,6 +89,11 @@ public class RecommendationService {
 
                 String categoryName = category.largeCategory().getDisplayName();
 
+                // 선호 카테고리 필터링: 선호 카테고리가 있으면 해당 카테고리만 허용
+                if (!preferredCategories.isEmpty() && !preferredCategories.contains(categoryName)) {
+                    continue; // 선호하지 않은 카테고리는 추천에서 제외
+                }
+
                 // 8a & 8b. 사전 집계된 선호도/불호 점수 적용 (O(1) 조회)
                 PreferenceScore preferenceScore = preferenceScoreMap.getOrDefault(
                     categoryName,
@@ -102,9 +110,10 @@ public class RecommendationService {
                     }
                 }
 
-                // 8d. 의견일치율 계산
+                // 8d. 의견일치율 계산 (선호도 점수만 사용, 거리/불호 제외)
                 double maxPossibleScore = participants.size() * 3.0;
-                double agreementRate = (totalScore / maxPossibleScore) * 100.0;
+                double preferenceOnlyScore = preferenceScore.totalPreferenceScore(); // 불호 제외
+                double agreementRate = Math.round((preferenceOnlyScore / maxPossibleScore) * 100.0 * 100.0) / 100.0;
 
                 ScoredRestaurant scored = new ScoredRestaurant(restaurant, totalScore, agreementRate);
 
@@ -180,6 +189,28 @@ public class RecommendationService {
         }
 
         return scoreMap;
+    }
+
+    /**
+     * 참여자들의 선호 카테고리를 추출합니다.
+     * "상관없음"이 아닌 모든 선호 카테고리를 Set으로 반환합니다.
+     *
+     * @param participants 참여자 목록
+     * @return 선호 카테고리 Set (비어있으면 필터링 없이 모든 카테고리 허용)
+     */
+    private Set<String> extractPreferredCategories(List<Participant> participants) {
+        Set<String> preferredCategories = new HashSet<>();
+
+        for (Participant participant : participants) {
+            List<String> preferences = StringUtils.splitByComma(participant.preferences());
+            for (String pref : preferences) {
+                if (!pref.equals("상관없음")) {
+                    preferredCategories.add(pref);
+                }
+            }
+        }
+
+        return preferredCategories;
     }
 
     /**
