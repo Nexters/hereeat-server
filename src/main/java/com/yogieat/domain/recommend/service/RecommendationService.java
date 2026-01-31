@@ -140,6 +140,27 @@ public class RecommendationService {
         return scoreMap;
     }
 
+    /**
+     * 참여자들의 선호 카테고리를 추출합니다.
+     * "상관없음"이 아닌 모든 선호 카테고리를 Set으로 반환합니다.
+     *
+     * @param participants 참여자 목록
+     * @return 선호 카테고리 Set (비어있으면 필터링 없이 모든 카테고리 허용)
+     */
+    private Set<String> extractPreferredCategories(List<Participant> participants) {
+        Set<String> preferredCategories = new HashSet<>();
+
+        for (Participant participant : participants) {
+            List<String> preferences = StringUtils.splitByComma(participant.preferences());
+            for (String pref : preferences) {
+                if (!pref.equals("상관없음")) {
+                    preferredCategories.add(pref);
+                }
+            }
+        }
+
+        return preferredCategories;
+    }
 
     /**
      * 참여자들의 불호 카테고리를 추출합니다.
@@ -194,7 +215,6 @@ public class RecommendationService {
 
     /**
      * 다단계 Fallback 전략을 사용하여 Top 3 레스토랑 추천
-     *
      * 1단계: 선호도 점수 > 0인 레스토랑만 추천
      * 2단계: 불호 카테고리만 제외하고 모든 레스토랑 추천
      *
@@ -304,9 +324,7 @@ public class RecommendationService {
             }
 
             // 의견일치율 계산
-            double maxPossibleScore = participants.size() * 3.0;
-            double preferenceOnlyScore = preferenceScore.totalPreferenceScore();
-            double agreementRate = Math.round((preferenceOnlyScore / maxPossibleScore) * 100.0 * 100.0) / 100.0;
+            double agreementRate = getAgreementRate(participants, preferenceScore);
 
             ScoredRestaurant scored = new ScoredRestaurant(restaurant, totalScore, agreementRate);
 
@@ -324,6 +342,24 @@ public class RecommendationService {
         top3.sort(Comparator.comparingDouble(ScoredRestaurant::totalScore).reversed());
 
         return top3;
+    }
+
+    private static double getAgreementRate(List<Participant> participants, PreferenceScore preferenceScore) {
+        double preferenceOnlyScore = preferenceScore.totalPreferenceScore();
+        double agreementRate;
+
+        if (preferenceOnlyScore > 0) {
+            // 선호도가 있으면 선호도 기반 계산
+            double maxPossibleScore = participants.size() * 3.0;
+            agreementRate = (preferenceOnlyScore / maxPossibleScore) * 100.0;
+        } else {
+            // 선호도가 없으면 불호 기반 계산 (수용 가능 비율)
+            int dislikeCount = preferenceScore.dislikeCount();
+            agreementRate = ((double)(participants.size() - dislikeCount) / participants.size()) * 100.0;
+        }
+
+        agreementRate = Math.round(agreementRate * 100.0) / 100.0;
+        return agreementRate;
     }
 
     /**
