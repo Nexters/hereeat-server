@@ -1,6 +1,7 @@
 package com.yogieat.domain.recommend.service;
 
 import com.yogieat.domain.category.domain.Category;
+import com.yogieat.domain.category.domain.value.LargeCategory;
 import com.yogieat.domain.category.service.CategoryService;
 import com.yogieat.domain.common.GeoJson;
 import com.yogieat.domain.common.Region;
@@ -112,6 +113,7 @@ public class RecommendationService {
     /**
      * 참여자들의 선호도와 불호를 카테고리별로 미리 집계
      * O(P × 3) 시간에 모든 선호도 점수를 계산하여 O(R × P × 3) 반복을 제거
+     * enum name ("KOREAN") 또는 displayName ("한식") 모두 처리하며, displayName으로 정규화합니다.
      */
     private Map<String, PreferenceScore> aggregatePreferenceScores(List<Participant> participants) {
         Map<String, PreferenceScore> scoreMap = new HashMap<>();
@@ -121,18 +123,26 @@ public class RecommendationService {
             List<String> preferences = StringUtils.splitByComma(participant.preferences());
             for (int i = 0; i < preferences.size(); i++) {
                 String pref = preferences.get(i);
-                if (!pref.equals("상관없음")) {
-                    PreferenceScore current = scoreMap.getOrDefault(pref, PreferenceScore.empty());
-                    scoreMap.put(pref, current.addPreference(i + 1)); // rank는 1-based
+                if (!pref.equals("상관없음") && !pref.equals("ANY")) {
+                    // enum name 또는 displayName을 displayName으로 정규화
+                    String normalizedPref = normalizeToDisplayName(pref);
+                    if (normalizedPref != null) {
+                        PreferenceScore current = scoreMap.getOrDefault(normalizedPref, PreferenceScore.empty());
+                        scoreMap.put(normalizedPref, current.addPreference(i + 1)); // rank는 1-based
+                    }
                 }
             }
 
             // 불호 집계
             List<String> dislikes = StringUtils.splitByComma(participant.dislikes());
             for (String dislike : dislikes) {
-                if (!dislike.equals("상관없음")) {
-                    PreferenceScore current = scoreMap.getOrDefault(dislike, PreferenceScore.empty());
-                    scoreMap.put(dislike, current.addDislike());
+                if (!dislike.equals("상관없음") && !dislike.equals("ANY")) {
+                    // enum name 또는 displayName을 displayName으로 정규화
+                    String normalizedDislike = normalizeToDisplayName(dislike);
+                    if (normalizedDislike != null) {
+                        PreferenceScore current = scoreMap.getOrDefault(normalizedDislike, PreferenceScore.empty());
+                        scoreMap.put(normalizedDislike, current.addDislike());
+                    }
                 }
             }
         }
@@ -165,9 +175,10 @@ public class RecommendationService {
     /**
      * 참여자들의 불호 카테고리를 추출합니다.
      * "상관없음"이 아닌 모든 불호 카테고리를 Set으로 반환합니다.
+     * enum name ("KOREAN") 또는 displayName ("한식") 모두 처리하며, displayName으로 정규화합니다.
      *
      * @param participants 참여자 목록
-     * @return 불호 카테고리 Set
+     * @return 불호 카테고리 Set (displayName 형식)
      */
     private Set<String> extractDislikedCategories(List<Participant> participants) {
         Set<String> dislikedCategories = new HashSet<>();
@@ -175,8 +186,12 @@ public class RecommendationService {
         for (Participant participant : participants) {
             List<String> dislikes = StringUtils.splitByComma(participant.dislikes());
             for (String dislike : dislikes) {
-                if (!dislike.equals("상관없음")) {
-                    dislikedCategories.add(dislike);
+                if (!dislike.equals("상관없음") && !dislike.equals("ANY")) {
+                    // enum name 또는 displayName을 displayName으로 정규화
+                    String normalizedDislike = normalizeToDisplayName(dislike);
+                    if (normalizedDislike != null) {
+                        dislikedCategories.add(normalizedDislike);
+                    }
                 }
             }
         }
@@ -386,10 +401,8 @@ public class RecommendationService {
                 // 불호 카테고리 제외
                 yield !dislikedCategories.contains(categoryName);
             }
-            case DISLIKED_EXCLUDED -> {
-                // 불호만 제외 (선호도 점수 체크 안함)
-                yield !dislikedCategories.contains(categoryName);
-            }
+            case DISLIKED_EXCLUDED -> // 불호만 제외 (선호도 점수 체크 안함)
+                    !dislikedCategories.contains(categoryName);
         };
     }
 
@@ -401,6 +414,30 @@ public class RecommendationService {
         PREFERENCE_SCORE_POSITIVE,
         /** 불호 카테고리만 제외 (2단계 Fallback) */
         DISLIKED_EXCLUDED
+    }
+
+    /**
+     * 카테고리 값을 displayName으로 정규화합니다.
+     * enum name ("KOREAN", "CHINESE" 등) 또는 displayName ("한식", "중식" 등) 모두 처리합니다.
+     *
+     * @param categoryValue 카테고리 값 (enum name 또는 displayName)
+     * @return displayName 형식으로 정규화된 값, 알 수 없는 값이면 null
+     */
+    private String normalizeToDisplayName(String categoryValue) {
+        // 1. 이미 displayName이면 그대로 반환
+        LargeCategory byDisplayName = LargeCategory.fromDisplayName(categoryValue);
+        if (byDisplayName != null) {
+            return categoryValue;
+        }
+
+        // 2. enum name이면 displayName으로 변환
+        LargeCategory byEnumName = LargeCategory.fromString(categoryValue);
+        if (byEnumName != null) {
+            return byEnumName.getDisplayName();
+        }
+
+        // 3. 알 수 없는 값
+        return null;
     }
 
     private void saveFailedResult(Long gatheringId) {
