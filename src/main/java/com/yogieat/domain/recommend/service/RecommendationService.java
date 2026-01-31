@@ -66,69 +66,18 @@ public class RecommendationService {
             // 6. 선호도/불호 사전 집계 (성능 최적화: O(P×3) 한 번으로 O(R×P×3) 제거)
             Map<String, PreferenceScore> preferenceScoreMap = aggregatePreferenceScores(participants);
 
-            // 6-1. 선호 카테고리 추출 (필터링용)
-            Set<String> preferredCategories = extractPreferredCategories(participants);
+            // 6-1. 불호 카테고리 추출
+            Set<String> dislikedCategories = extractDislikedCategories(participants);
 
             // 7. Region별 중심 좌표
             GeoJson.Point centerPoint = region.getCoordinatesStandard();
 
-            // 8. 각 Restaurant 점수 계산 (Top-K 최적화: PriorityQueue 사용)
-            // Min-heap으로 상위 3개만 유지 (O(R log 3) = O(R))
-            PriorityQueue<ScoredRestaurant> top3Heap = new PriorityQueue<>(
-                Comparator.comparingDouble(ScoredRestaurant::totalScore)
+            // 8. 다단계 Fallback으로 Top 3 레스토랑 추천
+            List<ScoredRestaurant> top3 = findTopRestaurantsWithFallback(
+                restaurants, categoryMap, preferenceScoreMap,
+                dislikedCategories,
+                participants, majorityRange, centerPoint
             );
-
-            for (Restaurant restaurant : restaurants) {
-                double totalScore = 0.0;
-
-                // Category 조회
-                Category category = categoryMap.get(restaurant.categoryId());
-                if (category == null) {
-                    continue; // 카테고리 정보가 없으면 스킵
-                }
-
-                String categoryName = category.largeCategory().getDisplayName();
-
-                // 선호 카테고리 필터링: 선호 카테고리가 있으면 해당 카테고리만 허용
-                if (!preferredCategories.isEmpty() && !preferredCategories.contains(categoryName)) {
-                    continue; // 선호하지 않은 카테고리는 추천에서 제외
-                }
-
-                // 8a & 8b. 사전 집계된 선호도/불호 점수 적용 (O(1) 조회)
-                PreferenceScore preferenceScore = preferenceScoreMap.getOrDefault(
-                    categoryName,
-                    PreferenceScore.empty()
-                );
-                totalScore += preferenceScore.calculateFinalScore();
-
-                // 8c. DistanceRange 가산점
-                if (majorityRange != DistanceRange.ANY && restaurant.location() != null) {
-                    double distance = calculateDistance(centerPoint, restaurant.location());
-                    boolean withinRange = isWithinDistanceRange(distance, majorityRange);
-                    if (withinRange) {
-                        totalScore += 1.0;
-                    }
-                }
-
-                // 8d. 의견일치율 계산 (선호도 점수만 사용, 거리/불호 제외)
-                double maxPossibleScore = participants.size() * 3.0;
-                double preferenceOnlyScore = preferenceScore.totalPreferenceScore(); // 불호 제외
-                double agreementRate = Math.round((preferenceOnlyScore / maxPossibleScore) * 100.0 * 100.0) / 100.0;
-
-                ScoredRestaurant scored = new ScoredRestaurant(restaurant, totalScore, agreementRate);
-
-                // Top-K 알고리즘: 상위 3개만 유지
-                if (top3Heap.size() < 3) {
-                    top3Heap.offer(scored);
-                } else if (scored.totalScore() > top3Heap.peek().totalScore()) {
-                    top3Heap.poll();
-                    top3Heap.offer(scored);
-                }
-            }
-
-            // 9. 상위 3개 추출 및 정렬 (힙에서 추출 후 내림차순 정렬)
-            List<ScoredRestaurant> top3 = new ArrayList<>(top3Heap);
-            top3.sort(Comparator.comparingDouble(ScoredRestaurant::totalScore).reversed());
 
             if (top3.isEmpty()) {
                 saveFailedResult(gatheringId);
@@ -191,26 +140,27 @@ public class RecommendationService {
         return scoreMap;
     }
 
+
     /**
-     * 참여자들의 선호 카테고리를 추출합니다.
-     * "상관없음"이 아닌 모든 선호 카테고리를 Set으로 반환합니다.
+     * 참여자들의 불호 카테고리를 추출합니다.
+     * "상관없음"이 아닌 모든 불호 카테고리를 Set으로 반환합니다.
      *
      * @param participants 참여자 목록
-     * @return 선호 카테고리 Set (비어있으면 필터링 없이 모든 카테고리 허용)
+     * @return 불호 카테고리 Set
      */
-    private Set<String> extractPreferredCategories(List<Participant> participants) {
-        Set<String> preferredCategories = new HashSet<>();
+    private Set<String> extractDislikedCategories(List<Participant> participants) {
+        Set<String> dislikedCategories = new HashSet<>();
 
         for (Participant participant : participants) {
-            List<String> preferences = StringUtils.splitByComma(participant.preferences());
-            for (String pref : preferences) {
-                if (!pref.equals("상관없음")) {
-                    preferredCategories.add(pref);
+            List<String> dislikes = StringUtils.splitByComma(participant.dislikes());
+            for (String dislike : dislikes) {
+                if (!dislike.equals("상관없음")) {
+                    dislikedCategories.add(dislike);
                 }
             }
         }
 
-        return preferredCategories;
+        return dislikedCategories;
     }
 
     /**
@@ -240,6 +190,181 @@ public class RecommendationService {
             case RANGE_1KM -> distance <= 1.0;
             case ANY -> true;
         };
+    }
+
+    /**
+     * 다단계 Fallback 전략을 사용하여 Top 3 레스토랑 추천
+     *
+     * 1단계: 선호도 점수 > 0인 레스토랑만 추천
+     * 2단계: 불호 카테고리만 제외하고 모든 레스토랑 추천
+     *
+     * @param restaurants 전체 레스토랑 목록
+     * @param categoryMap 카테고리 정보 Map
+     * @param preferenceScoreMap 카테고리별 선호도 점수 Map
+     * @param dislikedCategories 불호 카테고리 Set
+     * @param participants 참여자 목록
+     * @param majorityRange 다수결 거리 범위
+     * @param centerPoint 지역 중심 좌표
+     * @return Top 3 레스토랑 목록 (점수 높은 순)
+     */
+    private List<ScoredRestaurant> findTopRestaurantsWithFallback(
+            List<Restaurant> restaurants,
+            Map<Long, Category> categoryMap,
+            Map<String, PreferenceScore> preferenceScoreMap,
+            Set<String> dislikedCategories,
+            List<Participant> participants,
+            DistanceRange majorityRange,
+            GeoJson.Point centerPoint) {
+
+        // 1단계: 선호도 점수 > 0인 레스토랑만
+        List<ScoredRestaurant> results = scoreAndFilterRestaurants(
+            restaurants, categoryMap, preferenceScoreMap,
+            dislikedCategories,
+            participants, majorityRange, centerPoint,
+            FilterStrategy.PREFERENCE_SCORE_POSITIVE
+        );
+
+        if (!results.isEmpty()) {
+            log.info("Found {} restaurants with preference score > 0", results.size());
+            return results;
+        }
+
+        // 2단계: 불호만 필터링
+        log.warn("No restaurants found with preference score > 0. Filtering only disliked categories...");
+        results = scoreAndFilterRestaurants(
+            restaurants, categoryMap, preferenceScoreMap,
+            dislikedCategories,
+            participants, majorityRange, centerPoint,
+            FilterStrategy.DISLIKED_EXCLUDED
+        );
+
+        if (!results.isEmpty()) {
+            log.info("Found {} restaurants by excluding only disliked categories", results.size());
+        }
+
+        return results;
+    }
+
+    /**
+     * 레스토랑 점수 계산 및 필터링을 수행하여 Top 3 추출
+     *
+     * @param restaurants 전체 레스토랑 목록
+     * @param categoryMap 카테고리 정보 Map
+     * @param preferenceScoreMap 카테고리별 선호도 점수 Map
+     * @param dislikedCategories 불호 카테고리 Set
+     * @param participants 참여자 목록
+     * @param majorityRange 다수결 거리 범위
+     * @param centerPoint 지역 중심 좌표
+     * @param strategy 필터링 전략
+     * @return Top 3 레스토랑 목록 (점수 높은 순)
+     */
+    private List<ScoredRestaurant> scoreAndFilterRestaurants(
+            List<Restaurant> restaurants,
+            Map<Long, Category> categoryMap,
+            Map<String, PreferenceScore> preferenceScoreMap,
+            Set<String> dislikedCategories,
+            List<Participant> participants,
+            DistanceRange majorityRange,
+            GeoJson.Point centerPoint,
+            FilterStrategy strategy) {
+
+        PriorityQueue<ScoredRestaurant> top3Heap = new PriorityQueue<>(
+            Comparator.comparingDouble(ScoredRestaurant::totalScore)
+        );
+
+        for (Restaurant restaurant : restaurants) {
+            Category category = categoryMap.get(restaurant.categoryId());
+            if (category == null) {
+                continue;
+            }
+
+            String categoryName = category.largeCategory().getDisplayName();
+
+            PreferenceScore preferenceScore = preferenceScoreMap.getOrDefault(
+                categoryName,
+                PreferenceScore.empty()
+            );
+
+            // 전략별 필터링 적용
+            if (!shouldIncludeRestaurant(categoryName, preferenceScore, dislikedCategories, strategy)) {
+                continue;
+            }
+
+            // 점수 계산
+            double totalScore = 0.0;
+            totalScore += preferenceScore.calculateFinalScore();
+
+            // 거리 가산점
+            if (majorityRange != DistanceRange.ANY && restaurant.location() != null) {
+                double distance = calculateDistance(centerPoint, restaurant.location());
+                boolean withinRange = isWithinDistanceRange(distance, majorityRange);
+                if (withinRange) {
+                    totalScore += 1.0;
+                }
+            }
+
+            // 의견일치율 계산
+            double maxPossibleScore = participants.size() * 3.0;
+            double preferenceOnlyScore = preferenceScore.totalPreferenceScore();
+            double agreementRate = Math.round((preferenceOnlyScore / maxPossibleScore) * 100.0 * 100.0) / 100.0;
+
+            ScoredRestaurant scored = new ScoredRestaurant(restaurant, totalScore, agreementRate);
+
+            // Top-K 알고리즘: 상위 3개만 유지
+            if (top3Heap.size() < 3) {
+                top3Heap.offer(scored);
+            } else if (scored.totalScore() > top3Heap.peek().totalScore()) {
+                top3Heap.poll();
+                top3Heap.offer(scored);
+            }
+        }
+
+        // 상위 3개 추출 및 정렬
+        List<ScoredRestaurant> top3 = new ArrayList<>(top3Heap);
+        top3.sort(Comparator.comparingDouble(ScoredRestaurant::totalScore).reversed());
+
+        return top3;
+    }
+
+    /**
+     * 전략에 따라 레스토랑을 추천 대상에 포함할지 결정합니다.
+     *
+     * @param categoryName 레스토랑의 카테고리명
+     * @param preferenceScore 해당 카테고리의 선호도 점수
+     * @param dislikedCategories 불호 카테고리 Set
+     * @param strategy 필터링 전략
+     * @return 추천 대상에 포함 여부
+     */
+    private boolean shouldIncludeRestaurant(
+            String categoryName,
+            PreferenceScore preferenceScore,
+            Set<String> dislikedCategories,
+            FilterStrategy strategy) {
+
+        return switch (strategy) {
+            case PREFERENCE_SCORE_POSITIVE -> {
+                // 선호도 점수가 0보다 큰 경우만 포함
+                if (preferenceScore.totalPreferenceScore() <= 0) {
+                    yield false;
+                }
+                // 불호 카테고리 제외
+                yield !dislikedCategories.contains(categoryName);
+            }
+            case DISLIKED_EXCLUDED -> {
+                // 불호만 제외 (선호도 점수 체크 안함)
+                yield !dislikedCategories.contains(categoryName);
+            }
+        };
+    }
+
+    /**
+     * 레스토랑 필터링 전략
+     */
+    private enum FilterStrategy {
+        /** 선호도 점수 > 0인 레스토랑만 (1단계) */
+        PREFERENCE_SCORE_POSITIVE,
+        /** 불호 카테고리만 제외 (2단계 Fallback) */
+        DISLIKED_EXCLUDED
     }
 
     private void saveFailedResult(Long gatheringId) {

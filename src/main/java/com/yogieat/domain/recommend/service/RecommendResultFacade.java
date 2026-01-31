@@ -9,7 +9,7 @@ import com.yogieat.domain.participant.domain.value.DistanceRange;
 import com.yogieat.domain.participant.service.ParticipantAnalyzer;
 import com.yogieat.domain.participant.service.ParticipantService;
 import com.yogieat.domain.recommend.domain.RecommendResult;
-import com.yogieat.domain.recommend.domain.result.RecommendResultResult;
+import com.yogieat.domain.recommend.domain.result.RecommendResultData;
 import com.yogieat.domain.recommend.domain.value.CategoryAggregation;
 import com.yogieat.domain.restaurant.domain.Restaurant;
 import com.yogieat.domain.restaurant.service.RestaurantService;
@@ -37,7 +37,7 @@ public class RecommendResultFacade {
     private final ParticipantAnalyzer participantAnalyzer;
 
     @Transactional(readOnly = true)
-    public RecommendResultResult.Get getRecommendResults(String accessKey) {
+    public RecommendResultData.Get getRecommendResults(String accessKey) {
         // 1. accessKey로 Gathering 조회
         Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
 
@@ -45,7 +45,7 @@ public class RecommendResultFacade {
         List<RecommendResult> recommendResults = recommendResultService.findByGatheringId(gathering.id());
 
         if (recommendResults.isEmpty()) {
-            return RecommendResultResult.Get.of(
+            return RecommendResultData.Get.of(
                     Collections.emptyList(),
                     Collections.emptyMap(),
                     Collections.emptyMap(),
@@ -72,7 +72,7 @@ public class RecommendResultFacade {
                 .collect(Collectors.toMap(Category::id, Function.identity()));
 
         // 7. Result 생성
-        List<RecommendResultResult.Ranking> rankings = recommendResults.stream()
+        List<RecommendResultData.Ranking> rankings = recommendResults.stream()
                 .map(result -> buildRankingResult(result, restaurantMap, categoryMap, majorityDistanceRange))
                 .toList();
 
@@ -82,7 +82,7 @@ public class RecommendResultFacade {
                 .average()
                 .orElse(0.0) * 100.0) / 100.0;
 
-        return RecommendResultResult.Get.of(
+        return RecommendResultData.Get.of(
                 rankings,
                 aggregation.preferences(),
                 aggregation.dislikes(),
@@ -90,7 +90,7 @@ public class RecommendResultFacade {
         );
     }
 
-    private RecommendResultResult.Ranking buildRankingResult(
+    private RecommendResultData.Ranking buildRankingResult(
             RecommendResult result,
             Map<Long, Restaurant> restaurantMap,
             Map<Long, Category> categoryMap,
@@ -105,7 +105,7 @@ public class RecommendResultFacade {
             throw new CustomException(ErrorCode.CATEGORY_NOT_FOUND);
         }
 
-        return RecommendResultResult.Ranking.of(
+        return RecommendResultData.Ranking.of(
                 result.rank(),
                 restaurant.id(),
                 restaurant.name(),

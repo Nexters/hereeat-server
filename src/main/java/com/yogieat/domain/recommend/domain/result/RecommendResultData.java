@@ -7,7 +7,7 @@ import com.yogieat.domain.participant.domain.value.DistanceRange;
 import java.util.List;
 import java.util.Map;
 
-public record RecommendResultResult() {
+public record RecommendResultData() {
 
     /**
      * 추천 결과 조회 Result

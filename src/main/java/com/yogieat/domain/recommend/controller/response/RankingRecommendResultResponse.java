@@ -4,7 +4,7 @@ import com.yogieat.domain.category.domain.value.LargeCategory;
 import com.yogieat.domain.common.GeoJson;
 import com.yogieat.domain.common.Region;
 import com.yogieat.domain.participant.domain.value.DistanceRange;
-import com.yogieat.domain.recommend.domain.result.RecommendResultResult;
+import com.yogieat.domain.recommend.domain.result.RecommendResultData;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "추천 결과 랭킹 정보")
@@ -38,7 +38,7 @@ public record RankingRecommendResultResponse(
         @Schema(description = "다수결 거리 범위", example = "RANGE_500M")
         DistanceRange majorityDistanceRange
 ) {
-    public static RankingRecommendResultResponse from(RecommendResultResult.Ranking ranking) {
+    public static RankingRecommendResultResponse from(RecommendResultData.Ranking ranking) {
         return new RankingRecommendResultResponse(
                 ranking.rank(),
                 ranking.restaurantId(),
