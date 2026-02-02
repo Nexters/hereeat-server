@@ -1,0 +1,22 @@
+dependencies {
+    // Internal module dependencies
+    implementation project(':apps:domain')
+    implementation project(':storage:db-core')
+    implementation project(':support:swagger')
+    implementation project(':support:monitoring')
+    implementation project(':support:logging')
+    implementation project(':external:ai')
+    implementation project(':external:kakao')
+
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+// Enable bootJar for API module (main application)
+tasks.named('bootJar') {
+    enabled = true
+}
+
+tasks.named('jar') {
+    enabled = false
+}

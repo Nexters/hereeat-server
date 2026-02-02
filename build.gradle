@@ -1,108 +1,140 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.5.9'
-    id 'io.spring.dependency-management' version '1.1.7'
-    id 'com.diffplug.spotless' version '7.0.2'
+    id 'org.springframework.boot' version "${springBootVersion}" apply false
+    id 'io.spring.dependency-management' version "${springDependencyManagementVersion}" apply false
+    id 'com.diffplug.spotless' version "${spotlessVersion}" apply false
 }
 
-group = 'com.yogieat'
-version = '0.0.1-SNAPSHOT'
+group = projectGroup
+version = "${projectVersion}-SNAPSHOT"
 description = 'yogieat'
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+// Common configuration for all subprojects
+subprojects {
+    // Apply java-library plugin for library modules, java plugin for application modules
+    if (project.path.startsWith(':apps:api')) {
+        apply plugin: 'java'
+    } else {
+        apply plugin: 'java-library'
     }
-}
-
-configurations {
-    compileOnly {
-        extendsFrom annotationProcessor
-    }
-}
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     
-    // Micrometer Tracing with Brave
-    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'com.google.genai:google-genai:1.10.0'
-    implementation 'org.hibernate:hibernate-spatial:6.6.10.Final'
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
+    apply plugin: 'org.springframework.boot'
+    apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'com.diffplug.spotless'
 
-    // QueryDSL (OpenFeign fork - Jakarta support by default)
-    implementation 'io.github.openfeign.querydsl:querydsl-jpa:7.1'
-    annotationProcessor 'io.github.openfeign.querydsl:querydsl-apt:7.1:jakarta'
-    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
-    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+    group = rootProject.group
+    version = rootProject.version
 
-    compileOnly 'org.projectlombok:lombok'
-    runtimeOnly 'com.h2database:h2'
-    runtimeOnly 'org.postgresql:postgresql'
-    annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-
-// Spotless 설정
-spotless {
     java {
-        target("**/*.java")
-        targetExclude("**/generated/**") // QueryDSL generated classes 제외
-        importOrder()
-        removeUnusedImports() // 사용하지 않는 import 제거
-        trimTrailingWhitespace() // 공백 제거
-        endWithNewline() // 끝부분 NewLine 처리
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
+        }
     }
 
-    // SQL 파일 포맷팅 (선택)
-    sql {
-        target 'src/**/*.sql'
-        dbeaver()
+    configurations {
+        compileOnly {
+            extendsFrom annotationProcessor
+        }
     }
 
-    // YAML, JSON 등 기타 파일
-    format 'misc', {
-        target '*.md', '.gitignore', '*.yml', '*.yaml'
-        trimTrailingWhitespace()
-        endWithNewline()
+    repositories {
+        mavenCentral()
+    }
+
+    // Common dependencies for ALL modules
+    dependencies {
+        // Lombok for all modules
+        compileOnly 'org.projectlombok:lombok'
+        annotationProcessor 'org.projectlombok:lombok'
+
+        // Testing for all modules
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+        // Configuration processor for @ConfigurationProperties
+        annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+        // Spring Boot Core (for all modules)
+        implementation 'org.springframework.boot:spring-boot-starter'
+
+        // Validation (for domain models)
+        implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+        // Web dependencies (HttpStatus, etc.)
+        implementation 'org.springframework.boot:spring-boot-starter-web'
+
+        // Data JPA (for domain entities and repositories)
+        implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+        // Transaction support
+        implementation 'org.springframework:spring-tx'
+        implementation 'jakarta.transaction:jakarta.transaction-api'
+
+        // Jackson for JSON (domain models)
+        implementation 'com.fasterxml.jackson.core:jackson-databind'
+        implementation 'com.fasterxml.jackson.core:jackson-annotations'
+
+        // Hibernate Spatial for GIS support
+        implementation "org.hibernate:hibernate-spatial:${hibernateVersion}"
+    }
+
+    // Dependency management - Spring Boot BOM
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.boot:spring-boot-dependencies:${springBootVersion}"
+        }
+    }
+
+    // Spotless configuration for all subprojects
+    spotless {
+        java {
+            target("**/*.java")
+            targetExclude("**/generated/**", "**/build/generated/**")
+            importOrder()
+            removeUnusedImports()
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+
+        sql {
+            target 'src/**/*.sql'
+            dbeaver()
+        }
+
+        format 'misc', {
+            target '*.md', '.gitignore', '*.yml', '*.yaml'
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+    }
+
+    // Default: disable bootJar for all subprojects (enabled only in apps/api)
+    tasks.named('bootJar') {
+        enabled = false
+    }
+
+    // Enable plain jar for libraries
+    tasks.named('jar') {
+        enabled = true
+    }
+
+    tasks.named('test') {
+        useJUnitPlatform()
     }
 }
 
-// Git Hook 자동 설치
+// Git Hook installation at root level
 tasks.register('installGitHook', Copy) {
     from file('scripts/pre-commit')
     into file('.git/hooks')
+    doFirst {
+        file('.git/hooks').mkdirs()
+    }
 }
 
-// 첫 빌드시 자동 설치
-tasks.named('compileJava') {
-    dependsOn 'installGitHook'
-    dependsOn 'spotlessCheck'
-}
-
-tasks.named('test') {
-    useJUnitPlatform()
-}
-
-// QueryDSL 설정
-def generatedDir = 'src/main/generated'
-
-sourceSets {
-    main.java.srcDirs += [ generatedDir ]
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.getGeneratedSourceOutputDirectory().set(file(generatedDir))
-}
-
-clean {
-    delete file(generatedDir)
+// Apply git hook on build
+allprojects {
+    tasks.matching { it.name == 'build' }.configureEach {
+        dependsOn rootProject.tasks.installGitHook
+    }
 }

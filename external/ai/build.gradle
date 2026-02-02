@@ -1,0 +1,4 @@
+dependencies {
+    implementation project(':apps:domain')
+    implementation "com.google.genai:google-genai:${googleGenaiVersion}"
+}
