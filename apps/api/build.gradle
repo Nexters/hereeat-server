@@ -8,6 +8,9 @@ dependencies {
     implementation project(':external:ai')
     implementation project(':external:kakao')
 
+    // Validation (used only by apps:api for request validation)
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
 }
