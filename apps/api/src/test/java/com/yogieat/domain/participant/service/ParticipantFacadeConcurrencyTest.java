@@ -2,16 +2,18 @@ package com.yogieat.domain.participant.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.yogieat.DatabaseCleaner;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.datasource.db.core.gathering.GatheringEntity;
-import com.yogieat.datasource.db.core.gathering.GatheringJpaRepository;
-import com.yogieat.datasource.db.core.participant.ParticipantJpaRepository;
 import com.yogieat.domain.fixture.GatheringFixture;
+import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.value.TimeSlot;
+import com.yogieat.gathering.service.GatheringRepository;
 import com.yogieat.participant.domain.command.ParticipantCommand;
 import com.yogieat.participant.service.ParticipantFacade;
+import com.yogieat.participant.service.ParticipantRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
@@ -32,23 +35,21 @@ import org.springframework.test.context.ActiveProfiles;
 class ParticipantFacadeConcurrencyTest {
 
     @Autowired private ParticipantFacade participantFacade;
-
-    @Autowired private GatheringJpaRepository gatheringRepository;
-
-    @Autowired private ParticipantJpaRepository participantRepository;
+    @Autowired private GatheringRepository gatheringRepository;
+    @Autowired private ParticipantRepository participantRepository;
+    @Autowired private ApplicationContext applicationContext;
 
     @AfterEach
     void cleanup() {
-        participantRepository.deleteAll();
-        gatheringRepository.deleteAll();
+        DatabaseCleaner.clear(applicationContext);
     }
 
     @Test
     @DisplayName("동시에 10명이 참여 시도 시 peopleCount(4)를 초과하지 않는다")
     void concurrentParticipation_shouldNotExceedPeopleCount() throws InterruptedException {
         // Given: peopleCount=4인 모임 생성
-        GatheringEntity gathering = GatheringFixture.create("Test Gathering", 4);
-        gatheringRepository.save(gathering);
+        GatheringEntity gatheringEntity = GatheringFixture.create("Test Gathering", 4);
+        Gathering gathering = gatheringRepository.save(GatheringEntity.toDomain(gatheringEntity));
 
         int threadCount = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -64,7 +65,7 @@ class ParticipantFacadeConcurrencyTest {
                         try {
                             ParticipantCommand.Create command =
                                     new ParticipantCommand.Create(
-                                            gathering.getAccessKey(), null, List.of(), List.of());
+                                            gathering.accessKey(), null, List.of(), List.of());
                             participantFacade.participate(command);
                             successCount.incrementAndGet();
                         } catch (CustomException e) {
@@ -84,7 +85,7 @@ class ParticipantFacadeConcurrencyTest {
         assertThat(successCount.get()).isEqualTo(4);
         assertThat(failCount.get()).isEqualTo(6);
 
-        long actualCount = participantRepository.countByGatheringId(gathering.getId());
+        long actualCount = participantRepository.countByGatheringId(gathering.id());
         assertThat(actualCount).isEqualTo(4);
     }
 
@@ -92,8 +93,8 @@ class ParticipantFacadeConcurrencyTest {
     @DisplayName("서로 다른 모임은 동시 참여 가능 (락 독립성)")
     void differentGatherings_canParticipateSimultaneously() throws InterruptedException {
         // Given: 2개 모임 (각각 고유한 accessKey)
-        GatheringEntity gathering1 = createGatheringWithAccessKey("access-key-1", "Gathering 1");
-        GatheringEntity gathering2 = createGatheringWithAccessKey("access-key-2", "Gathering 2");
+        Gathering gathering1 = createGatheringWithAccessKey("access-key-1", "Gathering 1");
+        Gathering gathering2 = createGatheringWithAccessKey("access-key-2", "Gathering 2");
 
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch endLatch = new CountDownLatch(2);
@@ -106,7 +107,7 @@ class ParticipantFacadeConcurrencyTest {
                             try {
                                 startLatch.await();
                                 long start = System.currentTimeMillis();
-                                participantFacade.participate(createCommand(gathering1.getAccessKey()));
+                                participantFacade.participate(createCommand(gathering1.accessKey()));
                                 executionTimes.add(System.currentTimeMillis() - start);
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
@@ -121,7 +122,7 @@ class ParticipantFacadeConcurrencyTest {
                             try {
                                 startLatch.await();
                                 long start = System.currentTimeMillis();
-                                participantFacade.participate(createCommand(gathering2.getAccessKey()));
+                                participantFacade.participate(createCommand(gathering2.accessKey()));
                                 executionTimes.add(System.currentTimeMillis() - start);
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
@@ -136,17 +137,17 @@ class ParticipantFacadeConcurrencyTest {
 
         // Then: 둘 다 성공, 실행 시간이 거의 동시 (락 대기 없음)
         assertThat(executionTimes).hasSize(2);
-        assertThat(participantRepository.countByGatheringId(gathering1.getId())).isEqualTo(1);
-        assertThat(participantRepository.countByGatheringId(gathering2.getId())).isEqualTo(1);
+        assertThat(participantRepository.countByGatheringId(gathering1.id())).isEqualTo(1);
+        assertThat(participantRepository.countByGatheringId(gathering2.id())).isEqualTo(1);
     }
 
-    private GatheringEntity createGathering(String title) {
-        GatheringEntity gathering = GatheringFixture.create(title, 4);
-        return gatheringRepository.save(gathering);
+    private Gathering createGathering(String title) {
+        GatheringEntity gatheringEntity = GatheringFixture.create(title, 4);
+        return gatheringRepository.save(GatheringEntity.toDomain(gatheringEntity));
     }
 
-    private GatheringEntity createGatheringWithAccessKey(String accessKey, String title) {
-        GatheringEntity gathering = GatheringFixture.create(
+    private Gathering createGatheringWithAccessKey(String accessKey, String title) {
+        GatheringEntity gatheringEntity = GatheringFixture.create(
                 accessKey,
                 title,
                 LocalDate.now().plusDays(7),
@@ -154,7 +155,7 @@ class ParticipantFacadeConcurrencyTest {
                 Region.GANGNAM,
                 4
         );
-        return gatheringRepository.save(gathering);
+        return gatheringRepository.save(GatheringEntity.toDomain(gatheringEntity));
     }
 
     private ParticipantCommand.Create createCommand(String accessKey) {

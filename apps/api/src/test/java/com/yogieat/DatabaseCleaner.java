@@ -1,6 +1,5 @@
 package com.yogieat;
 
-import jakarta.persistence.EntityManager;
 import java.util.List;
 import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -13,39 +12,36 @@ public class DatabaseCleaner {
     }
 
     public static void clear(ApplicationContext applicationContext) {
-        var entityManager = applicationContext.getBean(EntityManager.class);
         var jdbcTemplate = applicationContext.getBean(JdbcTemplate.class);
         var transactionTemplate = applicationContext.getBean(TransactionTemplate.class);
 
         transactionTemplate.execute(
                 status -> {
-                    entityManager.clear();
-                    deleteAll(jdbcTemplate, entityManager);
+                    deleteAll(jdbcTemplate);
                     return null;
                 });
     }
 
-    private static void deleteAll(JdbcTemplate jdbcTemplate, EntityManager entityManager) {
-        entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE").executeUpdate();
+    private static void deleteAll(JdbcTemplate jdbcTemplate) {
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
         for (String tableName : findDatabaseTableNames(jdbcTemplate)) {
-            deleteDataFromTable(entityManager, tableName);
-            resetAutoIncrementColumn(jdbcTemplate, entityManager, tableName);
+            deleteDataFromTable(jdbcTemplate, tableName);
+            resetAutoIncrementColumn(jdbcTemplate, tableName);
         }
-        entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE").executeUpdate();
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
     }
 
-    private static void deleteDataFromTable(EntityManager entityManager, String tableName) {
+    private static void deleteDataFromTable(JdbcTemplate jdbcTemplate, String tableName) {
         String deleteQuery = "DELETE FROM %s".formatted(tableName);
-        entityManager.createNativeQuery(deleteQuery).executeUpdate();
+        jdbcTemplate.execute(deleteQuery);
     }
 
-    private static void resetAutoIncrementColumn(
-            JdbcTemplate jdbcTemplate, EntityManager entityManager, String tableName) {
+    private static void resetAutoIncrementColumn(JdbcTemplate jdbcTemplate, String tableName) {
         String autoIncrementColumn = findAutoIncrementColumn(jdbcTemplate, tableName);
         String resetQuery =
                 "ALTER TABLE %s ALTER COLUMN %s RESTART WITH 1"
                         .formatted(tableName, autoIncrementColumn);
-        entityManager.createNativeQuery(resetQuery).executeUpdate();
+        jdbcTemplate.execute(resetQuery);
     }
 
     private static String findAutoIncrementColumn(JdbcTemplate jdbcTemplate, String tableName) {
