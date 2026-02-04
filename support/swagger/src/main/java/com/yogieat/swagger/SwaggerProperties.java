@@ -1,4 +1,4 @@
-package com.yogieat.support.swagger;
+package com.yogieat.swagger;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
