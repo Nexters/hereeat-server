@@ -7,6 +7,7 @@ import com.yogieat.participant.domain.command.ParticipantCommand;
 import com.yogieat.participant.domain.result.ParticipantResult;
 import com.yogieat.participant.domain.value.DistanceRange;
 import com.yogieat.recommend.event.GatheringFullEvent;
+import com.yogieat.recommend.service.RecommendResultService;
 import com.yogieat.util.LockManager;
 import com.yogieat.util.StringUtils;
 import jakarta.transaction.Transactional;
@@ -23,6 +24,7 @@ public class ParticipantFacade {
     private final GatheringService gatheringService;
     private final LockManager lockManager;
     private final ApplicationEventPublisher eventPublisher;
+    private final RecommendResultService recommendResultService;
 
     @Transactional
     public ParticipantResult.Create participate(ParticipantCommand.Create command) {
@@ -55,10 +57,15 @@ public class ParticipantFacade {
                             participantService.create(
                                     gathering.id(), distanceRange, preferences, dislikes);
 
-                    // 7. 인원 충족 시 이벤트 발행
+                    // 7. 인원 충족 시 PENDING 상태 생성 및 이벤트 발행
                     if (currentParticipantCount + 1 == gathering.peopleCount()) {
-                        log.info("Gathering is full. Publishing GatheringFullEvent for gathering: {}",
+                        log.info("Gathering is full. Creating PENDING status for gathering: {}",
                                  gathering.id());
+
+                        // PENDING 레코드 생성 (동기적)
+                        recommendResultService.createPendingStatus(gathering.id());
+
+                        log.info("Publishing GatheringFullEvent for gathering: {}", gathering.id());
                         eventPublisher.publishEvent(new GatheringFullEvent(
                                 this,
                                 gathering.id(),

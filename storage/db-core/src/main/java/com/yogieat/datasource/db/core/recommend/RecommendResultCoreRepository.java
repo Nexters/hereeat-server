@@ -2,6 +2,8 @@ package com.yogieat.datasource.db.core.recommend;
 
 import com.yogieat.recommend.domain.RecommendResult;
 import com.yogieat.recommend.service.RecommendResultRepository;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -35,5 +37,20 @@ public class RecommendResultCoreRepository implements RecommendResultRepository 
     @Override
     public boolean existsByGatheringId(Long gatheringId) {
         return recommendResultJpaRepository.existsByGatheringId(gatheringId);
+    }
+
+    @Override
+    public void deleteByGatheringId(Long gatheringId) {
+        recommendResultJpaRepository.deleteByGatheringId(gatheringId);
+    }
+
+    @Override
+    public List<RecommendResult> findOrphanedPending(Duration threshold) {
+        LocalDateTime cutoffTime = LocalDateTime.now().minus(threshold);
+        List<RecommendResultEntity> entities =
+            recommendResultJpaRepository.findPendingOlderThan(cutoffTime);
+        return entities.stream()
+            .map(RecommendResultEntity::toDomain)
+            .toList();
     }
 }

@@ -9,13 +9,16 @@ import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.domain.value.DistanceRange;
 import com.yogieat.participant.service.ParticipantAnalyzer;
 import com.yogieat.participant.service.ParticipantRepository;
+import com.yogieat.recommend.domain.FailureReason;
 import com.yogieat.recommend.domain.RecommendResult;
+import com.yogieat.recommend.domain.RecommendResultFailed;
 import com.yogieat.recommend.domain.RecommendStatus;
 import com.yogieat.recommend.domain.value.PreferenceScore;
 import com.yogieat.recommend.domain.value.ScoredRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantRepository;
 import com.yogieat.util.StringUtils;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,7 @@ public class RecommendationService {
     private final RestaurantRepository restaurantRepository;
     private final CategoryService categoryService;
     private final RecommendResultRepository recommendResultRepository;
+    private final RecommendResultFailedRepository recommendResultFailedRepository;
     private final ParticipantAnalyzer participantAnalyzer;
 
     @Transactional
@@ -38,22 +42,35 @@ public class RecommendationService {
         try {
             log.info("Processing recommendation for gathering: {}", gatheringId);
 
-            // 1. 중복 추천 방지
-            if (recommendResultRepository.existsByGatheringId(gatheringId)) {
-                return;
+            // 1. 기존 레코드 확인
+            List<RecommendResult> existing = recommendResultRepository.findByGatheringId(gatheringId);
+            if (!existing.isEmpty()) {
+                RecommendStatus currentStatus = existing.getFirst().status();
+
+                // PENDING이 아닌 경우 (COMPLETED/FAILED) 재처리 방지
+                if (currentStatus != RecommendStatus.PENDING) {
+                    log.info("Recommendation already processed for gathering: {} with status: {}",
+                             gatheringId, currentStatus);
+                    return;
+                }
+
+                // PENDING인 경우: 삭제 후 진행
+                log.info("Deleting PENDING status before processing for gathering: {}", gatheringId);
+                recommendResultRepository.deleteByGatheringId(gatheringId);
             }
 
             // 2. 참여자 조회
             List<Participant> participants = participantRepository.findByGatheringId(gatheringId);
             if (participants.isEmpty()) {
-                saveFailedResult(gatheringId);
+                saveFailedResult(gatheringId, FailureReason.NO_PARTICIPANTS, "No participants found");
                 return;
             }
 
             // 3. Restaurant 조회
             List<Restaurant> restaurants = restaurantRepository.findByRegion(region);
             if (restaurants.isEmpty()) {
-                saveFailedResult(gatheringId);
+                saveFailedResult(gatheringId, FailureReason.NO_RESTAURANTS,
+                                 "No restaurants found in region: " + region);
                 return;
             }
 
@@ -81,7 +98,8 @@ public class RecommendationService {
             );
 
             if (top3.isEmpty()) {
-                saveFailedResult(gatheringId);
+                saveFailedResult(gatheringId, FailureReason.NO_RESTAURANTS,
+                                 "No suitable restaurants found after filtering");
                 return;
             }
 
@@ -106,7 +124,17 @@ public class RecommendationService {
             recommendResultRepository.saveAll(results);
         } catch (Exception e) {
             log.error("Failed to process recommendation for gathering: {}", gatheringId, e);
-            saveFailedResult(gatheringId);
+
+            // PENDING 레코드 삭제 후 FAILED 저장
+            try {
+                recommendResultRepository.deleteByGatheringId(gatheringId);
+                log.info("Deleted PENDING status before saving FAILED for gathering: {}", gatheringId);
+            } catch (Exception deleteEx) {
+                log.error("Failed to delete PENDING status for gathering: {}", gatheringId, deleteEx);
+            }
+
+            saveFailedResult(gatheringId, FailureReason.PROCESSING_EXCEPTION,
+                             e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }
     }
 
@@ -440,7 +468,8 @@ public class RecommendationService {
         return null;
     }
 
-    private void saveFailedResult(Long gatheringId) {
+    private void saveFailedResult(Long gatheringId, FailureReason reason, String errorMessage) {
+        // 1. t_recommend_result에 FAILED 레코드 생성
         RecommendResult failedResult = RecommendResult.Create.of(
                 gatheringId,
                 null,
@@ -450,5 +479,16 @@ public class RecommendationService {
                 0.0
         );
         recommendResultRepository.saveAll(List.of(failedResult));
+
+        // 2. t_recommend_result_failed에 실패 컨텍스트 저장
+        RecommendResultFailed failedContext = RecommendResultFailed.Create.of(
+                gatheringId,
+                reason,
+                errorMessage,
+                LocalDateTime.now()
+        );
+        recommendResultFailedRepository.save(failedContext);
+
+        log.info("Saved FAILED result with reason: {} for gathering: {}", reason, gatheringId);
     }
 }

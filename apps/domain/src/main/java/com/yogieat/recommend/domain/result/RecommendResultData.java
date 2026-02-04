@@ -4,6 +4,8 @@ import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.participant.domain.value.DistanceRange;
+import com.yogieat.recommend.domain.RecommendStatus;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -13,18 +15,40 @@ public record RecommendResultData() {
      * 추천 결과 조회 Result
      */
     public record Get(
+            RecommendStatus status,
             List<Ranking> rankings,
             Map<String, Integer> preferences,
             Map<String, Integer> dislikes,
             Double averageAgreementRate
     ) {
         public static Get of(
+                RecommendStatus status,
                 List<Ranking> rankings,
                 Map<String, Integer> preferences,
                 Map<String, Integer> dislikes,
                 Double averageAgreementRate
         ) {
-            return new Get(rankings, preferences, dislikes, averageAgreementRate);
+            return new Get(status, rankings, preferences, dislikes, averageAgreementRate);
+        }
+
+        public static Get ofPending() {
+            return new Get(
+                RecommendStatus.PENDING,
+                Collections.emptyList(),
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                0.0
+            );
+        }
+
+        public static Get ofEmpty() {
+            return new Get(
+                null,
+                Collections.emptyList(),
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                0.0
+            );
         }
     }
 
