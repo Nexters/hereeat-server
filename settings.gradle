@@ -1,1 +1,17 @@
 rootProject.name = 'yogieat'
+
+// Apps modules
+include 'apps:api'
+include 'apps:domain'
+
+// External integration modules
+include 'external:ai'
+include 'external:kakao'
+
+// Storage modules
+include 'storage:db-core'
+
+// Support modules
+include 'support:logging'
+include 'support:monitoring'
+include 'support:swagger'

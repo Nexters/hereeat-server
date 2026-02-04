@@ -1,0 +1,27 @@
+dependencies {
+    // Internal module dependencies
+    implementation project(':apps:domain')
+    implementation project(':storage:db-core')
+    implementation project(':support:swagger')
+    implementation project(':support:monitoring')
+    implementation project(':support:logging')
+    implementation project(':external:ai')
+    implementation project(':external:kakao')
+
+    // Validation (used only by apps:api for request validation)
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Test dependencies
+    testImplementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+// Enable bootJar for API module (main application)
+tasks.named('bootJar') {
+    enabled = true
+}
+
+tasks.named('jar') {
+    enabled = false
+}
