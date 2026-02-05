@@ -1,7 +1,7 @@
 package com.yogieat.controller.v1.recommend.response;
 
-import com.yogieat.recommend.domain.RecommendStatus;
 import com.yogieat.recommend.domain.result.RecommendResultData;
+import com.yogieat.recommend.domain.value.RecommendStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;

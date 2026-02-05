@@ -1,8 +1,8 @@
 package com.yogieat.datasource.db.core.recommend;
 
 import com.yogieat.datasource.db.core.common.BaseEntity;
-import com.yogieat.recommend.domain.FailureReason;
 import com.yogieat.recommend.domain.RecommendResultFailed;
+import com.yogieat.recommend.domain.value.FailureReason;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;

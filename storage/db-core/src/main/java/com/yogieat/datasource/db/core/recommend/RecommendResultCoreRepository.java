@@ -4,7 +4,7 @@ import static com.yogieat.datasource.db.core.recommend.QRecommendResultEntity.*;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.yogieat.recommend.domain.RecommendResult;
-import com.yogieat.recommend.domain.RecommendStatus;
+import com.yogieat.recommend.domain.value.RecommendStatus;
 import com.yogieat.recommend.service.RecommendResultRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;

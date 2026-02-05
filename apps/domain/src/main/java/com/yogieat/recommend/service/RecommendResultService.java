@@ -1,7 +1,7 @@
 package com.yogieat.recommend.service;
 
 import com.yogieat.recommend.domain.RecommendResult;
-import com.yogieat.recommend.domain.RecommendStatus;
+import com.yogieat.recommend.domain.value.RecommendStatus;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

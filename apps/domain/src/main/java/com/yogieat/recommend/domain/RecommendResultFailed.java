@@ -1,5 +1,6 @@
 package com.yogieat.recommend.domain;
 
+import com.yogieat.recommend.domain.value.FailureReason;
 import java.time.LocalDateTime;
 
 public record RecommendResultFailed(

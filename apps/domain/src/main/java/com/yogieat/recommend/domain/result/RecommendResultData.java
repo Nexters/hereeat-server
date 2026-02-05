@@ -4,7 +4,7 @@ import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.participant.domain.value.DistanceRange;
-import com.yogieat.recommend.domain.RecommendStatus;
+import com.yogieat.recommend.domain.value.RecommendStatus;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;

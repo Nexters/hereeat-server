@@ -1,9 +1,9 @@
 package com.yogieat.scheduler;
 
-import com.yogieat.recommend.domain.FailureReason;
 import com.yogieat.recommend.domain.RecommendResult;
 import com.yogieat.recommend.domain.RecommendResultFailed;
-import com.yogieat.recommend.domain.RecommendStatus;
+import com.yogieat.recommend.domain.value.FailureReason;
+import com.yogieat.recommend.domain.value.RecommendStatus;
 import com.yogieat.recommend.service.RecommendResultFailedRepository;
 import com.yogieat.recommend.service.RecommendResultRepository;
 import java.time.Duration;
@@ -36,8 +36,6 @@ public class PendingRecommendCleanupJob {
         if (!isRunning.compareAndSet(false, true)) {
             return;
         }
-
-        long startTime = System.currentTimeMillis();
 
         try {
             // 1분 이상 된 PENDING 레코드 조회

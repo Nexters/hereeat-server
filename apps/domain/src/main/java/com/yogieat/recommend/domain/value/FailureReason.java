@@ -1,4 +1,4 @@
-package com.yogieat.recommend.domain;
+package com.yogieat.recommend.domain.value;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

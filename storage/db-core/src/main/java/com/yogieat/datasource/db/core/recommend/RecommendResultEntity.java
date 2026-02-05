@@ -2,7 +2,7 @@ package com.yogieat.datasource.db.core.recommend;
 
 import com.yogieat.datasource.db.core.common.BaseEntity;
 import com.yogieat.recommend.domain.RecommendResult;
-import com.yogieat.recommend.domain.RecommendStatus;
+import com.yogieat.recommend.domain.value.RecommendStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
