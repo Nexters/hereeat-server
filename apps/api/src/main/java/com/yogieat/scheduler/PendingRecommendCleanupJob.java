@@ -76,9 +76,11 @@ public class PendingRecommendCleanupJob {
                         LocalDateTime.now()
                     );
                     recommendResultFailedRepository.save(failedContext);
+                    log.info("Cleaned up PENDING recommend result for gatheringId={}", gatheringId);
 
                     successCount++;
                 } catch (Exception e) {
+                    log.error("Failed to cleanup PENDING recommend result for gatheringId={}", pending.gatheringId(), e);
                     failureCount++;
                 }
             }
