@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.List;
 
 public interface RecommendResultRepository {
+    RecommendResult save(RecommendResult recommendResult);
     List<RecommendResult> saveAll(List<RecommendResult> recommendResults);
     List<RecommendResult> findByGatheringId(Long gatheringId);
     boolean existsByGatheringId(Long gatheringId);

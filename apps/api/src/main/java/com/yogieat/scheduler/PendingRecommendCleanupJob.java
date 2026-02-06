@@ -66,7 +66,7 @@ public class PendingRecommendCleanupJob {
                         null,
                         0.0
                     );
-                    recommendResultRepository.saveAll(List.of(failedResult));
+                    recommendResultRepository.save(failedResult);
 
                     // 3. t_recommend_result_failed에 실패 컨텍스트 저장
                     RecommendResultFailed failedContext = RecommendResultFailed.Create.of(

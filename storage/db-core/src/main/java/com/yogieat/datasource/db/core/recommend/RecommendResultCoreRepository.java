@@ -19,6 +19,13 @@ public class RecommendResultCoreRepository implements RecommendResultRepository 
     private final JPAQueryFactory jpaQueryFactory;
 
     @Override
+    public RecommendResult save(RecommendResult recommendResult) {
+        RecommendResultEntity entity = RecommendResultEntity.from(recommendResult);
+        RecommendResultEntity savedEntity = recommendResultJpaRepository.save(entity);
+        return RecommendResultEntity.toDomain(savedEntity);
+    }
+
+    @Override
     public List<RecommendResult> saveAll(List<RecommendResult> recommendResults) {
         List<RecommendResultEntity> entities = recommendResults.stream()
                 .map(RecommendResultEntity::from)
