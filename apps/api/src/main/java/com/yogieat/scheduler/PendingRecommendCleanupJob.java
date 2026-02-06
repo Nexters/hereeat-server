@@ -46,7 +46,6 @@ public class PendingRecommendCleanupJob {
                 return;
             }
 
-            int successCount = 0;
             int failureCount = 0;
 
             // 각 PENDING 레코드를 FAILED로 전환
@@ -78,7 +77,6 @@ public class PendingRecommendCleanupJob {
                     recommendResultFailedRepository.save(failedContext);
                     log.info("Cleaned up PENDING recommend result for gatheringId={}", gatheringId);
 
-                    successCount++;
                 } catch (Exception e) {
                     log.error("Failed to cleanup PENDING recommend result for gatheringId={}", pending.gatheringId(), e);
                     failureCount++;
