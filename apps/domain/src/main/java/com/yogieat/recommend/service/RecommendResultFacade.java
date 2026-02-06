@@ -13,9 +13,9 @@ import com.yogieat.participant.service.ParticipantService;
 import com.yogieat.recommend.domain.RecommendResult;
 import com.yogieat.recommend.domain.result.RecommendResultData;
 import com.yogieat.recommend.domain.value.CategoryAggregation;
+import com.yogieat.recommend.domain.value.RecommendStatus;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantService;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -44,25 +44,27 @@ public class RecommendResultFacade {
         // 2. gatheringId로 RecommendResult 목록 조회 (rank 순서대로)
         List<RecommendResult> recommendResults = recommendResultService.findByGatheringId(gathering.id());
 
+        // 3. 결과가 없는 경우
         if (recommendResults.isEmpty()) {
-            return RecommendResultData.Get.of(
-                    Collections.emptyList(),
-                    Collections.emptyMap(),
-                    Collections.emptyMap(),
-                    0.0
-            );
+            return RecommendResultData.Get.ofEmpty();
         }
 
-        // 3. 참여자 목록 조회
+        // 4. PENDING 상태인 경우
+        if (recommendResults.get(0).status() == RecommendStatus.PENDING) {
+            log.info("Recommendation is still PENDING for gathering: {}", gathering.id());
+            return RecommendResultData.Get.ofPending();
+        }
+
+        // 5. 참여자 목록 조회
         List<Participant> participants = participantService.findByGatheringId(gathering.id());
 
-        // 4. 다수결 DistanceRange 결정
+        // 6. 다수결 DistanceRange 결정
         DistanceRange majorityDistanceRange = participantAnalyzer.determineMajorityDistanceRange(participants);
 
-        // 5. 카테고리별 선호도/불호 집계
+        // 7. 카테고리별 선호도/불호 집계
         CategoryAggregation aggregation = participantAnalyzer.aggregateCategoryPreferences(participants);
 
-        // 6. Restaurant 정보와 Category 정보 조회 및 캐싱
+        // 8. Restaurant 정보와 Category 정보 조회 및 캐싱
         List<Long> restaurantIds = recommendResults.stream()
                 .map(RecommendResult::restaurantId)
                 .toList();
@@ -71,18 +73,19 @@ public class RecommendResultFacade {
         Map<Long, Category> categoryMap = categoryService.findAll().stream()
                 .collect(Collectors.toMap(Category::id, Function.identity()));
 
-        // 7. Result 생성
+        // 9. Result 생성
         List<RecommendResultData.Ranking> rankings = recommendResults.stream()
                 .map(result -> buildRankingResult(result, restaurantMap, categoryMap, majorityDistanceRange))
                 .toList();
 
-        // 8. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
+        // 10. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
         double averageAgreementRate = Math.round(recommendResults.stream()
                 .mapToDouble(RecommendResult::agreementRate)
                 .average()
                 .orElse(0.0) * 100.0) / 100.0;
 
         return RecommendResultData.Get.of(
+                RecommendStatus.COMPLETED,
                 rankings,
                 aggregation.preferences(),
                 aggregation.dislikes(),

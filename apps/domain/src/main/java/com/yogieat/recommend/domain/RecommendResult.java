@@ -1,5 +1,7 @@
 package com.yogieat.recommend.domain;
 
+import com.yogieat.recommend.domain.value.RecommendStatus;
+
 public record RecommendResult(
         Long id,
         Long gatheringId,

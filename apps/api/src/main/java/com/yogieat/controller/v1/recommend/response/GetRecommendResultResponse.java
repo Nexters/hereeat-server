@@ -1,12 +1,16 @@
 package com.yogieat.controller.v1.recommend.response;
 
 import com.yogieat.recommend.domain.result.RecommendResultData;
+import com.yogieat.recommend.domain.value.RecommendStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;
 
 @Schema(description = "추천 결과 조회 응답 정보")
 public record GetRecommendResultResponse(
+        @Schema(description = "추천 처리 상태 (PENDING: 처리 중, COMPLETED: 완료, FAILED: 실패)",
+                example = "COMPLETED")
+        RecommendStatus status,
         @Schema(description = "1위 추천 결과")
         RankingRecommendResultResponse topRecommendation,
         @Schema(description = "2, 3위 추천 결과 리스트")
@@ -30,6 +34,7 @@ public record GetRecommendResultResponse(
                 : List.of();
 
         return new GetRecommendResultResponse(
+                result.status(),
                 topRecommendation,
                 otherCandidates,
                 result.preferences(),
