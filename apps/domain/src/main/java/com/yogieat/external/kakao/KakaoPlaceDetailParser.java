@@ -52,8 +52,7 @@ public class KakaoPlaceDetailParser {
             Double rating = extractRating(panel);
 
             // 평점이 3.0~5.0 사이가 아니면 필터링
-            if (rating == null || rating < 3.0 || rating > 5.0) {
-                log.debug("Filtered out place due to rating: placeId={}, rating={}", requestedPlaceId, rating);
+            if (rating == null || rating < 3.5 || rating > 5.0) {
                 return KakaoPlaceDetailData.empty(requestedPlaceId);
             }
 
