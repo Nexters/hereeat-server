@@ -1,6 +1,7 @@
 package com.yogieat.participant.service;
 
 import com.yogieat.gathering.domain.Gathering;
+import com.yogieat.gathering.event.ParticipantJoinedEvent;
 import com.yogieat.gathering.service.GatheringService;
 import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.domain.command.ParticipantCommand;
@@ -57,10 +58,19 @@ public class ParticipantFacade {
                             participantService.create(
                                     gathering.id(), distanceRange, preferences, dislikes);
 
-                    // 7. 인원 충족 시 PENDING 상태 생성 및 이벤트 발행
-                    if (currentParticipantCount + 1 == gathering.peopleCount()) {
+                    // 7. 참여자 변경 SSE 이벤트 발행
+                    long newCount = currentParticipantCount + 1;
+                    eventPublisher.publishEvent(new ParticipantJoinedEvent(
+                            this,
+                            command.accessKey(),
+                            newCount,
+                            gathering.peopleCount()
+                    ));
+
+                    // 8. 인원 충족 시 PENDING 상태 생성 및 이벤트 발행
+                    if (newCount == gathering.peopleCount()) {
                         log.info("Gathering is full. Creating PENDING status for gathering: {}",
-                                 gathering.id());
+                                gathering.id());
 
                         // PENDING 레코드 생성 (동기적)
                         recommendResultService.createPendingStatus(gathering.id());
