@@ -1,0 +1,18 @@
+have_fun: false
+code_review:
+  disable: false
+  comment_severity_threshold: MEDIUM
+  max_review_comments: 5  # 최대 5개 코멘트로 제한 (우선순위 기반)
+  pull_request_opened:
+    help: false
+    summary: true
+    code_review: true
+    include_drafts: false  # Draft PR은 리뷰 제외
+ignore_patterns:
+  - ".github/"
+  - ".claude/"
+  - ".claude-plugin/"
+  - ".amazonq/"
+  - ".serena/"
+  - "**/generated/**"  # 자동 생성된 파일 제외
+  - "**/build/**"  # 빌드 산출물 제외

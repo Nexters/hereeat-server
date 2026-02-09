@@ -41,6 +41,7 @@ out/
 .serena
 .claude
 .claude-plugin
+.amazonq
 
 ### ENV ###
 .env
