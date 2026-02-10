@@ -1,6 +1,8 @@
 package com.yogieat.participant.service;
 
 import com.yogieat.gathering.domain.Gathering;
+import com.yogieat.gathering.domain.result.GatheringResult;
+import com.yogieat.gathering.service.GatheringEventNotifier;
 import com.yogieat.gathering.service.GatheringService;
 import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.domain.command.ParticipantCommand;
@@ -25,6 +27,7 @@ public class ParticipantFacade {
     private final LockManager lockManager;
     private final ApplicationEventPublisher eventPublisher;
     private final RecommendResultService recommendResultService;
+    private final GatheringEventNotifier gatheringEventNotifier;
 
     @Transactional
     public ParticipantResult.Create participate(ParticipantCommand.Create command) {
@@ -57,10 +60,17 @@ public class ParticipantFacade {
                             participantService.create(
                                     gathering.id(), distanceRange, preferences, dislikes);
 
-                    // 7. 인원 충족 시 PENDING 상태 생성 및 이벤트 발행
-                    if (currentParticipantCount + 1 == gathering.peopleCount()) {
-                        log.info("Gathering is full. Creating PENDING status for gathering: {}",
-                                 gathering.id());
+                    // 7. 참여자 변경 SSE 알림
+                    long newCount = currentParticipantCount + 1;
+                    GatheringResult.ParticipantCount status =
+                            GatheringResult.ParticipantCount.of(newCount, gathering.peopleCount());
+                    gatheringEventNotifier.notifyParticipantJoined(command.accessKey(), status);
+
+                    // 8. 인원 충족 시 PENDING 상태 생성 및 이벤트 발행
+                    if (newCount == gathering.peopleCount()) {
+                        log.info("Gathering is full. Creating PENDING status for gathering: {}", gathering.id());
+
+                        gatheringEventNotifier.notifyGatheringFull(command.accessKey(), status);
 
                         // PENDING 레코드 생성 (동기적)
                         recommendResultService.createPendingStatus(gathering.id());
