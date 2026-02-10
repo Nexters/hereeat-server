@@ -22,7 +22,7 @@ class CreateParticipantRequestTest {
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -43,7 +43,7 @@ class CreateParticipantRequestTest {
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -61,7 +61,7 @@ class CreateParticipantRequestTest {
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -79,7 +79,7 @@ class CreateParticipantRequestTest {
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -97,7 +97,7 @@ class CreateParticipantRequestTest {
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -115,7 +115,7 @@ class CreateParticipantRequestTest {
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -133,7 +133,7 @@ class CreateParticipantRequestTest {
 
         // When & Then
         assertThatThrownBy(
-                        () -> new CreateParticipantRequest(accessKey, distance, dislikes, preferences))
+                        () -> CreateParticipantRequest.of(accessKey, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }
@@ -149,7 +149,7 @@ class CreateParticipantRequestTest {
 
         // When
         CreateParticipantRequest request =
-                new CreateParticipantRequest(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -167,7 +167,7 @@ class CreateParticipantRequestTest {
 
         // When & Then
         assertThatThrownBy(
-                        () -> new CreateParticipantRequest(accessKey, distance, dislikes, preferences))
+                        () -> CreateParticipantRequest.of(accessKey, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_PREFERENCES_EXCEEDED);
     }
@@ -183,7 +183,7 @@ class CreateParticipantRequestTest {
 
         // When & Then
         assertThatThrownBy(
-                        () -> new CreateParticipantRequest(accessKey, distance, dislikes, preferences))
+                        () -> CreateParticipantRequest.of(accessKey, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }
