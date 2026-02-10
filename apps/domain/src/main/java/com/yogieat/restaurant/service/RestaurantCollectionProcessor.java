@@ -301,9 +301,7 @@ public class RestaurantCollectionProcessor {
                 } else {
                     mapUrl = originalMapUrl;
                 }
-                geoJsonLocation = new GeoJson.Point(
-                    List.of(data.location().getX(), data.location().getY())
-                );
+                geoJsonLocation = data.location();
 
                 // 5. Kakao Detail API (panel3)로 평점 및 사진 보강 시도
                 Optional<KakaoPlaceDetailData> detailOpt = kakaoPlaceDetailClient.fetchPlaceDetail(place.id());

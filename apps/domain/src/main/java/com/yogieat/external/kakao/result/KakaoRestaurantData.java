@@ -1,6 +1,6 @@
 package com.yogieat.external.kakao.result;
 
-import org.locationtech.jts.geom.Point;
+import com.yogieat.common.GeoJson;
 
 /**
  * Domain DTO for restaurant data from Kakao Place API
@@ -11,5 +11,5 @@ public record KakaoRestaurantData(
     String name,
     String address,
     String mapUrl,
-    Point location
+    GeoJson.Point location
 ) {}

@@ -1,6 +1,5 @@
 package com.yogieat.datasource.db.core.restaurant;
 
-import com.yogieat.common.GeoConverter;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.datasource.db.core.common.BaseEntity;
@@ -17,7 +16,10 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.PrecisionModel;
 
 @Getter
 @Entity
@@ -43,6 +45,9 @@ import org.locationtech.jts.geom.Point;
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RestaurantEntity extends BaseEntity {
+    private static final GeometryFactory GEOMETRY_FACTORY =
+            new GeometryFactory(new PrecisionModel(), 4326);
+
     private String name;
     private String address;
     private Double rating;
@@ -94,10 +99,9 @@ public class RestaurantEntity extends BaseEntity {
      * Encapsulates builder usage and prevents external access to builder
      *
      * @param createRestaurant Domain object for creating restaurant
-     * @param geoConverter Converter to transform GeoJson.Point to JTS Point
      * @return RestaurantEntity instance
      */
-    public static RestaurantEntity from(CreateRestaurant createRestaurant, GeoConverter geoConverter) {
+    public static RestaurantEntity from(CreateRestaurant createRestaurant) {
         return builder()
                 .externalId(createRestaurant.externalId())
                 .categoryId(createRestaurant.categoryId())
@@ -111,7 +115,7 @@ public class RestaurantEntity extends BaseEntity {
                 .region(createRestaurant.region())
                 .location(
                         createRestaurant.location() != null
-                                ? geoConverter.geoJsonPointToJtsPoint(createRestaurant.location())
+                                ? toJtsPoint(createRestaurant.location())
                                 : null)
                 .build();
     }
@@ -133,5 +137,10 @@ public class RestaurantEntity extends BaseEntity {
                     ? new GeoJson.Point(List.of(entity.location.getX(), entity.location.getY()))
                     : null
         );
+    }
+
+    private static Point toJtsPoint(GeoJson.Point point) {
+        List<Double> coordinates = point.getCoordinates();
+        return GEOMETRY_FACTORY.createPoint(new Coordinate(coordinates.getFirst(), coordinates.get(1)));
     }
 }

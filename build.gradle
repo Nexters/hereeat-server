@@ -53,23 +53,6 @@ subprojects {
 
         // Configuration processor for @ConfigurationProperties
         annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
-
-        // Spring Boot Core (for all modules)
-        implementation 'org.springframework.boot:spring-boot-starter'
-
-        // Web dependencies (used by: apps:api, apps:domain, external:kakao)
-        implementation 'org.springframework.boot:spring-boot-starter-web'
-
-        // Transaction support (used by: apps:domain, storage:db-core)
-        implementation 'org.springframework:spring-tx'
-        implementation 'jakarta.transaction:jakarta.transaction-api'
-
-        // Jackson for JSON (used by: apps:domain, external:ai, external:kakao)
-        implementation 'com.fasterxml.jackson.core:jackson-databind'
-        implementation 'com.fasterxml.jackson.core:jackson-annotations'
-
-        // Hibernate Spatial for GIS (used by: apps:api, apps:domain, storage:db-core)
-        implementation "org.hibernate:hibernate-spatial:${hibernateVersion}"
     }
 
     // Dependency management - Spring Boot BOM

@@ -7,6 +7,9 @@ dependencies {
 
     // Data JPA (for domain entities and repositories)
     api 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation "org.hibernate:hibernate-spatial:${hibernateVersion}"
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations'
 
     runtimeOnly 'org.postgresql:postgresql'
     runtimeOnly 'com.h2database:h2'

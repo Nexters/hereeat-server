@@ -1,6 +1,5 @@
 package com.yogieat.datasource.db.core.restaurant;
 
-import com.yogieat.common.GeoConverter;
 import com.yogieat.common.Region;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Repository;
 public class RestaurantCoreRepository implements RestaurantRepository {
 
     private final RestaurantJpaRepository restaurantJpaRepository;
-    private final GeoConverter geoConverter;
 
     @Override
     public boolean existsByExternalId(String externalId) {
@@ -30,7 +28,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     @Override
     public Restaurant save(CreateRestaurant createRestaurant) {
         // Convert CreateRestaurant to entity using static factory method
-        RestaurantEntity entity = RestaurantEntity.from(createRestaurant, geoConverter);
+        RestaurantEntity entity = RestaurantEntity.from(createRestaurant);
 
         // Save and convert back to domain
         RestaurantEntity savedEntity = restaurantJpaRepository.save(entity);

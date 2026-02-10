@@ -10,11 +10,11 @@ import com.yogieat.recommend.event.GatheringFullEvent;
 import com.yogieat.recommend.service.RecommendResultService;
 import com.yogieat.util.LockManager;
 import com.yogieat.util.StringUtils;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor

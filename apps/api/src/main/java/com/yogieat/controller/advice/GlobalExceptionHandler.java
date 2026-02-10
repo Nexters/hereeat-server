@@ -26,6 +26,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 @RequiredArgsConstructor
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+    private final ErrorHttpStatusMapper errorHttpStatusMapper;
 
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
@@ -95,11 +96,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             MethodArgumentTypeMismatchException e) {
         log.error("MethodArgumentTypeMismatchException : {}", e.getMessage(), e);
         final ErrorCode errorCode = ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH;
+        final HttpStatus status = errorHttpStatusMapper.toHttpStatus(errorCode);
         final ErrorResponse errorResponse =
                 ErrorResponse.of(e.getClass().getSimpleName(), errorCode.getMessage());
         final GlobalApiResponse response =
-                GlobalApiResponse.fail(errorCode.getStatus().value(), errorResponse);
-        return ResponseEntity.status(errorCode.getStatus()).body(response);
+                GlobalApiResponse.fail(status.value(), errorResponse);
+        return ResponseEntity.status(status).body(response);
     }
 
     /** 지원하지 않은 HTTP method 호출 할 경우 발생 */
@@ -111,22 +113,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             WebRequest request) {
         log.error("HttpRequestMethodNotSupportedException : {}", e.getMessage(), e);
         final ErrorCode errorCode = ErrorCode.METHOD_NOT_ALLOWED;
+        final HttpStatus statusMapped = errorHttpStatusMapper.toHttpStatus(errorCode);
         final ErrorResponse errorResponse =
                 ErrorResponse.of(e.getClass().getSimpleName(), errorCode.getMessage());
         final GlobalApiResponse response =
-                GlobalApiResponse.fail(errorCode.getStatus().value(), errorResponse);
-        return ResponseEntity.status(errorCode.getStatus()).body(response);
+                GlobalApiResponse.fail(statusMapped.value(), errorResponse);
+        return ResponseEntity.status(statusMapped).body(response);
     }
 
      @ExceptionHandler(CustomException.class)
      public ResponseEntity<GlobalApiResponse> handleCustomException(CustomException e) {
          log.error("CustomException : {}", e.getMessage(), e);
          final ErrorCode errorCode = e.getErrorCode();
+         final HttpStatus status = errorHttpStatusMapper.toHttpStatus(errorCode);
          final ErrorResponse errorResponse =
                  ErrorResponse.of(errorCode.getCode(), errorCode.getMessage());
          final GlobalApiResponse response =
-                 GlobalApiResponse.fail(errorCode.getStatus().value(), errorResponse);
-         return ResponseEntity.status(errorCode.getStatus()).body(response);
+                 GlobalApiResponse.fail(status.value(), errorResponse);
+         return ResponseEntity.status(status).body(response);
      }
 
     /**
@@ -146,11 +150,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         while (cause != null) {
             if (cause instanceof CustomException customException) {
                 final ErrorCode errorCode = customException.getErrorCode();
+                final HttpStatus statusMapped = errorHttpStatusMapper.toHttpStatus(errorCode);
                 final ErrorResponse errorResponse =
                         ErrorResponse.of(errorCode.getCode(), errorCode.getMessage());
                 final GlobalApiResponse response =
-                        GlobalApiResponse.fail(errorCode.getStatus().value(), errorResponse);
-                return ResponseEntity.status(errorCode.getStatus()).body(response);
+                        GlobalApiResponse.fail(statusMapped.value(), errorResponse);
+                return ResponseEntity.status(statusMapped).body(response);
             }
             cause = cause.getCause();
         }
@@ -168,10 +173,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<GlobalApiResponse> handleException(Exception e) {
         log.error("Internal Server Error : {}", e.getMessage(), e);
         final ErrorCode internalServerError = ErrorCode.INTERNAL_SERVER_ERROR;
+        final HttpStatus status = errorHttpStatusMapper.toHttpStatus(internalServerError);
         final ErrorResponse errorResponse =
                 ErrorResponse.of(e.getClass().getSimpleName(), internalServerError.getMessage());
         final GlobalApiResponse response =
-                GlobalApiResponse.fail(internalServerError.getStatus().value(), errorResponse);
-        return ResponseEntity.status(internalServerError.getStatus()).body(response);
+                GlobalApiResponse.fail(status.value(), errorResponse);
+        return ResponseEntity.status(status).body(response);
     }
 }
