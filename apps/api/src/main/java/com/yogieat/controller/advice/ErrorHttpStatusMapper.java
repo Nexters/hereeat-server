@@ -32,9 +32,7 @@ public class ErrorHttpStatusMapper {
                  KAKAO_API_ERROR -> HttpStatus.SERVICE_UNAVAILABLE;
             case KAKAO_RATE_LIMIT_EXCEEDED -> HttpStatus.TOO_MANY_REQUESTS;
             case LOCK_TIMEOUT -> HttpStatus.REQUEST_TIMEOUT;
-            case INTERNAL_SERVER_ERROR,
-                 GEMINI_RESPONSE_PARSE_ERROR,
-                 RESTAURANT_COLLECTION_FAILED -> HttpStatus.INTERNAL_SERVER_ERROR;
+            default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }
 }
