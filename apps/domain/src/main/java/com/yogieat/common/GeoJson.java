@@ -1,21 +1,9 @@
 package com.yogieat.common;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.util.List;
 import lombok.Getter;
 
-@JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "type"
-)
-@JsonSubTypes({
-    @JsonSubTypes.Type(value = GeoJson.Point.class, name = "Point")
-})
 public class GeoJson {
-    @JsonIgnore
     public String getType() {
         return null;
     }
@@ -28,7 +16,6 @@ public class GeoJson {
             this.coordinates = coordinates;
         }
 
-        @JsonIgnore
         @Override
         public String getType() {
             return "Point";

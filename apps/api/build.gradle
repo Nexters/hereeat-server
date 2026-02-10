@@ -8,6 +8,9 @@ dependencies {
     implementation project(':external:ai')
     implementation project(':external:kakao')
 
+    // API runtime
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
     // Validation (used only by apps:api for request validation)
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 

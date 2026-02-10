@@ -71,7 +71,7 @@ graph TB
 
 #### external:kakao
 - **책임**: Kakao API 통합 (지도, 장소 검색)
-- **포함**: KakaoPlaceClient, KakaoPlaceMapper
+- **포함**: KakaoPlaceClientImpl, KakaoPlaceDetailClientImpl, KakaoPlaceMapperImpl, KakaoPlaceDetailParser
 - **플러그인**: `java-library`
 
 ### Storage Layer (데이터 저장소 계층)
@@ -207,7 +207,7 @@ sequenceDiagram
 
 ### 2. 의존성 역전 원칙 (DIP)
 - 상위 레벨 모듈(`apps:domain`)은 하위 레벨 모듈에 의존하지 않는다
-- 인터페이스(Repository)를 통해 의존성을 역전시킨다
+- Repository/External Client 인터페이스를 통해 의존성을 역전시킨다
 
 ### 3. 개방-폐쇄 원칙 (OCP)
 - 새로운 외부 서비스 추가 시 `external` 모듈만 추가한다
@@ -216,6 +216,22 @@ sequenceDiagram
 ### 4. 계층 분리
 - 각 계층은 명확한 경계를 가진다
 - 의존성 방향은 항상 외부 → 내부(도메인)으로 흐른다
+
+## 최근 리팩토링 적용 사항
+
+### 리스크와 우선순위
+1. 도메인 계층에 인프라 구현이 혼재되어 계층 경계가 약화됨
+2. 루트 공통 의존성 주입으로 모듈별 최소 의존 원칙이 약화됨
+3. JPA 스캔 범위가 광범위하여 모듈 경계 누수 위험이 있음
+4. 애플리케이션 엔트리포인트 접근 제어자 누락으로 실행 호환성 리스크가 있음
+5. 문서와 실제 코드 구조 간 불일치가 존재함
+
+### 반영 결과
+1. `apps:domain`에는 Kakao 포트 인터페이스만 두고, 상세 조회/파싱/매핑 구현은 `external:kakao`로 이동
+2. 루트 `build.gradle`의 광역 implementation 의존성 제거, 모듈별 `build.gradle`에 명시
+3. `storage:db-core`의 Entity/Repository 스캔 범위를 `com.yogieat.datasource.db.core`로 축소
+4. `ServerApplication.main`을 `public static`으로 수정
+5. 본 문서를 현재 구조 기준으로 갱신
 
 ## 장점
 

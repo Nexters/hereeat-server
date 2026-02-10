@@ -9,12 +9,12 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableTransactionManagement
 @EntityScan(
         basePackages = {
-                "com.yogieat"
+                "com.yogieat.datasource.db.core"
         }
 )
 @EnableJpaRepositories(
         basePackages = {
-                "com.yogieat"
+                "com.yogieat.datasource.db.core"
         }
 )
 public class CoreJpaConfig { // JPA + Transaction + Repository

@@ -3,9 +3,9 @@ package com.yogieat.gathering.service;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.command.GatheringCommand;
 import com.yogieat.gathering.domain.result.GatheringResult;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor

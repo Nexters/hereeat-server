@@ -1,6 +1,7 @@
 package com.yogieat.config.async;
 
 import com.yogieat.common.error.CustomException;
+import com.yogieat.controller.advice.ErrorHttpStatusMapper;
 import java.lang.reflect.Method;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -11,6 +12,11 @@ import org.springframework.http.HttpStatus;
 public class AsyncExceptionHandler implements AsyncUncaughtExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(AsyncExceptionHandler.class);
+    private final ErrorHttpStatusMapper errorHttpStatusMapper;
+
+    public AsyncExceptionHandler(ErrorHttpStatusMapper errorHttpStatusMapper) {
+        this.errorHttpStatusMapper = errorHttpStatusMapper;
+    }
 
     @Override
     public void handleUncaughtException(
@@ -19,7 +25,7 @@ public class AsyncExceptionHandler implements AsyncUncaughtExceptionHandler {
             Object @NonNull ... params
     ) {
         if (ex instanceof CustomException customException) {
-            HttpStatus status = customException.getErrorCode().getStatus();
+            HttpStatus status = errorHttpStatusMapper.toHttpStatus(customException.getErrorCode());
             String errorMessage =
                     String.format(
                             "CustomException in async method '%s': %s",
