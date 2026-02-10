@@ -129,6 +129,40 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
          return ResponseEntity.status(errorCode.getStatus()).body(response);
      }
 
+    /**
+     * HTTP 메시지를 읽을 수 없을 때 발생하는 예외 처리
+     * JSON 역직렬화 중 발생한 CustomException을 처리
+     */
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            @NonNull org.springframework.http.converter.HttpMessageNotReadableException e,
+            @NonNull HttpHeaders headers,
+            @NonNull HttpStatusCode status,
+            @NonNull WebRequest request) {
+        log.error("HttpMessageNotReadableException : {}", e.getMessage(), e);
+
+        // 원인이 CustomException인 경우 처리
+        Throwable cause = e.getCause();
+        while (cause != null) {
+            if (cause instanceof CustomException customException) {
+                final ErrorCode errorCode = customException.getErrorCode();
+                final ErrorResponse errorResponse =
+                        ErrorResponse.of(errorCode.getCode(), errorCode.getMessage());
+                final GlobalApiResponse response =
+                        GlobalApiResponse.fail(errorCode.getStatus().value(), errorResponse);
+                return ResponseEntity.status(errorCode.getStatus()).body(response);
+            }
+            cause = cause.getCause();
+        }
+
+        // CustomException이 아닌 경우 기본 처리
+        final ErrorResponse errorResponse =
+                ErrorResponse.of(e.getClass().getSimpleName(), "잘못된 요청 형식입니다");
+        final GlobalApiResponse response =
+                GlobalApiResponse.fail(HttpStatus.BAD_REQUEST.value(), errorResponse);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
     /** 500번대 에러 처리 */
     @ExceptionHandler(Exception.class)
     protected ResponseEntity<GlobalApiResponse> handleException(Exception e) {

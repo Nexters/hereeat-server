@@ -29,6 +29,7 @@ public record CreateParticipantRequest(
         if (dislikes != null && dislikes.size() > MAX_DISLIKES_SIZE) {
             throw new CustomException(ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
         }
+
         if (preferences != null && preferences.size() > MAX_PREFERENCES_SIZE) {
             throw new CustomException(ErrorCode.PARTICIPANT_PREFERENCES_EXCEEDED);
         }
