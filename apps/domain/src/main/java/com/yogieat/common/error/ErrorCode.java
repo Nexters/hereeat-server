@@ -43,7 +43,7 @@ public enum ErrorCode {
     GATHERING_SCHEDULED_DATE_PAST(HttpStatus.BAD_REQUEST, "GA007", "과거 날짜로는 모임을 생성할 수 없습니다"),
 
 	// Participant
-	PARTICIPANT_DISLIKES_EXCEEDED(HttpStatus.BAD_REQUEST, "P001", "비선호 음식은 최대 1개까지 입력 가능합니다"),
+	PARTICIPANT_DISLIKES_EXCEEDED(HttpStatus.BAD_REQUEST, "P001", "비선호 음식은 최소 1개, 최대 4개까지 입력 가능합니다"),
     PARTICIPANT_PREFERENCES_EXCEEDED(HttpStatus.BAD_REQUEST, "P002", "선호 음식은 최대 3개까지 입력 가능합니다"),
 
 	// Lock

@@ -33,21 +33,19 @@ class CreateParticipantRequestTest {
     }
 
     @Test
-    @DisplayName("dislikes가 null이면 생성에 성공한다")
-    void dislikesNull_shouldCreateSuccessfully() {
+    @DisplayName("dislikes가 null이면 예외가 발생한다")
+    void dislikesNull_shouldThrowException() {
         // Given
         String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = null;
         List<String> preferences = List.of("치킨");
 
-        // When
-        CreateParticipantRequest request =
-                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
-
-        // Then
-        assertThat(request).isNotNull();
-        assertThat(request.dislikes()).isNull();
+        // When & Then
+        assertThatThrownBy(
+                        () -> CreateParticipantRequest.of(accessKey, distance, dislikes, preferences))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }
 
     @Test
@@ -69,21 +67,19 @@ class CreateParticipantRequestTest {
     }
 
     @Test
-    @DisplayName("dislikes가 빈 리스트이면 생성에 성공한다")
-    void dislikesEmpty_shouldCreateSuccessfully() {
+    @DisplayName("dislikes가 빈 리스트이면 예외가 발생한다")
+    void dislikesEmpty_shouldThrowException() {
         // Given
         String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of();
         List<String> preferences = List.of("치킨");
 
-        // When
-        CreateParticipantRequest request =
-                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
-
-        // Then
-        assertThat(request).isNotNull();
-        assertThat(request.dislikes()).isEmpty();
+        // When & Then
+        assertThatThrownBy(
+                        () -> CreateParticipantRequest.of(accessKey, distance, dislikes, preferences))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }
 
     @Test
@@ -123,12 +119,48 @@ class CreateParticipantRequestTest {
     }
 
     @Test
-    @DisplayName("dislikes가 2개 이상이면 예외가 발생한다")
-    void dislikesExceeded_shouldThrowException() {
+    @DisplayName("dislikes가 2개이면 생성에 성공한다")
+    void dislikesTwo_shouldCreateSuccessfully() {
         // Given
         String accessKey = "test-access-key";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파", "마늘");
+        List<String> preferences = List.of("치킨");
+
+        // When
+        CreateParticipantRequest request =
+                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
+
+        // Then
+        assertThat(request).isNotNull();
+        assertThat(request.dislikes()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("dislikes가 4개이면 생성에 성공한다")
+    void dislikesFour_shouldCreateSuccessfully() {
+        // Given
+        String accessKey = "test-access-key";
+        Double distance = 500.0;
+        List<String> dislikes = List.of("양파", "마늘", "파", "생강");
+        List<String> preferences = List.of("치킨");
+
+        // When
+        CreateParticipantRequest request =
+                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
+
+        // Then
+        assertThat(request).isNotNull();
+        assertThat(request.dislikes()).hasSize(4);
+    }
+
+    @Test
+    @DisplayName("dislikes가 5개 이상이면 예외가 발생한다")
+    void dislikesExceeded_shouldThrowException() {
+        // Given
+        String accessKey = "test-access-key";
+        Double distance = 500.0;
+        List<String> dislikes = List.of("양파", "마늘", "파", "생강", "고추");
         List<String> preferences = List.of("치킨");
 
         // When & Then
@@ -173,12 +205,12 @@ class CreateParticipantRequestTest {
     }
 
     @Test
-    @DisplayName("dislikes 2개, preferences 4개 모두 초과하면 dislikes 예외가 먼저 발생한다")
+    @DisplayName("dislikes 5개, preferences 4개 모두 초과하면 dislikes 예외가 먼저 발생한다")
     void bothExceeded_shouldThrowDislikesExceptionFirst() {
         // Given
         String accessKey = "test-access-key";
         Double distance = 500.0;
-        List<String> dislikes = List.of("양파", "마늘");
+        List<String> dislikes = List.of("양파", "마늘", "파", "생강", "고추");
         List<String> preferences = List.of("치킨", "피자", "햄버거", "파스타");
 
         // When & Then

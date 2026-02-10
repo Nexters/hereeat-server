@@ -17,16 +17,16 @@ public record CreateParticipantRequest(
         @Schema(description = "참여자 선호 음식 목록", example = "[\"한식\", \"일식\"]")
         List<String> preferences
 ) {
-    private static final int MAX_DISLIKES_SIZE = 1;
+    private static final int MAX_DISLIKES_SIZE = 4;
     private static final int MAX_PREFERENCES_SIZE = 3;
 
     /**
      * TODO: 추후 변동사항이 있을 수도 있음
      * Compact constructor for validation
-     * dislikes: 최대 1개, preferences: 최대 3개까지만 허용
+     * dislikes: 최소 1개, 최대 4개, preferences: 최대 3개까지만 허용
      */
     public CreateParticipantRequest {
-        if (dislikes != null && dislikes.size() > MAX_DISLIKES_SIZE) {
+        if (dislikes == null || dislikes.isEmpty() || dislikes.size() > MAX_DISLIKES_SIZE) {
             throw new CustomException(ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
         }
 
