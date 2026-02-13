@@ -30,4 +30,9 @@ public class ParticipantCoreRepository implements ParticipantRepository {
                 .map(ParticipantEntity::toDomain)
                 .toList();
     }
+
+    @Override
+    public boolean existsByGatheringIdAndNickname(Long gatheringId, String nickname) {
+        return participantJpaRepository.existsByGatheringIdAndNickname(gatheringId, nickname);
+    }
 }

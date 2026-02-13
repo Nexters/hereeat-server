@@ -44,6 +44,9 @@ public enum ErrorCode {
 	// Participant
 	PARTICIPANT_DISLIKES_EXCEEDED("P001", "비선호 음식은 최소 1개, 최대 4개까지 입력 가능합니다"),
     PARTICIPANT_PREFERENCES_EXCEEDED("P002", "선호 음식은 최대 3개까지 입력 가능합니다"),
+    PARTICIPANT_NICKNAME_REQUIRED("P003", "닉네임은 필수입니다"),
+    PARTICIPANT_NICKNAME_TOO_LONG("P004", "닉네임은 최대 8자까지 입력 가능합니다"),
+    DUPLICATE_NICKNAME("P005", "이미 입장한 사용자입니다"),
 
 	// Lock
 	LOCK_TIMEOUT("L001", "락 획득 시간이 초과되었습니다"),

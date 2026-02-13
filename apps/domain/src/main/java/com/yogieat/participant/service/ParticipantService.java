@@ -16,6 +16,7 @@ public class ParticipantService {
     @Transactional
     public Participant create(
             Long gatheringId,
+            String nickname,
             DistanceRange distanceRange,
             String preferences,
             String dislikes
@@ -24,12 +25,18 @@ public class ParticipantService {
                 null, // id는 저장 시 자동 생성
                 null, // 추후 인증 추가 시 userId로 설정
                 gatheringId,
+                nickname,
                 distanceRange,
                 preferences,
                 dislikes,
                 Role.MEMBER // 참여자는 기본적으로 MEMBER 역할
         );
         return participantRepository.save(participant);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean existsByGatheringIdAndNickname(Long gatheringId, String nickname) {
+        return participantRepository.existsByGatheringIdAndNickname(gatheringId, nickname);
     }
 
     /**

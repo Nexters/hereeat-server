@@ -65,7 +65,7 @@ class ParticipantFacadeConcurrencyTest {
                         try {
                             ParticipantCommand.Create command =
                                     new ParticipantCommand.Create(
-                                            gathering.accessKey(), null, List.of(), List.of());
+                                            gathering.accessKey(), null, null, List.of(), List.of());
                             participantFacade.participate(command);
                             successCount.incrementAndGet();
                         } catch (CustomException e) {
@@ -103,33 +103,33 @@ class ParticipantFacadeConcurrencyTest {
 
         // When: 동시에 다른 모임 참여
         new Thread(
-                        () -> {
-                            try {
-                                startLatch.await();
-                                long start = System.currentTimeMillis();
-                                participantFacade.participate(createCommand(gathering1.accessKey()));
-                                executionTimes.add(System.currentTimeMillis() - start);
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                            } finally {
-                                endLatch.countDown();
-                            }
-                        })
+                () -> {
+                    try {
+                        startLatch.await();
+                        long start = System.currentTimeMillis();
+                        participantFacade.participate(createCommand(gathering1.accessKey()));
+                        executionTimes.add(System.currentTimeMillis() - start);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        endLatch.countDown();
+                    }
+                })
                 .start();
 
         new Thread(
-                        () -> {
-                            try {
-                                startLatch.await();
-                                long start = System.currentTimeMillis();
-                                participantFacade.participate(createCommand(gathering2.accessKey()));
-                                executionTimes.add(System.currentTimeMillis() - start);
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                            } finally {
-                                endLatch.countDown();
-                            }
-                        })
+                () -> {
+                    try {
+                        startLatch.await();
+                        long start = System.currentTimeMillis();
+                        participantFacade.participate(createCommand(gathering2.accessKey()));
+                        executionTimes.add(System.currentTimeMillis() - start);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        endLatch.countDown();
+                    }
+                })
                 .start();
 
         startLatch.countDown(); // 동시 시작
@@ -159,6 +159,6 @@ class ParticipantFacadeConcurrencyTest {
     }
 
     private ParticipantCommand.Create createCommand(String accessKey) {
-        return new ParticipantCommand.Create(accessKey, null, List.of(), List.of());
+        return new ParticipantCommand.Create(accessKey, null, null, List.of(), List.of());
     }
 }
