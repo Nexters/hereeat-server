@@ -1,0 +1,112 @@
+name: Production Build and Deploy
+on:
+  push:
+    branches: [ "chore/prod-deploy" ]
+
+env:
+  DOCKERHUB_USERNAME: yogieat
+  DOCKERHUB_IMAGE_NAME: yogieat-server
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: PROD
+    strategy:
+      matrix:
+        java-version: [ "25" ]
+        distribution: [ "corretto" ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: ${{ matrix.distribution }}
+          cache: 'gradle'
+          cache-dependency-path: |
+            **/*.gradle*
+            **/gradle-wrapper.properties
+
+      - name: Setup Gradle Build
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/develop' }}
+
+      # Gradlew 실행 허용
+      - name: Run chmod to make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build --no-daemon
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Docker 메타데이터 추출
+      - name: Extract Docker metadata
+        id: metadata
+        uses: docker/metadata-action@v5.5.0
+        env:
+          DOCKERHUB_IMAGE_FULL_NAME: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_IMAGE_NAME }}
+        with:
+          images: ${{ env.DOCKERHUB_IMAGE_FULL_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+          flavor: |
+            latest=false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          platforms: linux/amd64
+
+      # 서버로 docker-compose 파일 전송
+      - name: Copy docker-compose file to Server
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avzr --delete
+          remote_host: ${{ secrets.SERVER_HOST }}
+          remote_user: ${{ secrets.SERVER_USERNAME }}
+          remote_key: ${{ secrets.SERVER_PRIVATE_KEY }}
+          path: ./docker/docker-compose.yaml
+          remote_path: ~/
+
+      - name: Deploy to Instance Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_PRIVATE_KEY }}
+          script: |
+            echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ env.DOCKERHUB_USERNAME }}" --password-stdin
+            echo "Deploying with IMAGE_FULL_URL=${{ steps.metadata.outputs.tags }}"
+            cd ~
+            IMAGE_FULL_URL="${{ steps.metadata.outputs.tags }}" DOCKERHUB_IMAGE_NAME="${{ env.DOCKERHUB_IMAGE_NAME }}" docker compose -f docker-compose.yaml up -d
+            docker image prune -a -f
+
+      - name: Discord notification
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          title: "🚀 PROD 빌드 및 배포"
+          description: |
+            **상태**: ${{ job.status }}
+            **브랜치**: ${{ github.ref_name }}
+            **커밋**: ${{ github.sha }}
+            **커밋 메시지**: ${{ github.event.head_commit.message }}
+            **이미지**: ${{ steps.metadata.outputs.tags }}
+          color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
+          username: GitHub Actions
