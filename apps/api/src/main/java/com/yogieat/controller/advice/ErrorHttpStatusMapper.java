@@ -23,6 +23,7 @@ public class ErrorHttpStatusMapper {
                  PARTICIPANT_PREFERENCES_EXCEEDED,
                  PARTICIPANT_NICKNAME_REQUIRED,
                  PARTICIPANT_NICKNAME_TOO_LONG,
+                 PARTICIPANT_NICKNAME_INVALID,
                  INVALID_CATEGORY_AGGREGATION,
                  INVALID_PREFERENCE_SCORE -> HttpStatus.BAD_REQUEST;
             case METHOD_NOT_ALLOWED -> HttpStatus.METHOD_NOT_ALLOWED;

@@ -5,6 +5,7 @@ import com.yogieat.common.error.ErrorCode;
 import com.yogieat.participant.domain.command.ParticipantCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Schema(description = "모임 참여 요청 정보")
 public record CreateParticipantRequest(
@@ -22,6 +23,7 @@ public record CreateParticipantRequest(
     private static final int MAX_DISLIKES_SIZE = 4;
     private static final int MAX_PREFERENCES_SIZE = 3;
     private static final int MAX_NICKNAME_LENGTH = 8;
+    private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ\\s]+$");
 
     /**
      * TODO: 추후 변동사항이 있을 수도 있음
@@ -35,6 +37,10 @@ public record CreateParticipantRequest(
 
         if (nickname.length() > MAX_NICKNAME_LENGTH) {
             throw new CustomException(ErrorCode.PARTICIPANT_NICKNAME_TOO_LONG);
+        }
+
+        if (!NICKNAME_PATTERN.matcher(nickname).matches()) {
+            throw new CustomException(ErrorCode.PARTICIPANT_NICKNAME_INVALID);
         }
 
         if (dislikes == null || dislikes.isEmpty() || dislikes.size() > MAX_DISLIKES_SIZE) {
