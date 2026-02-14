@@ -16,13 +16,14 @@ class CreateParticipantRequestTest {
     void validRequest_shouldCreateSuccessfully() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = List.of("치킨", "피자", "햄버거");
 
         // When
         CreateParticipantRequest request =
-                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -37,13 +38,14 @@ class CreateParticipantRequestTest {
     void dislikesNull_shouldThrowException() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = null;
         List<String> preferences = List.of("치킨");
 
         // When & Then
         assertThatThrownBy(
-                        () -> CreateParticipantRequest.of(accessKey, distance, dislikes, preferences))
+                () -> CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }
@@ -53,13 +55,14 @@ class CreateParticipantRequestTest {
     void preferencesNull_shouldCreateSuccessfully() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = null;
 
         // When
         CreateParticipantRequest request =
-                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -71,13 +74,14 @@ class CreateParticipantRequestTest {
     void dislikesEmpty_shouldThrowException() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of();
         List<String> preferences = List.of("치킨");
 
         // When & Then
         assertThatThrownBy(
-                        () -> CreateParticipantRequest.of(accessKey, distance, dislikes, preferences))
+                () -> CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }
@@ -87,13 +91,14 @@ class CreateParticipantRequestTest {
     void preferencesEmpty_shouldCreateSuccessfully() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = List.of();
 
         // When
         CreateParticipantRequest request =
-                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -105,13 +110,14 @@ class CreateParticipantRequestTest {
     void dislikesOne_shouldCreateSuccessfully() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = List.of("치킨");
 
         // When
         CreateParticipantRequest request =
-                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -123,13 +129,14 @@ class CreateParticipantRequestTest {
     void dislikesTwo_shouldCreateSuccessfully() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파", "마늘");
         List<String> preferences = List.of("치킨");
 
         // When
         CreateParticipantRequest request =
-                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -141,13 +148,14 @@ class CreateParticipantRequestTest {
     void dislikesFour_shouldCreateSuccessfully() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파", "마늘", "파", "생강");
         List<String> preferences = List.of("치킨");
 
         // When
         CreateParticipantRequest request =
-                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -159,13 +167,14 @@ class CreateParticipantRequestTest {
     void dislikesExceeded_shouldThrowException() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파", "마늘", "파", "생강", "고추");
         List<String> preferences = List.of("치킨");
 
         // When & Then
         assertThatThrownBy(
-                        () -> CreateParticipantRequest.of(accessKey, distance, dislikes, preferences))
+                () -> CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }
@@ -175,13 +184,14 @@ class CreateParticipantRequestTest {
     void preferencesThree_shouldCreateSuccessfully() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = List.of("치킨", "피자", "햄버거");
 
         // When
         CreateParticipantRequest request =
-                CreateParticipantRequest.of(accessKey, distance, dislikes, preferences);
+                CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences);
 
         // Then
         assertThat(request).isNotNull();
@@ -193,13 +203,14 @@ class CreateParticipantRequestTest {
     void preferencesExceeded_shouldThrowException() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파");
         List<String> preferences = List.of("치킨", "피자", "햄버거", "파스타");
 
         // When & Then
         assertThatThrownBy(
-                        () -> CreateParticipantRequest.of(accessKey, distance, dislikes, preferences))
+                () -> CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_PREFERENCES_EXCEEDED);
     }
@@ -209,13 +220,14 @@ class CreateParticipantRequestTest {
     void bothExceeded_shouldThrowDislikesExceptionFirst() {
         // Given
         String accessKey = "test-access-key";
+        String nickname = "닉네임";
         Double distance = 500.0;
         List<String> dislikes = List.of("양파", "마늘", "파", "생강", "고추");
         List<String> preferences = List.of("치킨", "피자", "햄버거", "파스타");
 
         // When & Then
         assertThatThrownBy(
-                        () -> CreateParticipantRequest.of(accessKey, distance, dislikes, preferences))
+                () -> CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }

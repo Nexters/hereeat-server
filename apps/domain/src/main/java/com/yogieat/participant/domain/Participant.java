@@ -7,6 +7,7 @@ public record Participant(
         Long id,
         Long userId,
         Long gatheringId,
+        String nickname,
         DistanceRange distanceRange,
         String preferences,
         String dislikes,
