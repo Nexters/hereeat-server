@@ -35,6 +35,8 @@ public record CreateParticipantRequest(
             throw new CustomException(ErrorCode.PARTICIPANT_NICKNAME_REQUIRED);
         }
 
+        nickname = nickname.strip();
+
         if (nickname.length() > MAX_NICKNAME_LENGTH) {
             throw new CustomException(ErrorCode.PARTICIPANT_NICKNAME_TOO_LONG);
         }
