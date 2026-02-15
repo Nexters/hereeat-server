@@ -147,7 +147,7 @@ public class GeminiResponseParser {
         StringBuilder sb = new StringBuilder(truncatedJson);
 
         // 1. 마지막 불완전한 객체/배열 항목 제거
-        // 마지막으로 완전한 객체가 끝나는 위치 찾기 (}, ], 또는 "value" 뒤의 ,)
+        // 마지막으로 완전한 객체가 끝나는 위치 찾기 (}, ] 경계)
         int lastCompleteIndex = findLastCompleteIndex(sb.toString());
         if (lastCompleteIndex > 0 && lastCompleteIndex < sb.length()) {
             sb.setLength(lastCompleteIndex);
@@ -202,9 +202,6 @@ public class GeminiResponseParser {
             if (!inString) {
                 if (c == '}' || c == ']') {
                     lastComplete = i + 1;
-                } else if (c == ',' && i > 0) {
-                    // 콤마 이전까지가 완전한 요소
-                    lastComplete = i;
                 }
             }
 
