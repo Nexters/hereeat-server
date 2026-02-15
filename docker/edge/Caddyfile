@@ -1,0 +1,4 @@
+{$EDGE_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy yogieat-api:8080
+}

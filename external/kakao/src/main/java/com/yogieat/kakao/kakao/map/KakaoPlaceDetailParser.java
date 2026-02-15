@@ -327,12 +327,21 @@ public class KakaoPlaceDetailParser {
      * @return [메뉴명, 가격] 배열
      */
     private String[] extractRepresentMenu(JsonNode panel) {
-        JsonNode items = panel.at("/menu/menus/items");
-        if (items != null && items.isArray() && !items.isEmpty()) {
-            JsonNode firstItem = items.get(0);
-            String name = extractText(firstItem, "name");
-            Integer price = extractInteger(firstItem.get("price"));
-            return new String[]{name, price != null ? price.toString() : null};
+        JsonNode menus = panel.at("/menu/menus");
+        if (menus != null && menus.isArray()) {
+            for (JsonNode menu : menus) {
+                JsonNode items = menu.get("items");
+                if (items == null || !items.isArray() || items.isEmpty()) {
+                    continue;
+                }
+
+                JsonNode firstItem = items.get(0);
+                String name = extractText(firstItem, "name");
+                Integer price = extractInteger(firstItem.get("price"));
+                if (name != null && !name.isBlank()) {
+                    return new String[]{name, price != null ? price.toString() : null};
+                }
+            }
         }
         return new String[]{null, null};
     }
@@ -423,7 +432,11 @@ public class KakaoPlaceDetailParser {
 
         if (node.isTextual()) {
             try {
-                return Integer.parseInt(node.asText());
+                String normalized = node.asText().replaceAll("[^0-9-]", "");
+                if (normalized.isBlank() || "-".equals(normalized)) {
+                    return null;
+                }
+                return Integer.parseInt(normalized);
             } catch (NumberFormatException e) {
                 return null;
             }

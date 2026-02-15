@@ -31,6 +31,9 @@ public enum ErrorCode {
     INVALID_CATEGORY_NAME("R003", "알 수 없는 카테고리명입니다"),
     CATEGORY_NOT_FOUND("R005", "해당 카테고리를 찾을 수 없습니다"),
     RESTAURANT_NOT_FOUND("R004", "해당 맛집을 찾을 수 없습니다"),
+    SYNC_JOB_NOT_FOUND("R006", "해당 동기화 Job을 찾을 수 없습니다"),
+    SYNC_JOB_CONFLICT("R007", "이미 실행 중인 동기화 Job이 존재합니다"),
+    RESTAURANT_SYNC_FAILED("R008", "맛집 동기화 작업이 실패했습니다"),
 
     // Gathering
     GATHERING_NOT_FOUND("GA001", "해당 모임을 찾을 수 없습니다"),

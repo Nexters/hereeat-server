@@ -3,6 +3,7 @@ rootProject.name = 'yogieat'
 // Apps modules
 include 'apps:api'
 include 'apps:domain'
+include 'batch:sync'
 
 // External integration modules
 include 'external:ai'

@@ -423,7 +423,7 @@ public class RestaurantCollectionProcessor {
                     reviewCount = detail.reviewCount();
                     blogReviewCount = detail.blogReviewCount();
                     representMenu = detail.representMenu();
-                    representMenuPrice = detail.representMenuPrice();
+                    representMenuPrice = normalizeMenuPrice(detail.representMenuPrice());
                     priceLevel = detail.priceLevel();
                     aiMateSummaryTitle = detail.aiMateSummaryTitle();
                     aiMateSummaryContents = detail.aiMateSummaryContents();
@@ -500,5 +500,12 @@ public class RestaurantCollectionProcessor {
             // 예외 발생 시 이 트랜잭션만 롤백 (REQUIRES_NEW)
             return false;
         }
+    }
+
+    private Integer normalizeMenuPrice(Integer price) {
+        if (price == null || price <= 0) {
+            return null;
+        }
+        return price;
     }
 }
