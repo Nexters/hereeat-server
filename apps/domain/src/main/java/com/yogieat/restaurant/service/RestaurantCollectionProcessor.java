@@ -78,7 +78,8 @@ public class RestaurantCollectionProcessor {
     private static final int RESTAURANTS_PER_REQUEST = 5;
     private static final long RATE_LIMIT_DELAY_MS = 5000; // Gemini API rate limit을 위한 지연 시간 (5초)
     private static final int LOCATION_CATEGORY_BATCH_SIZE = 5; // 한 번에 처리할 location-category 조합 개수
-    private static final long BATCH_DELAY_MS = 15000; // 배치 간 휴식 시간 (10초)
+    private static final long BATCH_DELAY_MS = 15000; // 배치 간 휴식 시간 (15초)
+    private static final int MIN_REVIEW_COUNT = 30;
 
     /**
      * 지역별 맛집 수집 제한
@@ -232,7 +233,8 @@ public class RestaurantCollectionProcessor {
     @Transactional
     public int collectRestaurantsForLocation(String location, String category) {
         Region region = getRegionFromLocationName(location);
-        restaurantValidator.prepareForBatchValidation(region);
+        RestaurantValidator.ValidationContext validationContext =
+                restaurantValidator.prepareForBatchValidation(region);
 
         List<SuggestionRestaurant> suggestions = geminiClient.generateRestaurants(
             location, category, RESTAURANTS_PER_REQUEST
@@ -240,7 +242,7 @@ public class RestaurantCollectionProcessor {
 
         int savedCount = 0;
         for (SuggestionRestaurant suggestion : suggestions) {
-            boolean saved = processRestaurant(suggestion, region, location);
+            boolean saved = processRestaurant(suggestion, region, location, validationContext);
             if (saved) {
                 savedCount++;
             }
@@ -275,12 +277,13 @@ public class RestaurantCollectionProcessor {
         Region region = getRegionFromLocationName(location);
 
         // 2. Validator 캐시 준비: 해당 Place의 기존 레스토랑 로드 (N번 → 1번 DB 쿼리)
-        restaurantValidator.prepareForBatchValidation(region);
+        RestaurantValidator.ValidationContext validationContext =
+                restaurantValidator.prepareForBatchValidation(region);
 
         // 3. 각 suggestion 처리 (카테고리 생성 + Gemini 데이터 + Kakao 데이터 보강)
         int savedCount = 0;
         for (SuggestionRestaurant suggestion : suggestions) {
-            boolean saved = processRestaurant(suggestion, region, location);
+            boolean saved = processRestaurant(suggestion, region, location, validationContext);
             if (saved) {
                 savedCount++;
             }
@@ -330,171 +333,68 @@ public class RestaurantCollectionProcessor {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected boolean processRestaurant(SuggestionRestaurant suggestion, Region restaurantRegion, String locationName) {
+    protected boolean processRestaurant(
+            SuggestionRestaurant suggestion,
+            Region restaurantRegion,
+            String locationName,
+            RestaurantValidator.ValidationContext validationContext
+    ) {
         try {
-            // 1. largeCategory displayName을 LargeCategory enum으로 변환
-            LargeCategory largeCategory = getLargeCategoryFromDisplayName(suggestion.largeCategory());
+            Long categoryId = resolveCategoryId(suggestion);
+            EnrichedRestaurantData enrichedData = enrichRestaurantData(suggestion, locationName);
 
-            // 2. Gemini suggestion으로부터 카테고리 조회 또는 생성
-            Long categoryId = categoryService.findOrCreateCategory(
-                largeCategory,
-                suggestion.mediumCategory()
-            );
-
-            // 3. 데이터 보강용 변수 초기화
-            String externalId = null;
-            String mapUrl = null;
-            GeoJson.Point geoJsonLocation = null;
-            Double rating = suggestion.rating(); // Gemini 평점으로 시작
-            String imageUrl = null;
-            String placeName = null;
-            String representativeReview = null;
-
-            // 3-1. 추천 근거 데이터 변수 초기화
-            Integer reviewCount = null;
-            Integer blogReviewCount = null;
-            String representMenu = null;
-            Integer representMenuPrice = null;
-            String priceLevel = null;
-            String aiMateSummaryTitle = null;
-            List<String> aiMateSummaryContents = null;
-            // 추천 시간대
-            TimeSlot timeSlot = null;
-
-            // 4. Kakao Search API로 기본 정보 보강 시도
-            Optional<KaKaoPlaceDocumentResult> placeOpt = kakaoPlaceClient.searchPlace(
-                suggestion.name(), locationName
-            );
-
-            if (placeOpt.isPresent()) {
-                KaKaoPlaceDocumentResult place = placeOpt.get();
-
-                // 4-0. 카페/커피숍 필터링
-                String categoryName = place.categoryName();
-                if (categoryName != null &&
-                    (categoryName.contains("카페") || categoryName.contains("커피"))) {
-                    log.info("Skipping cafe/coffee shop: {} (category: {})",
-                        suggestion.name(), categoryName);
-                    return false;
-                }
-
-                // 4-1. Kakao 검색 데이터로 보강
-                KakaoRestaurantData data = kakaoPlaceMapper.toDomainData(place);
-                externalId = data.externalId();
-                String originalMapUrl = data.mapUrl();
-                if (originalMapUrl.startsWith("https:")) {
-                    mapUrl = originalMapUrl;
-                } else if (originalMapUrl.startsWith("http:")) {
-                    mapUrl = "https:" + originalMapUrl.substring("http:".length());
-                } else if (originalMapUrl.startsWith("//")) {
-                    mapUrl = "https:" + originalMapUrl;
-                } else {
-                    mapUrl = originalMapUrl;
-                }
-                geoJsonLocation = data.location();
-
-                // 5. Kakao Detail API (panel3)로 평점 및 사진 보강 시도
-                Optional<KakaoPlaceDetailData> detailOpt = kakaoPlaceDetailClient.fetchPlaceDetail(place.id());
-                if (detailOpt.isPresent()) {
-                    KakaoPlaceDetailData detail = detailOpt.get();
-
-                    // 5-1. 필터링 체크: rating이 null이면 음식점이 아니거나 평점이 범위 밖
-                    if (detail.rating() == null) {
-                        log.info("Skipping restaurant due to filtering (non-restaurant or invalid rating): {} in {}",
-                            suggestion.name(), locationName);
-                        return false;
-                    }
-
-                    // 5-2. panel3 평점 사용 (Gemini보다 정확)
-                    rating = detail.rating();
-                    placeName = detail.placeName();
-
-                    // 5-3. 메인 사진 URL이 있으면 사용
-                    if (detail.mainPhotoUrl() != null && !detail.mainPhotoUrl().isBlank()) {
-                        imageUrl = detail.mainPhotoUrl();
-                    }
-
-                    // 5-4. 대표 리뷰가 있으면 사용
-                    if (detail.representativeReview() != null && !detail.representativeReview().isBlank()) {
-                        representativeReview = detail.representativeReview();
-                    }
-
-                    // 5-5. 추천 근거 데이터 추출
-                    reviewCount = detail.reviewCount();
-                    blogReviewCount = detail.blogReviewCount();
-                    representMenu = detail.representMenu();
-                    representMenuPrice = normalizeMenuPrice(detail.representMenuPrice());
-                    priceLevel = detail.priceLevel();
-                    aiMateSummaryTitle = detail.aiMateSummaryTitle();
-                    aiMateSummaryContents = detail.aiMateSummaryContents();
-                    // 추천 시간대 추출
-                    timeSlot = detail.timeSlot();
-
-                    // 5-6. ai_mate 데이터 필터링
-                    if (aiMateSummaryTitle == null || aiMateSummaryTitle.isBlank()) {
-                        log.info("Skipping restaurant due to missing ai_mate data: {}",
-                            suggestion.name());
-                        return false;
-                    }
-
-                    // 5-7. 리뷰 수 필터링: review_count >= 30 AND blog_review_count >= 30
-                    if (reviewCount == null || reviewCount < 30 || blogReviewCount == null || blogReviewCount < 30) {
-                        log.info("Skipping restaurant due to insufficient reviews: {} (reviews: {}, blog: {})",
-                            suggestion.name(), reviewCount, blogReviewCount);
-                        return false;
-                    }
-                }
-            } else {
-                log.warn("Kakao place not found for: {} in {}", suggestion.name(), locationName);
+            if (enrichedData.isSkipped()) {
+                return false;
             }
 
-            // 6. externalId가 null이면 저장하지 않음 (Kakao 데이터 필수)
-            if (externalId == null || externalId.isBlank()) {
+            if (enrichedData.externalId() == null || enrichedData.externalId().isBlank()) {
                 log.warn("Skipping restaurant due to missing externalId: {} in {}",
                     suggestion.name(), locationName);
                 return false;
             }
 
-            // 7. 저장 전 중복 검증 (캐시 사용)
             RestaurantValidator.ValidationResult validationResult =
-                restaurantValidator.duplicateValidateWithCache(suggestion, externalId);
+                    restaurantValidator.duplicateValidateWithCache(
+                            validationContext,
+                            suggestion,
+                            enrichedData.externalId()
+                    );
 
             if (!validationResult.isValid()) {
                 return false;
             }
 
-            // 8. Gemini + Kakao 보강 데이터로 Restaurant 생성
             CreateRestaurant createRestaurant = CreateRestaurant.of(
-                suggestion,
-                placeName,
-                categoryId,
-                externalId,
-                mapUrl,
-                geoJsonLocation,
-                rating,
-                imageUrl,
-                representativeReview,
-                restaurantRegion,
-                // 추천 근거 데이터
-                reviewCount,
-                blogReviewCount,
-                representMenu,
-                representMenuPrice,
-                priceLevel,
-                aiMateSummaryTitle,
-                aiMateSummaryContents,
-                // 추천 시간대
-                timeSlot
+                    suggestion,
+                    enrichedData.placeName(),
+                    categoryId,
+                    enrichedData.externalId(),
+                    enrichedData.mapUrl(),
+                    enrichedData.geoJsonLocation(),
+                    enrichedData.rating(),
+                    enrichedData.imageUrl(),
+                    enrichedData.representativeReview(),
+                    restaurantRegion,
+                    enrichedData.reviewCount(),
+                    enrichedData.blogReviewCount(),
+                    enrichedData.representMenu(),
+                    enrichedData.representMenuPrice(),
+                    enrichedData.priceLevel(),
+                    enrichedData.aiMateSummaryTitle(),
+                    enrichedData.aiMateSummaryContents(),
+                    enrichedData.timeSlot()
             );
 
-            // 9. 도메인 레포지토리를 통해 저장
             restaurantRepository.save(createRestaurant);
 
-            // 10. 같은 배치 내 중복 방지를 위해 캐시에 추가
-            restaurantValidator.addToCache(externalId, suggestion.name(), suggestion.address());
+            restaurantValidator.addToCache(
+                    validationContext,
+                    enrichedData.externalId(),
+                    suggestion.name(),
+                    suggestion.address()
+            );
 
             return true;
-
         } catch (Exception e) {
             log.error("Failed to process restaurant: {} in {}", suggestion.name(), locationName, e);
             // 예외 발생 시 이 트랜잭션만 롤백 (REQUIRES_NEW)
@@ -502,10 +402,214 @@ public class RestaurantCollectionProcessor {
         }
     }
 
+    private Long resolveCategoryId(SuggestionRestaurant suggestion) {
+        LargeCategory largeCategory = getLargeCategoryFromDisplayName(suggestion.largeCategory());
+        return categoryService.findOrCreateCategory(largeCategory, suggestion.mediumCategory());
+    }
+
+    private EnrichedRestaurantData enrichRestaurantData(SuggestionRestaurant suggestion, String locationName) {
+        EnrichedRestaurantData enrichedData = EnrichedRestaurantData.fromSuggestion(suggestion);
+        Optional<KaKaoPlaceDocumentResult> placeOpt = kakaoPlaceClient.searchPlace(suggestion.name(), locationName);
+
+        if (placeOpt.isEmpty()) {
+            log.warn("Kakao place not found for: {} in {}", suggestion.name(), locationName);
+            return enrichedData;
+        }
+
+        KaKaoPlaceDocumentResult place = placeOpt.get();
+        if (isCafeOrCoffee(place)) {
+            log.info("Skipping cafe/coffee shop: {} (category: {})", suggestion.name(), place.categoryName());
+            return EnrichedRestaurantData.skipped();
+        }
+
+        applySearchData(enrichedData, place);
+        applyDetailData(enrichedData, suggestion, locationName, place.id());
+        return enrichedData;
+    }
+
+    private boolean isCafeOrCoffee(KaKaoPlaceDocumentResult place) {
+        String categoryName = place.categoryName();
+        return categoryName != null && (categoryName.contains("카페") || categoryName.contains("커피"));
+    }
+
+    private void applySearchData(EnrichedRestaurantData enrichedData, KaKaoPlaceDocumentResult place) {
+        KakaoRestaurantData data = kakaoPlaceMapper.toDomainData(place);
+        enrichedData.externalId = data.externalId();
+        enrichedData.mapUrl = normalizeMapUrl(data.mapUrl());
+        enrichedData.geoJsonLocation = data.location();
+    }
+
+    private void applyDetailData(
+            EnrichedRestaurantData enrichedData,
+            SuggestionRestaurant suggestion,
+            String locationName,
+            String placeId
+    ) {
+        Optional<KakaoPlaceDetailData> detailOpt = kakaoPlaceDetailClient.fetchPlaceDetail(placeId);
+        if (detailOpt.isEmpty()) {
+            return;
+        }
+
+        KakaoPlaceDetailData detail = detailOpt.get();
+        if (detail.rating() == null) {
+            log.info("Skipping restaurant due to filtering (non-restaurant or invalid rating): {} in {}",
+                    suggestion.name(), locationName);
+            enrichedData.skip = true;
+            return;
+        }
+
+        enrichedData.rating = detail.rating();
+        enrichedData.placeName = detail.placeName();
+        enrichedData.imageUrl = hasText(detail.mainPhotoUrl()) ? detail.mainPhotoUrl() : null;
+        enrichedData.representativeReview = hasText(detail.representativeReview()) ? detail.representativeReview() : null;
+        enrichedData.reviewCount = detail.reviewCount();
+        enrichedData.blogReviewCount = detail.blogReviewCount();
+        enrichedData.representMenu = detail.representMenu();
+        enrichedData.representMenuPrice = normalizeMenuPrice(detail.representMenuPrice());
+        enrichedData.priceLevel = detail.priceLevel();
+        enrichedData.aiMateSummaryTitle = detail.aiMateSummaryTitle();
+        enrichedData.aiMateSummaryContents = detail.aiMateSummaryContents();
+        enrichedData.timeSlot = detail.timeSlot();
+
+        if (!hasText(enrichedData.aiMateSummaryTitle)) {
+            log.info("Skipping restaurant due to missing ai_mate data: {}", suggestion.name());
+            enrichedData.skip = true;
+            return;
+        }
+
+        if (isInsufficientReviewCount(enrichedData.reviewCount, enrichedData.blogReviewCount)) {
+            log.info("Skipping restaurant due to insufficient reviews: {} (reviews: {}, blog: {})",
+                    suggestion.name(), enrichedData.reviewCount, enrichedData.blogReviewCount);
+            enrichedData.skip = true;
+        }
+    }
+
+    private String normalizeMapUrl(String originalMapUrl) {
+        if (originalMapUrl == null || originalMapUrl.isBlank()) {
+            return originalMapUrl;
+        }
+        if (originalMapUrl.startsWith("https:")) {
+            return originalMapUrl;
+        }
+        if (originalMapUrl.startsWith("http:")) {
+            return "https:" + originalMapUrl.substring("http:".length());
+        }
+        if (originalMapUrl.startsWith("//")) {
+            return "https:" + originalMapUrl;
+        }
+        return originalMapUrl;
+    }
+
+    private boolean isInsufficientReviewCount(Integer reviewCount, Integer blogReviewCount) {
+        return reviewCount == null
+                || reviewCount < MIN_REVIEW_COUNT
+                || blogReviewCount == null
+                || blogReviewCount < MIN_REVIEW_COUNT;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     private Integer normalizeMenuPrice(Integer price) {
         if (price == null || price <= 0) {
             return null;
         }
         return price;
+    }
+
+    private static class EnrichedRestaurantData {
+        private String externalId;
+        private String mapUrl;
+        private GeoJson.Point geoJsonLocation;
+        private Double rating;
+        private String imageUrl;
+        private String placeName;
+        private String representativeReview;
+        private Integer reviewCount;
+        private Integer blogReviewCount;
+        private String representMenu;
+        private Integer representMenuPrice;
+        private String priceLevel;
+        private String aiMateSummaryTitle;
+        private List<String> aiMateSummaryContents;
+        private TimeSlot timeSlot;
+        private boolean skip;
+
+        private static EnrichedRestaurantData fromSuggestion(SuggestionRestaurant suggestion) {
+            EnrichedRestaurantData data = new EnrichedRestaurantData();
+            data.rating = suggestion.rating();
+            return data;
+        }
+
+        private static EnrichedRestaurantData skipped() {
+            EnrichedRestaurantData data = new EnrichedRestaurantData();
+            data.skip = true;
+            return data;
+        }
+
+        private String externalId() {
+            return skip ? null : externalId;
+        }
+
+        private String mapUrl() {
+            return skip ? null : mapUrl;
+        }
+
+        private GeoJson.Point geoJsonLocation() {
+            return skip ? null : geoJsonLocation;
+        }
+
+        private Double rating() {
+            return skip ? null : rating;
+        }
+
+        private String imageUrl() {
+            return skip ? null : imageUrl;
+        }
+
+        private String placeName() {
+            return skip ? null : placeName;
+        }
+
+        private String representativeReview() {
+            return skip ? null : representativeReview;
+        }
+
+        private Integer reviewCount() {
+            return skip ? null : reviewCount;
+        }
+
+        private Integer blogReviewCount() {
+            return skip ? null : blogReviewCount;
+        }
+
+        private String representMenu() {
+            return skip ? null : representMenu;
+        }
+
+        private Integer representMenuPrice() {
+            return skip ? null : representMenuPrice;
+        }
+
+        private String priceLevel() {
+            return skip ? null : priceLevel;
+        }
+
+        private String aiMateSummaryTitle() {
+            return skip ? null : aiMateSummaryTitle;
+        }
+
+        private List<String> aiMateSummaryContents() {
+            return skip ? null : aiMateSummaryContents;
+        }
+
+        private TimeSlot timeSlot() {
+            return skip ? null : timeSlot;
+        }
+
+        private boolean isSkipped() {
+            return skip;
+        }
     }
 }

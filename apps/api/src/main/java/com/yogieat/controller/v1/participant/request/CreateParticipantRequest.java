@@ -26,8 +26,7 @@ public record CreateParticipantRequest(
     private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ\\s]+$");
 
     /**
-     * TODO: 추후 변동사항이 있을 수도 있음
-     * Compact constructor for validation
+     * Compact constructor for validation.
      * nickname: 최대 8자 (공백 포함), dislikes: 최소 1개, 최대 4개, preferences: 최대 3개까지만 허용
      */
     public CreateParticipantRequest {

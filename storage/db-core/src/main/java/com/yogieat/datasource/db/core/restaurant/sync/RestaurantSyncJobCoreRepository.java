@@ -1,5 +1,7 @@
 package com.yogieat.datasource.db.core.restaurant.sync;
 
+import com.yogieat.common.error.CustomException;
+import com.yogieat.common.error.ErrorCode;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncJobStatus;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
@@ -45,8 +47,7 @@ public class RestaurantSyncJobCoreRepository implements RestaurantSyncJobReposit
     @Override
     @Transactional
     public void markRunning(Long jobId) {
-        RestaurantSyncJobEntity entity = syncJobJpaRepository.findById(jobId).orElseThrow();
-        entity.markRunning();
+        getJobEntityOrThrow(jobId).markRunning();
     }
 
     @Override
@@ -58,35 +59,40 @@ public class RestaurantSyncJobCoreRepository implements RestaurantSyncJobReposit
             long successIncrement,
             long failedIncrement
     ) {
-        RestaurantSyncJobEntity entity = syncJobJpaRepository.findById(jobId).orElseThrow();
-        entity.updateProgress(lastProcessedRestaurantId, processedIncrement, successIncrement, failedIncrement);
+        getJobEntityOrThrow(jobId).updateProgress(
+                lastProcessedRestaurantId,
+                processedIncrement,
+                successIncrement,
+                failedIncrement
+        );
     }
 
     @Override
     @Transactional
     public void markSuccess(Long jobId) {
-        RestaurantSyncJobEntity entity = syncJobJpaRepository.findById(jobId).orElseThrow();
-        entity.markSuccess();
+        getJobEntityOrThrow(jobId).markSuccess();
     }
 
     @Override
     @Transactional
     public void markPartialFailed(Long jobId, String errorSummary) {
-        RestaurantSyncJobEntity entity = syncJobJpaRepository.findById(jobId).orElseThrow();
-        entity.markPartialFailed(errorSummary);
+        getJobEntityOrThrow(jobId).markPartialFailed(errorSummary);
     }
 
     @Override
     @Transactional
     public void markFailed(Long jobId, String errorSummary) {
-        RestaurantSyncJobEntity entity = syncJobJpaRepository.findById(jobId).orElseThrow();
-        entity.markFailed(errorSummary);
+        getJobEntityOrThrow(jobId).markFailed(errorSummary);
     }
 
     @Override
     @Transactional
     public void initializeTotalCount(Long jobId, long totalCount) {
-        RestaurantSyncJobEntity entity = syncJobJpaRepository.findById(jobId).orElseThrow();
-        entity.initializeTotalCount(totalCount);
+        getJobEntityOrThrow(jobId).initializeTotalCount(totalCount);
+    }
+
+    private RestaurantSyncJobEntity getJobEntityOrThrow(Long jobId) {
+        return syncJobJpaRepository.findById(jobId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SYNC_JOB_NOT_FOUND));
     }
 }

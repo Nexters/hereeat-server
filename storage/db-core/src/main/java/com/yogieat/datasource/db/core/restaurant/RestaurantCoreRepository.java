@@ -1,5 +1,9 @@
 package com.yogieat.datasource.db.core.restaurant;
 
+import static com.yogieat.datasource.db.core.restaurant.QRestaurantEntity.*;
+
+import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.yogieat.common.Region;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
@@ -21,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RestaurantCoreRepository implements RestaurantRepository {
 
     private final RestaurantJpaRepository restaurantJpaRepository;
+    private final JPAQueryFactory jpaQueryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
     @Override
@@ -35,10 +40,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     public Restaurant save(CreateRestaurant createRestaurant) {
-        // Convert CreateRestaurant to entity using static factory method
         RestaurantEntity entity = RestaurantEntity.from(createRestaurant);
-
-        // Save and convert back to domain
         RestaurantEntity savedEntity = restaurantJpaRepository.save(entity);
         return RestaurantEntity.toDomain(savedEntity);
     }
@@ -53,10 +55,9 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     @Override
     public List<Restaurant> findByRegion(Region region) {
         return restaurantJpaRepository.findByRegionAndDeletedAtIsNull(region).stream()
-            .map(RestaurantEntity::toDomain)
-            .toList();
+                .map(RestaurantEntity::toDomain)
+                .toList();
     }
-
 
     @Override
     public Optional<Restaurant> findById(Long id) {
@@ -71,7 +72,6 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .toList();
     }
 
-
     @Override
     public long countByRegion(Region region) {
         return restaurantJpaRepository.countByRegionAndDeletedAtIsNull(region);
@@ -85,12 +85,22 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     public List<Long> findActiveRestaurantIdsAfter(Long lastId, int limit) {
-        return restaurantJpaRepository.findActiveIdsAfter(lastId, limit);
+        BooleanExpression idCondition = lastId == null ? null : restaurantEntity.id.gt(lastId);
+
+        return jpaQueryFactory.select(restaurantEntity.id)
+                .from(restaurantEntity)
+                .where(
+                        restaurantEntity.deletedAt.isNull(),
+                        idCondition
+                )
+                .orderBy(restaurantEntity.id.asc())
+                .limit(limit)
+                .fetch();
     }
 
     @Override
     public long countActiveRestaurants() {
-        return restaurantJpaRepository.countActiveRestaurants();
+        return restaurantJpaRepository.countByDeletedAtIsNull();
     }
 
     @Override
