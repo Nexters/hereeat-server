@@ -68,6 +68,7 @@ API_IMAGE_FULL_URL=yogieat/yogieat-server-api:<tag> \
 BATCH_IMAGE_FULL_URL=yogieat/yogieat-server-batch-sync:<tag> \
 DOCKERHUB_API_IMAGE_NAME=yogieat-server-api \
 DOCKERHUB_BATCH_IMAGE_NAME=yogieat-server-batch-sync \
+ENV_FILE_PATH=../.env \
 ../scripts/deploy/compose-up.sh
 ```
 
@@ -81,6 +82,7 @@ DOCKERHUB_API_IMAGE_NAME=yogieat-server-api \
 DOCKERHUB_BATCH_IMAGE_NAME=yogieat-server-batch-sync \
 ENABLE_EDGE_SSL=true \
 EDGE_DOMAIN=api.example.com \
+ENV_FILE_PATH=../.env \
 ../scripts/deploy/compose-up.sh
 ```
 
