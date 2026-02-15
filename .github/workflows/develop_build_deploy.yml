@@ -2,7 +2,7 @@ name: develop Build And Deploy
 
 on:
   push:
-    branches: [ "feature/batch-restaurant" ]
+    branches: [ "develop" ]
 
 env:
   DOCKERHUB_USERNAME: yogieat
