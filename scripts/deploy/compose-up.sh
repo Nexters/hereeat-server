@@ -12,8 +12,13 @@ export API_IMAGE_FULL_URL BATCH_IMAGE_FULL_URL
 export DOCKERHUB_API_IMAGE_NAME DOCKERHUB_BATCH_IMAGE_NAME
 
 ENV_FILE_PATH="${ENV_FILE_PATH:-~/.env}"
+# Expand "~" to HOME so values like "~/.env" work under non-interactive shells too.
+if [[ "${ENV_FILE_PATH}" == "~"* ]]; then
+  ENV_FILE_PATH="${HOME}${ENV_FILE_PATH:1}"
+fi
 if [[ ! -f "${ENV_FILE_PATH}" ]]; then
   echo "ERROR: env file not found: ${ENV_FILE_PATH}"
+  echo "       Hint: pass an absolute path (e.g. /root/.env) if needed."
   exit 1
 fi
 export ENV_FILE_PATH
