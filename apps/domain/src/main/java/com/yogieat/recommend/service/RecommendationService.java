@@ -107,7 +107,7 @@ public class RecommendationService {
                     .map(sr -> String.format("%s(%.2f%%)", sr.restaurant().name(), sr.agreementRate()))
                     .collect(Collectors.joining(", ")));
 
-            // 10. RecommendResult 저장
+            // 10. RecommendResult 저장 (추천 근거 텍스트 포함)
             List<RecommendResult> results = new ArrayList<>();
             for (int i = 0; i < top3.size(); i++) {
                 ScoredRestaurant scored = top3.get(i);
@@ -117,7 +117,8 @@ public class RecommendationService {
                         scored.agreementRate(),
                         RecommendStatus.COMPLETED,
                         i + 1, // rank: 1, 2, 3,
-                        top3.get(i).totalScore()
+                        top3.get(i).totalScore(),
+                        scored.reasonText()  // 추천 근거 텍스트 (신규)
                 ));
             }
 
@@ -335,6 +336,8 @@ public class RecommendationService {
             Comparator.comparingDouble(ScoredRestaurant::totalScore)
         );
 
+        int totalParticipants = participants.size();
+
         for (Restaurant restaurant : restaurants) {
             Category category = categoryMap.get(restaurant.categoryId());
             if (category == null) {
@@ -348,16 +351,24 @@ public class RecommendationService {
                 PreferenceScore.empty()
             );
 
-            // 전략별 필터링 적용
+            // 전략별 필터링 적용 (순수 선호수 기준으로 변경)
             if (!shouldIncludeRestaurant(categoryName, preferenceScore, dislikedCategories, strategy)) {
                 continue;
             }
 
-            // 점수 계산
+            // 점수 계산 (개선된 알고리즘)
             double totalScore = 0.0;
+
+            // 1. 기존 선호도 점수
             totalScore += preferenceScore.calculateFinalScore();
 
-            // 거리 가산점
+            // 2. 순수 선호수 가산점 (신규)
+            totalScore += preferenceScore.calculateNetPreferenceBonus();
+
+            // 3. 리뷰/평점 신뢰도 점수 (신규)
+            totalScore += calculateCredibilityScore(restaurant.rating(), restaurant.reviewCount());
+
+            // 4. 거리 가산점
             if (majorityRange != DistanceRange.ANY && restaurant.location() != null) {
                 double distance = calculateDistance(centerPoint, restaurant.location());
                 boolean withinRange = isWithinDistanceRange(distance, majorityRange);
@@ -369,7 +380,15 @@ public class RecommendationService {
             // 의견일치율 계산
             double agreementRate = getAgreementRate(participants, preferenceScore);
 
-            ScoredRestaurant scored = new ScoredRestaurant(restaurant, totalScore, agreementRate);
+            // 추천 근거 텍스트 생성 (신규)
+            String reasonText = buildReasonText(
+                    totalParticipants,
+                    preferenceScore.preferenceCount(),
+                    categoryName,
+                    restaurant.aiMateSummaryTitle()
+            );
+
+            ScoredRestaurant scored = new ScoredRestaurant(restaurant, totalScore, agreementRate, reasonText);
 
             // Top-K 알고리즘: 상위 3개만 유지
             if (top3Heap.size() < 3) {
@@ -407,6 +426,7 @@ public class RecommendationService {
 
     /**
      * 전략에 따라 레스토랑을 추천 대상에 포함할지 결정합니다.
+     * (개선: 순수 선호수 기준으로 필터링)
      *
      * @param categoryName 레스토랑의 카테고리명
      * @param preferenceScore 해당 카테고리의 선호도 점수
@@ -426,12 +446,78 @@ public class RecommendationService {
                 if (preferenceScore.totalPreferenceScore() <= 0) {
                     yield false;
                 }
-                // 불호 카테고리 제외
-                yield !dislikedCategories.contains(categoryName);
+                // 개선: 순수 선호수 기준 필터링 (불호보다 선호가 1명 이상 적을 때만 제외)
+                int netPreference = preferenceScore.getNetPreference();
+                yield netPreference >= -1;  // 불호가 선호보다 2명 이상 많을 때만 제외
             }
-            case DISLIKED_EXCLUDED -> // 불호만 제외 (선호도 점수 체크 안함)
-                    !dislikedCategories.contains(categoryName);
+            case DISLIKED_EXCLUDED -> {
+                // 개선: 순수 선호수 기준 (불호만 있고 선호가 없는 경우만 제외)
+                int netPreference = preferenceScore.getNetPreference();
+                yield netPreference >= -1;  // 불호가 선호보다 2명 이상 많을 때만 제외
+            }
         };
+    }
+
+
+    /**
+     * 리뷰/평점 신뢰도 점수 계산
+     * Wilson Score 기반 간소화 버전: 4.5점 100개 리뷰 > 5.0점 1개 리뷰
+     *
+     * @param rating 평점 (1.0~5.0)
+     * @param reviewCount 리뷰 수
+     * @return 신뢰도 점수
+     */
+    private double calculateCredibilityScore(Double rating, Integer reviewCount) {
+        if (rating == null || reviewCount == null || reviewCount == 0) {
+            return 0.0;
+        }
+
+        // 리뷰 수 가중치 (로그 스케일로 급격한 증가 방지)
+        // 100개 → 2.0, 1000개 → 3.0
+        double reviewWeight = Math.log10(reviewCount + 1);
+
+        // 평점 정규화 (3.0~5.0 → 0.0~1.0)
+        double normalizedRating = (rating - 3.0) / 2.0;
+        normalizedRating = Math.max(0.0, Math.min(1.0, normalizedRating));
+
+        // 신뢰도 점수 = 평점 × 리뷰 가중치
+        return normalizedRating * reviewWeight;
+    }
+
+    /**
+     * 추천 근거 텍스트 생성
+     * 예: "5명 중 3명이 일식을 골라서\n400시간 숙성으로 완성한 겉바속촉 돈카츠\n를 추천해요"
+     *
+     * @param totalParticipants 총 참여자 수
+     * @param preferenceCount 해당 카테고리 선호자 수
+     * @param categoryName 카테고리명 (한글)
+     * @param aiSummaryTitle AI 요약 타이틀
+     * @return 추천 근거 텍스트
+     */
+    private String buildReasonText(
+            int totalParticipants,
+            int preferenceCount,
+            String categoryName,
+            String aiSummaryTitle) {
+
+        StringBuilder sb = new StringBuilder();
+
+        // 1. 참여자 선호 정보
+        if (preferenceCount > 0) {
+            sb.append(totalParticipants).append("명 중 ")
+              .append(preferenceCount).append("명이 ")
+              .append(categoryName).append("을 골라서\n");
+        }
+
+        // 2. AI 요약 타이틀 (있는 경우)
+        if (aiSummaryTitle != null && !aiSummaryTitle.isBlank()) {
+            sb.append(aiSummaryTitle).append("\n");
+        }
+
+        // 3. 마무리 멘트
+        sb.append("를 추천해요");
+
+        return sb.toString();
     }
 
     /**
@@ -476,7 +562,8 @@ public class RecommendationService {
                 0.0,
                 RecommendStatus.FAILED,
                 null,
-                0.0
+                0.0,
+                null  // reasonText
         );
         recommendResultRepository.saveAll(List.of(failedResult));
 

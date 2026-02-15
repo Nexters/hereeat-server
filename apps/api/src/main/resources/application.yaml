@@ -20,3 +20,7 @@ server:
     threads:
       max: 600
       min-spare: 100
+
+# Scheduling (테스트 환경에서는 비활성화)
+scheduling:
+  enabled: true

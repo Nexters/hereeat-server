@@ -49,6 +49,7 @@ public class GeminiResponseParser {
     /**
      * 배치 Gemini 응답을 장소-카테고리 조합의 맵으로 파싱
      * 중첩된 JSON 구조 처리: { "location": { "category": [...] } }
+     * 잘린 JSON 응답도 복구 시도
      *
      * @param responseText Gemini API로부터의 원시 응답
      * @return LocationCategoryKey에 대한 맛집 제안 리스트의 맵
@@ -58,13 +59,26 @@ public class GeminiResponseParser {
         try {
             String cleanedJson = cleanJsonResponse(responseText);
 
-            // 1. 중첩 구조 파싱: Map<Location, Map<Category, List<SuggestionRestaurant>>>
-            Map<String, Map<String, List<SuggestionRestaurant>>> nestedMap = objectMapper.readValue(
-                cleanedJson,
-                new TypeReference<Map<String, Map<String, List<SuggestionRestaurant>>>>() {}
-            );
+            // 1. 먼저 그대로 파싱 시도
+            Map<String, Map<String, List<SuggestionRestaurant>>> nestedMap;
+            try {
+                nestedMap = objectMapper.readValue(
+                    cleanedJson,
+                    new TypeReference<Map<String, Map<String, List<SuggestionRestaurant>>>>() {}
+                );
+            } catch (Exception parseError) {
+                // 2. 파싱 실패 시 잘린 JSON 복구 시도
+                log.warn("Initial parse failed, attempting to repair truncated JSON...");
+                String repairedJson = repairTruncatedJson(cleanedJson);
 
-            // 2. Map<LocationCategoryKey, List<SuggestionRestaurant>>로 평탄화
+                nestedMap = objectMapper.readValue(
+                    repairedJson,
+                    new TypeReference<Map<String, Map<String, List<SuggestionRestaurant>>>>() {}
+                );
+                log.info("Successfully parsed repaired JSON");
+            }
+
+            // 3. Map<LocationCategoryKey, List<SuggestionRestaurant>>로 평탄화
             Map<LocationCategoryKey, List<SuggestionRestaurant>> result = new HashMap<>();
             int totalCount = 0;
 
@@ -115,5 +129,88 @@ public class GeminiResponseParser {
         }
 
         return cleaned.trim();
+    }
+
+
+    /**
+     * 잘린 JSON 응답을 복구 시도
+     * LLM 응답이 토큰 제한으로 중간에 잘렸을 때 유효한 JSON으로 복구
+     *
+     * @param truncatedJson 잘린 JSON 문자열
+     * @return 복구된 JSON 문자열
+     */
+    private String repairTruncatedJson(String truncatedJson) {
+        if (truncatedJson == null || truncatedJson.isBlank()) {
+            return "{}";
+        }
+
+        StringBuilder sb = new StringBuilder(truncatedJson);
+
+        // 1. 마지막 불완전한 객체/배열 항목 제거
+        // 마지막으로 완전한 객체가 끝나는 위치 찾기 (}, ], 또는 "value" 뒤의 ,)
+        int lastCompleteIndex = findLastCompleteIndex(sb.toString());
+        if (lastCompleteIndex > 0 && lastCompleteIndex < sb.length()) {
+            sb.setLength(lastCompleteIndex);
+        }
+
+        // 2. 열린 괄호 개수 세기
+        int openBraces = 0;   // {
+        int openBrackets = 0; // [
+
+        for (int i = 0; i < sb.length(); i++) {
+            char c = sb.charAt(i);
+            if (c == '{') openBraces++;
+            else if (c == '}') openBraces--;
+            else if (c == '[') openBrackets++;
+            else if (c == ']') openBrackets--;
+        }
+
+        // 3. 닫히지 않은 괄호 닫기
+        while (openBrackets > 0) {
+            sb.append(']');
+            openBrackets--;
+        }
+        while (openBraces > 0) {
+            sb.append('}');
+            openBraces--;
+        }
+
+        String repaired = sb.toString();
+        log.debug("Repaired JSON: added {} closing braces, {} closing brackets",
+                openBraces, openBrackets);
+
+        return repaired;
+    }
+
+    /**
+     * 마지막으로 완전한 JSON 요소가 끝나는 인덱스 찾기
+     */
+    private int findLastCompleteIndex(String json) {
+        int lastComplete = -1;
+        boolean inString = false;
+        char prevChar = 0;
+
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+
+            // 문자열 내부인지 추적 (이스케이프된 따옴표 처리)
+            if (c == '"' && prevChar != '\\') {
+                inString = !inString;
+            }
+
+            // 문자열 외부에서 완전한 요소 종료 지점 찾기
+            if (!inString) {
+                if (c == '}' || c == ']') {
+                    lastComplete = i + 1;
+                } else if (c == ',' && i > 0) {
+                    // 콤마 이전까지가 완전한 요소
+                    lastComplete = i;
+                }
+            }
+
+            prevChar = c;
+        }
+
+        return lastComplete;
     }
 }

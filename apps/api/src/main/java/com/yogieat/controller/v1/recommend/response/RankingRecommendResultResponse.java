@@ -36,7 +36,25 @@ public record RankingRecommendResultResponse(
         @Schema(description = "카테고리 중분류", example = "한정식")
         String mediumCategory,
         @Schema(description = "다수결 거리 범위", example = "RANGE_500M")
-        DistanceRange majorityDistanceRange
+        DistanceRange majorityDistanceRange,
+        // 추천 근거 데이터 (신규 필드)
+        @Schema(description = "카카오맵 리뷰 수", example = "120")
+        Integer reviewCount,
+        @Schema(description = "블로그 리뷰 수", example = "239")
+        Integer blogReviewCount,
+        @Schema(description = "대표 메뉴 이름", example = "양지곰탕")
+        String representMenu,
+        @Schema(description = "대표 메뉴 가격", example = "12000")
+        Integer representMenuPrice,
+        @Schema(description = "가격대", example = "₩₩")
+        String priceLevel,
+        @Schema(description = "AI 요약 제목", example = "맑고 깊은 국물에 담긴 정성 한 그릇")
+        String aiMateSummaryTitle,
+        @Schema(description = "AI 요약 내용 (JSON 배열 문자열)", example = "[\"양지곰탕 추천\", \"단체석\", \"콜키지 부과\"]")
+        String aiMateSummaryContents,
+        // 추천 근거 텍스트 (신규)
+        @Schema(description = "추천 근거 텍스트", example = "5명 중 3명이 일식을 골라서\n400시간 숙성으로 완성한 겉바속촉 돈카츠\n를 추천해요")
+        String reasonText
 ) {
     public static RankingRecommendResultResponse from(RecommendResultData.Ranking ranking) {
         return new RankingRecommendResultResponse(
@@ -53,7 +71,15 @@ public record RankingRecommendResultResponse(
                 ranking.location(),
                 ranking.largeCategory(),
                 ranking.mediumCategory(),
-                ranking.majorityDistanceRange()
+                ranking.majorityDistanceRange(),
+                ranking.reviewCount(),
+                ranking.blogReviewCount(),
+                ranking.representMenu(),
+                ranking.representMenuPrice(),
+                ranking.priceLevel(),
+                ranking.aiMateSummaryTitle(),
+                ranking.aiMateSummaryContents(),
+                ranking.reasonText()
         );
     }
 }

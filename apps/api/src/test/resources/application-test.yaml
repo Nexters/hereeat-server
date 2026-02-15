@@ -1,0 +1,3 @@
+# 테스트 환경 설정
+scheduling:
+  enabled: false
