@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: yogieat-sync-batch
+  main:
+    web-application-type: none
+  config:
+    import:
+      - logging.yaml
+      - datasource.yaml
+      - client.yaml
+  task:
+    scheduling:
+      enabled: true
+
+sync:
+  job:
+    chunk-size: 50
+    parallelism: 4
+    poll-delay-ms: 5000
+    stale-running-threshold-minutes: 60
+    weekly-cron: "0 0 21 ? * SUN"
+    weekly-zone: "Asia/Seoul"

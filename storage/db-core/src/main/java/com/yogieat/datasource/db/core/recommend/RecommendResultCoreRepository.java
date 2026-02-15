@@ -32,7 +32,6 @@ public class RecommendResultCoreRepository implements RecommendResultRepository 
                 .toList();
 
         List<RecommendResultEntity> savedEntities = recommendResultJpaRepository.saveAll(entities);
-
         return savedEntities.stream()
                 .map(RecommendResultEntity::toDomain)
                 .toList();
@@ -60,12 +59,12 @@ public class RecommendResultCoreRepository implements RecommendResultRepository 
     public List<RecommendResult> findOrphanedPending(Duration threshold) {
         LocalDateTime cutoffTime = LocalDateTime.now().minus(threshold);
         List<RecommendResultEntity> entities = jpaQueryFactory.selectFrom(recommendResultEntity)
-            .where(
-                recommendResultEntity.status.eq(RecommendStatus.PENDING)
-                    .and(recommendResultEntity.createdAt.lt(cutoffTime))
-            ).fetch();
+                .where(
+                        recommendResultEntity.status.eq(RecommendStatus.PENDING)
+                                .and(recommendResultEntity.createdAt.lt(cutoffTime))
+                ).fetch();
         return entities.stream()
-            .map(RecommendResultEntity::toDomain)
-            .toList();
+                .map(RecommendResultEntity::toDomain)
+                .toList();
     }
 }

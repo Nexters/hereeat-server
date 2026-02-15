@@ -1,0 +1,25 @@
+services:
+  yogieat-api:
+    ports: []
+
+  yogieat-edge:
+    image: caddy:2.8-alpine
+    container_name: yogieat-edge
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - EDGE_DOMAIN=${EDGE_DOMAIN}
+    volumes:
+      - ./docker/edge/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - yogieat-api
+    networks:
+      - yogieat-network
+
+volumes:
+  caddy_data:
+  caddy_config:

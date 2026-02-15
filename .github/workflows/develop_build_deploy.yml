@@ -6,7 +6,8 @@ on:
 
 env:
   DOCKERHUB_USERNAME: yogieat
-  DOCKERHUB_IMAGE_NAME: yogieat-server
+  DOCKERHUB_API_IMAGE_NAME: yogieat-server-api
+  DOCKERHUB_BATCH_IMAGE_NAME: yogieat-server-batch-sync
 
 jobs:
   build-and-deploy:
@@ -48,16 +49,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Docker 메타데이터 추출
-      - name: Extract Docker metadata
-        id: metadata
-        uses: docker/metadata-action@v5.5.0
-        env:
-          DOCKERHUB_IMAGE_FULL_NAME: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_IMAGE_NAME }}
-        with:
-          images: ${{ env.DOCKERHUB_IMAGE_FULL_NAME }}
-          tags: |
-            type=sha,prefix=
+      - name: Set image tags
+        id: image-tags
+        run: |
+          echo "api_image=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_API_IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "batch_image=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -68,19 +64,42 @@ jobs:
           context: .
           file: ./docker/Dockerfile
           push: true
-          tags: ${{ steps.metadata.outputs.tags }}
+          build-args: |
+            JAR_FILE=apps/api/build/libs/*.jar
+          tags: ${{ steps.image-tags.outputs.api_image }}
           platforms: linux/amd64
 
-      # 서버로 docker-compose 파일 전송
-      - name: Copy docker-compose file to Server
+      - name: Build and push Batch image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          build-args: |
+            JAR_FILE=batch/sync/build/libs/*.jar
+          tags: ${{ steps.image-tags.outputs.batch_image }}
+          platforms: linux/amd64
+
+      # 서버로 docker 관련 파일 전송
+      - name: Copy docker directory to Server
         uses: burnett01/rsync-deployments@7.0.1
         with:
           switches: -avzr --delete
           remote_host: ${{ secrets.SERVER_HOST }}
           remote_user: ${{ secrets.SERVER_USERNAME }}
           remote_key: ${{ secrets.SERVER_PRIVATE_KEY }}
-          path: ./docker/docker-compose.yaml
+          path: ./docker
           remote_path: /root
+
+      - name: Copy deploy script to Server
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avzr --delete
+          remote_host: ${{ secrets.SERVER_HOST }}
+          remote_user: ${{ secrets.SERVER_USERNAME }}
+          remote_key: ${{ secrets.SERVER_PRIVATE_KEY }}
+          path: ./scripts/deploy
+          remote_path: /root/scripts
 
       # TODO: 서버로 Nginx 설정 파일 전송
 #      - name: Copy default.conf to Server
@@ -101,9 +120,16 @@ jobs:
           key: ${{ secrets.SERVER_PRIVATE_KEY }}
           script: |
             echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ env.DOCKERHUB_USERNAME }}" --password-stdin
-            echo "Deploying with IMAGE_FULL_URL=${{ steps.metadata.outputs.tags }}"
-            cd /root
-            IMAGE_FULL_URL="${{ steps.metadata.outputs.tags }}" DOCKERHUB_IMAGE_NAME="${{ env.DOCKERHUB_IMAGE_NAME }}" docker compose -f docker-compose.yaml up -d
+            echo "Deploying API image: ${{ steps.image-tags.outputs.api_image }}"
+            echo "Deploying Batch image: ${{ steps.image-tags.outputs.batch_image }}"
+            cd /root/docker
+            API_IMAGE_FULL_URL="${{ steps.image-tags.outputs.api_image }}" \
+            BATCH_IMAGE_FULL_URL="${{ steps.image-tags.outputs.batch_image }}" \
+            DOCKERHUB_API_IMAGE_NAME="${{ env.DOCKERHUB_API_IMAGE_NAME }}" \
+            DOCKERHUB_BATCH_IMAGE_NAME="${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}" \
+            DEPLOY_SCOPE="app" \
+            DEPLOY_ENV="dev" \
+            ../scripts/deploy/compose-up.sh
             docker image prune -a -f
 
       - name: Discord notification
@@ -117,6 +143,7 @@ jobs:
             **브랜치**: ${{ github.ref_name }}
             **커밋**: ${{ github.sha }}
             **커밋 메시지**: ${{ github.event.head_commit.message }}
-            **이미지**: ${{ steps.metadata.outputs.tags }}
+            **API 이미지**: ${{ steps.image-tags.outputs.api_image }}
+            **BATCH 이미지**: ${{ steps.image-tags.outputs.batch_image }}
           color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
           username: GitHub Actions

@@ -13,6 +13,9 @@ spring:
       - client.yaml
       - swagger.yaml
   web.resources.add-mappings: false
+  task:
+    scheduling:
+      enabled: true
 
 server:
   tomcat:
@@ -21,6 +24,10 @@ server:
       max: 600
       min-spare: 100
 
-# Scheduling (테스트 환경에서는 비활성화)
-scheduling:
-  enabled: true
+sync:
+  job:
+    chunk-size: 50
+    parallelism: 4
+    poll-delay-ms: 5000
+    weekly-cron: "0 0 21 ? * SUN"
+    weekly-zone: "Asia/Seoul"

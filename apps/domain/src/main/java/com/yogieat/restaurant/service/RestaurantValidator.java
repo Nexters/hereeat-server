@@ -19,11 +19,12 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class RestaurantValidator {
 
-    private final RestaurantRepository restaurantRepository;
+    private static final String DUPLICATE_EXTERNAL_ID_REASON = "Restaurant already exists with externalId: %s";
+    private static final String DUPLICATE_NAME_ADDRESS_REASON = "Restaurant already exists with same name and address";
+    private static final String REQUIRED_NAME_REASON = "Restaurant name is required";
+    private static final String REQUIRED_ADDRESS_REASON = "Restaurant address is required";
 
-    // 배치 검증 캐시
-    private final Set<String> cachedExternalIds = new HashSet<>();
-    private final Set<String> cachedNameAddressPairs = new HashSet<>();
+    private final RestaurantRepository restaurantRepository;
 
     /**
      * 주어진 장소에 대한 기존 맛집 데이터를 로드하여 배치 검증을 준비
@@ -31,16 +32,16 @@ public class RestaurantValidator {
      *
      * @param region 맛집 데이터를 로드할 장소
      */
-    public void prepareForBatchValidation(Region region) {
+    public ValidationContext prepareForBatchValidation(Region region) {
         log.info("Preparing batch validation cache for place: {}", region.getName());
 
         List<Restaurant> existingRestaurants = restaurantRepository.findByRegion(region);
 
-        cachedExternalIds.clear();
-        cachedNameAddressPairs.clear();
+        Set<String> cachedExternalIds = new HashSet<>();
+        Set<String> cachedNameAddressPairs = new HashSet<>();
 
         for (Restaurant restaurant : existingRestaurants) {
-            if (restaurant.externalId() != null && !restaurant.externalId().isBlank()) {
+            if (hasText(restaurant.externalId())) {
                 cachedExternalIds.add(restaurant.externalId());
             }
             if (restaurant.name() != null && restaurant.address() != null) {
@@ -50,6 +51,8 @@ public class RestaurantValidator {
 
         log.info("Loaded {} restaurants into cache ({} externalIds, {} name-address pairs)",
             existingRestaurants.size(), cachedExternalIds.size(), cachedNameAddressPairs.size());
+
+        return new ValidationContext(cachedExternalIds, cachedNameAddressPairs);
     }
 
     /**
@@ -60,39 +63,27 @@ public class RestaurantValidator {
      * @param externalId 카카오 장소 ID (카카오 장소를 찾지 못한 경우 null 가능)
      * @return 검증 상태와 사유를 포함한 ValidationResult
      */
-    public ValidationResult duplicateValidateWithCache(SuggestionRestaurant suggestion, String externalId) {
-        // 1. externalId가 있으면 중복 검사 (카카오 장소를 찾은 경우)
-        if (externalId != null && !externalId.isBlank()) {
-            if (cachedExternalIds.contains(externalId)) {
-                log.debug("Duplicate restaurant detected by externalId (cached): {} ({})",
-                    suggestion.name(), externalId);
-                return ValidationResult.duplicate(
-                    "Restaurant already exists with externalId: " + externalId
-                );
-            }
-        }
+    public ValidationResult duplicateValidateWithCache(
+            ValidationContext context,
+            SuggestionRestaurant suggestion,
+            String externalId
+    ) {
+        return validateDuplicate(
+                suggestion,
+                externalId,
+                new DuplicateLookupStrategy() {
+                    @Override
+                    public boolean isDuplicateExternalId(String id) {
+                        return context.containsExternalId(id);
+                    }
 
-        // 2. 이름과 주소로 중복 검사 (Gemini 전용 맛집 대비)
-        String nameAddressKey = createNameAddressKey(suggestion.name(), suggestion.address());
-        if (cachedNameAddressPairs.contains(nameAddressKey)) {
-            log.debug("Duplicate restaurant detected by name and address (cached): {} at {}",
-                suggestion.name(), suggestion.address());
-            return ValidationResult.duplicate(
-                "Restaurant already exists with same name and address"
-            );
-        }
-
-        // 3. 필수 필드 검증
-        if (suggestion.name() == null || suggestion.name().isBlank()) {
-            return ValidationResult.invalid("Restaurant name is required");
-        }
-
-        if (suggestion.address() == null || suggestion.address().isBlank()) {
-            return ValidationResult.invalid("Restaurant address is required");
-        }
-
-        // 모든 검증 통과
-        return ValidationResult.valid();
+                    @Override
+                    public boolean isDuplicateNameAddress(String name, String address) {
+                        return context.containsNameAddress(name, address);
+                    }
+                },
+                "cached"
+        );
     }
 
     /**
@@ -102,22 +93,8 @@ public class RestaurantValidator {
      * @param name 맛집 이름
      * @param address 맛집 주소
      */
-    public void addToCache(String externalId, String name, String address) {
-        if (externalId != null && !externalId.isBlank()) {
-            cachedExternalIds.add(externalId);
-        }
-        if (name != null && address != null) {
-            cachedNameAddressPairs.add(createNameAddressKey(name, address));
-        }
-    }
-
-    /**
-     * 검증 캐시를 초기화
-     * 다른 장소로 전환할 때 호출해야 함
-     */
-    public void clearCache() {
-        cachedExternalIds.clear();
-        cachedNameAddressPairs.clear();
+    public void addToCache(ValidationContext context, String externalId, String name, String address) {
+        context.add(externalId, name, address);
     }
 
     /**
@@ -135,37 +112,22 @@ public class RestaurantValidator {
      * @return 검증 상태와 사유를 포함한 ValidationResult
      */
     public ValidationResult duplicateValidate(SuggestionRestaurant suggestion, String externalId) {
-        // 1. externalId가 있으면 중복 검사 (카카오 장소를 찾은 경우)
-        if (externalId != null && !externalId.isBlank()) {
-            if (isDuplicateByExternalId(externalId)) {
-                log.debug("Duplicate restaurant detected by externalId: {} ({})",
-                    suggestion.name(), externalId);
-                return ValidationResult.duplicate(
-                    "Restaurant already exists with externalId: " + externalId
-                );
-            }
-        }
+        return validateDuplicate(
+                suggestion,
+                externalId,
+                new DuplicateLookupStrategy() {
+                    @Override
+                    public boolean isDuplicateExternalId(String id) {
+                        return isDuplicateByExternalId(id);
+                    }
 
-        // 2. 이름과 주소로 중복 검사 (Gemini 전용 맛집 대비)
-        if (isDuplicateByNameAndAddress(suggestion.name(), suggestion.address())) {
-            log.debug("Duplicate restaurant detected by name and address: {} at {}",
-                suggestion.name(), suggestion.address());
-            return ValidationResult.duplicate(
-                "Restaurant already exists with same name and address"
-            );
-        }
-
-        // 3. 필수 필드 검증
-        if (suggestion.name() == null || suggestion.name().isBlank()) {
-            return ValidationResult.invalid("Restaurant name is required");
-        }
-
-        if (suggestion.address() == null || suggestion.address().isBlank()) {
-            return ValidationResult.invalid("Restaurant address is required");
-        }
-
-        // 모든 검증 통과
-        return ValidationResult.valid();
+                    @Override
+                    public boolean isDuplicateNameAddress(String name, String address) {
+                        return isDuplicateByNameAndAddress(name, address);
+                    }
+                },
+                "db"
+        );
     }
 
     /**
@@ -175,7 +137,7 @@ public class RestaurantValidator {
      * @return 해당 externalId를 가진 맛집이 이미 존재하면 true
      */
     public boolean isDuplicateByExternalId(String externalId) {
-        if (externalId == null || externalId.isBlank()) {
+        if (!hasText(externalId)) {
             return false;
         }
         return restaurantRepository.existsByExternalId(externalId);
@@ -190,10 +152,83 @@ public class RestaurantValidator {
      * @return 동일한 이름과 주소를 가진 맛집이 이미 존재하면 true
      */
     public boolean isDuplicateByNameAndAddress(String name, String address) {
-        if (name == null || name.isBlank() || address == null || address.isBlank()) {
+        if (!hasText(name) || !hasText(address)) {
             return false;
         }
         return restaurantRepository.existsByNameAndAddress(name, address);
+    }
+
+    private ValidationResult validateDuplicate(
+            SuggestionRestaurant suggestion,
+            String externalId,
+            DuplicateLookupStrategy duplicateLookupStrategy,
+            String source
+    ) {
+        if (hasText(externalId) && duplicateLookupStrategy.isDuplicateExternalId(externalId)) {
+            log.debug("Duplicate restaurant detected by externalId ({}): {} ({})",
+                    source, suggestion.name(), externalId);
+            return ValidationResult.duplicate(DUPLICATE_EXTERNAL_ID_REASON.formatted(externalId));
+        }
+
+        if (duplicateLookupStrategy.isDuplicateNameAddress(suggestion.name(), suggestion.address())) {
+            log.debug("Duplicate restaurant detected by name and address ({}): {} at {}",
+                    source, suggestion.name(), suggestion.address());
+            return ValidationResult.duplicate(DUPLICATE_NAME_ADDRESS_REASON);
+        }
+
+        if (!hasText(suggestion.name())) {
+            return ValidationResult.invalid(REQUIRED_NAME_REASON);
+        }
+
+        if (!hasText(suggestion.address())) {
+            return ValidationResult.invalid(REQUIRED_ADDRESS_REASON);
+        }
+
+        return ValidationResult.valid();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private interface DuplicateLookupStrategy {
+        boolean isDuplicateExternalId(String externalId);
+        boolean isDuplicateNameAddress(String name, String address);
+    }
+
+    public static final class ValidationContext {
+        private final Set<String> externalIds;
+        private final Set<String> nameAddressPairs;
+
+        public ValidationContext(Set<String> externalIds, Set<String> nameAddressPairs) {
+            this.externalIds = externalIds;
+            this.nameAddressPairs = nameAddressPairs;
+        }
+
+        public boolean containsExternalId(String externalId) {
+            return hasText(externalId) && externalIds.contains(externalId);
+        }
+
+        public boolean containsNameAddress(String name, String address) {
+            return name != null && address != null && nameAddressPairs.contains(createNameAddressKey(name, address));
+        }
+
+        public void add(String externalId, String name, String address) {
+            if (hasText(externalId)) {
+                externalIds.add(externalId);
+            }
+            if (name != null && address != null) {
+                nameAddressPairs.add(createNameAddressKey(name, address));
+            }
+        }
+
+        private static String createNameAddressKey(String name, String address) {
+            return name + "|" + address;
+        }
+
+        private static boolean hasText(String value) {
+            return value != null && !value.isBlank();
+        }
     }
 
     /**
