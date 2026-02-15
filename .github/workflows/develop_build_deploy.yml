@@ -127,8 +127,7 @@ jobs:
             BATCH_IMAGE_FULL_URL="${{ steps.image-tags.outputs.batch_image }}" \
             DOCKERHUB_API_IMAGE_NAME="${{ env.DOCKERHUB_API_IMAGE_NAME }}" \
             DOCKERHUB_BATCH_IMAGE_NAME="${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}" \
-            ENABLE_EDGE_SSL="${{ secrets.ENABLE_EDGE_SSL }}" \
-            EDGE_DOMAIN="${{ secrets.EDGE_DOMAIN }}" \
+            DEPLOY_SCOPE="app" \
             ../scripts/deploy/compose-up.sh
             docker image prune -a -f
 
