@@ -18,13 +18,13 @@ docker compose up -d --build yogieat-api yogieat-batch-sync
 ## 2) 전체 보정 1회 실행
 
 ```bash
-curl -X POST http://localhost:9090/api/v1/restaurants/sync-jobs/all
+curl -X POST http://localhost:8080/api/v1/restaurants/sync-jobs/all
 ```
 
 응답으로 받은 `jobId`를 조회해 완료 상태를 확인한다.
 
 ```bash
-curl http://localhost:9090/api/v1/restaurants/sync-jobs/{jobId}
+curl http://localhost:8080/api/v1/restaurants/sync-jobs/{jobId}
 ```
 
 터미널 상태:
@@ -44,7 +44,7 @@ export DATASOURCE_DB_CORE_JDBC_URL=jdbc:postgresql://localhost:5432/yogieat
 export DATASOURCE_DB_CORE_USERNAME=postgres
 export DATASOURCE_DB_CORE_PASSWORD=postgres
 
-API_BASE_URL=http://localhost:9090/api/v1 \
+API_BASE_URL=http://localhost:8080/api/v1 \
 PRIORITY_LIMIT=100 \
 scripts/sync/run-single-sync-for-priority-nulls.sh
 ```

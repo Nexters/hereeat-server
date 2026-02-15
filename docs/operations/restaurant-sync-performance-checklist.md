@@ -24,7 +24,7 @@ docker logs yogieat-server-batch-sync > baseline-sync.log 2>&1
 
 2. 수동 전체 동기화 Job 실행
 ```bash
-curl -X POST http://localhost:9090/api/v1/restaurants/sync-jobs/all
+curl -X POST http://localhost:8080/api/v1/restaurants/sync-jobs/all
 ```
 
 3. Job 완료 후 로그 분석
