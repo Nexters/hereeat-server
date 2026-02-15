@@ -22,8 +22,10 @@ import lombok.NoArgsConstructor;
 @Table(
         name = "t_restaurant_sync_job",
         indexes = {
-            @Index(name = "idx_sync_job_status_created_at", columnList = "status, createdAt"),
-            @Index(name = "idx_sync_job_trigger_created_at", columnList = "triggerType, createdAt")
+            @Index(name = "idx_sync_job_status_created_at", columnList = "status, created_at"),
+            @Index(name = "idx_sync_job_trigger_created_at", columnList = "trigger_type, created_at"),
+            @Index(name = "idx_sync_job_scope_status_created_at", columnList = "scope, status, created_at"),
+            @Index(name = "idx_sync_job_target_status_created_at", columnList = "target_restaurant_id, status, created_at")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

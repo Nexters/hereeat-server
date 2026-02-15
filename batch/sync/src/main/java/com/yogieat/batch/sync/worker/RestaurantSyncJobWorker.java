@@ -4,13 +4,11 @@ import com.yogieat.batch.sync.config.SyncJobProperties;
 import com.yogieat.restaurant.service.RestaurantRepository;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncChunkResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
-import com.yogieat.restaurant.sync.domain.value.RestaurantSyncJobStatus;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
 import com.yogieat.restaurant.sync.service.RestaurantSyncJobRepository;
 import com.yogieat.restaurant.sync.service.RestaurantSyncService;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
@@ -39,13 +37,10 @@ public class RestaurantSyncJobWorker {
 
         RestaurantSyncJob currentJob = null;
         try {
-            Optional<RestaurantSyncJob> jobOpt = syncJobRepository.findTopByStatusOrderByCreatedAtAsc(RestaurantSyncJobStatus.PENDING);
-            if (jobOpt.isEmpty()) {
+            currentJob = syncJobRepository.claimNextPendingJob().orElse(null);
+            if (currentJob == null) {
                 return;
             }
-
-            currentJob = jobOpt.get();
-            syncJobRepository.markRunning(currentJob.id());
 
             if (currentJob.scope() == RestaurantSyncScope.SINGLE) {
                 executeSingle(currentJob);

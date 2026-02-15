@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
-import com.yogieat.restaurant.sync.domain.value.RestaurantSyncJobStatus;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncTriggerType;
 import java.util.Optional;
@@ -29,28 +28,24 @@ class RestaurantSyncJobCoreRepositoryTest {
     private RestaurantSyncJobCoreRepository coreRepository;
 
     @Test
-    @DisplayName("markRunning은 조회된 엔티티 상태를 RUNNING으로 변경한다")
-    void markRunning_ShouldUpdateStatus() {
+    @DisplayName("claimNextPendingJob은 가장 오래된 PENDING Job을 RUNNING으로 점유한다")
+    void claimNextPendingJob_ShouldReturnClaimedJob() {
         RestaurantSyncJobEntity entity = RestaurantSyncJobEntity.from(newJob());
+        when(syncJobJpaRepository.claimNextPendingJobIds()).thenReturn(java.util.List.of(1L));
         when(syncJobJpaRepository.findById(1L)).thenReturn(Optional.of(entity));
 
-        coreRepository.markRunning(1L);
+        Optional<RestaurantSyncJob> claimed = coreRepository.claimNextPendingJob();
 
-        assertThat(entity.getStatus()).isEqualTo(RestaurantSyncJobStatus.RUNNING);
+        assertThat(claimed).isPresent();
+        verify(syncJobJpaRepository).claimNextPendingJobIds();
         verify(syncJobJpaRepository).findById(1L);
     }
 
     @Test
-    @DisplayName("markFailed는 조회된 엔티티 상태를 FAILED로 변경한다")
-    void markFailed_ShouldUpdateStatus() {
-        RestaurantSyncJobEntity entity = RestaurantSyncJobEntity.from(newJob());
-        when(syncJobJpaRepository.findById(2L)).thenReturn(Optional.of(entity));
-
-        coreRepository.markFailed(2L, "boom");
-
-        assertThat(entity.getStatus()).isEqualTo(RestaurantSyncJobStatus.FAILED);
-        assertThat(entity.getErrorSummary()).isEqualTo("boom");
-        verify(syncJobJpaRepository).findById(2L);
+    @DisplayName("claim할 PENDING Job이 없으면 empty를 반환한다")
+    void claimNextPendingJob_ShouldReturnEmpty_WhenNoPendingJob() {
+        when(syncJobJpaRepository.claimNextPendingJobIds()).thenReturn(java.util.List.of());
+        assertThat(coreRepository.claimNextPendingJob()).isEmpty();
     }
 
     @Test

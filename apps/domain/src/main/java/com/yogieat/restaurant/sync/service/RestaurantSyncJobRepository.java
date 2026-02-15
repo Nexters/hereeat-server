@@ -10,13 +10,11 @@ public interface RestaurantSyncJobRepository {
 
     Optional<RestaurantSyncJob> findById(Long id);
 
-    Optional<RestaurantSyncJob> findTopByStatusOrderByCreatedAtAsc(RestaurantSyncJobStatus status);
+    Optional<RestaurantSyncJob> claimNextPendingJob();
 
     boolean existsByScopeAndStatus(RestaurantSyncScope scope, RestaurantSyncJobStatus status);
 
     boolean existsByTargetRestaurantIdAndStatus(Long targetRestaurantId, RestaurantSyncJobStatus status);
-
-    void markRunning(Long jobId);
 
     void updateProgress(
             Long jobId,

@@ -1,8 +1,6 @@
 package com.yogieat.restaurant.service;
 
 import com.yogieat.category.domain.value.LargeCategory;
-import com.yogieat.category.service.CategoryService;
-import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
@@ -14,8 +12,6 @@ import com.yogieat.external.kakao.KakaoPlaceMapper;
 import com.yogieat.external.kakao.result.KaKaoPlaceDocumentResult;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.external.kakao.result.KakaoRestaurantData;
-import com.yogieat.gathering.domain.value.TimeSlot;
-import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
 import java.util.ArrayList;
@@ -28,8 +24,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -41,8 +35,7 @@ public class RestaurantCollectionProcessor {
     private final KakaoPlaceDetailClient kakaoPlaceDetailClient;
     private final KakaoPlaceMapper kakaoPlaceMapper;
     private final RestaurantRepository restaurantRepository;
-    private final CategoryService categoryService;
-    private final RestaurantValidator restaurantValidator;
+    private final RestaurantCollectionWriteService restaurantCollectionWriteService;
 
     /**
      * Place enum에서 지원하는 지역 목록
@@ -98,35 +91,23 @@ public class RestaurantCollectionProcessor {
     );
     private static final int DEFAULT_REGION_LIMIT = 50;  // 기본 제한
 
-    /**
-     * Place enum에 정의된 모든 지역에 대해 맛집 데이터 수집
-     * 배치 처리 최적화:
-     * - Gemini API 호출 1회로 모든 location × category 조합 처리
-     * - API 호출 10회 → 1회 (90% 감소)
-     * - 처리 시간 대폭 단축 (rate limit 대기 제거)
-     * - 지역별 수집 제한 적용 (GANGNAM, HONGDAE: 100개, 나머지: 50개)
-     */
-    @Transactional
     public void collectAllRegions() {
         try {
-            // 1. 지역별 현재 맛집 수 조회 및 수집 필요 지역 필터링
-            List<String> locationsToCollect = filterLocationsNeedingCollection();
+            Map<Region, Long> regionCounts = loadRegionCounts();
+            List<String> locationsToCollect = filterLocationsNeedingCollection(regionCounts);
 
             if (locationsToCollect.isEmpty()) {
                 return;
             }
 
             List<Restaurant> restaurants = restaurantRepository.findAll();
-
             String restaurantNames = restaurants.stream()
                 .map(Restaurant::name)
                 .collect(Collectors.joining(", "));
 
-            // 2. 배치 API 호출: 필터링된 location × category 조합만 요청
             Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
                 geminiClient.generateRestaurantsBatch(locationsToCollect, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
 
-            // 3. 각 location-category 조합별로 데이터 처리 (페이징)
             int totalProcessed = 0;
             int totalSuccess = 0;
             int totalFailed = 0;
@@ -148,24 +129,24 @@ public class RestaurantCollectionProcessor {
                     LocationCategoryKey key = entry.getKey();
                     List<SuggestionRestaurant> suggestions = entry.getValue();
 
-                    // 지역별 제한 체크 (실시간)
                     Region region = getRegionFromLocationName(key.location());
-                    if (isRegionLimitReached(region)) {
+                    if (isRegionLimitReached(region, regionCounts)) {
                         continue;
                     }
 
                     try {
                         int processed = processRestaurantsForLocation(key.location(), key.category(), suggestions);
                         totalProcessed += processed;
+                        if (processed > 0) {
+                            regionCounts.compute(region, (r, count) -> count == null ? (long) processed : count + processed);
+                        }
                         totalSuccess++;
-
                     } catch (Exception e) {
                         log.error("Failed: {} - {}", key.location(), key.category(), e);
                         totalFailed++;
                     }
                 }
 
-                // 배치 간 휴식 (마지막 배치가 아닌 경우)
                 if (endIndex < entries.size()) {
                     try {
                         Thread.sleep(BATCH_DELAY_MS);
@@ -185,18 +166,19 @@ public class RestaurantCollectionProcessor {
         }
     }
 
+    private Map<Region, Long> loadRegionCounts() {
+        return restaurantRepository.findAll().stream()
+                .collect(Collectors.groupingBy(
+                        Restaurant::region,
+                        Collectors.counting()
+                ));
+    }
 
-    /**
-     * 수집이 필요한 지역 목록 필터링
-     * 각 지역의 현재 맛집 수가 제한에 도달하지 않은 지역만 반환
-     *
-     * @return 수집이 필요한 지역명 목록
-     */
-    private List<String> filterLocationsNeedingCollection() {
+    private List<String> filterLocationsNeedingCollection(Map<Region, Long> regionCounts) {
         List<String> locationsToCollect = new ArrayList<>();
 
         for (Region region : Region.values()) {
-            long currentCount = restaurantRepository.countByRegion(region);
+            long currentCount = regionCounts.getOrDefault(region, 0L);
             int limit = REGION_LIMITS.getOrDefault(region, DEFAULT_REGION_LIMIT);
 
             if (currentCount < limit) {
@@ -212,14 +194,8 @@ public class RestaurantCollectionProcessor {
         return locationsToCollect;
     }
 
-    /**
-     * 지역의 맛집 수집 제한에 도달했는지 확인
-     *
-     * @param region 확인할 지역
-     * @return 제한 도달 여부
-     */
-    private boolean isRegionLimitReached(Region region) {
-        long currentCount = restaurantRepository.countByRegion(region);
+    private boolean isRegionLimitReached(Region region, Map<Region, Long> regionCounts) {
+        long currentCount = regionCounts.getOrDefault(region, 0L);
         int limit = REGION_LIMITS.getOrDefault(region, DEFAULT_REGION_LIMIT);
         return currentCount >= limit;
     }
@@ -230,65 +206,42 @@ public class RestaurantCollectionProcessor {
      * @deprecated Use batch processing via collectAllRegions() for better performance
      */
     @Deprecated
-    @Transactional
     public int collectRestaurantsForLocation(String location, String category) {
-        Region region = getRegionFromLocationName(location);
-        RestaurantValidator.ValidationContext validationContext =
-                restaurantValidator.prepareForBatchValidation(region);
-
         List<SuggestionRestaurant> suggestions = geminiClient.generateRestaurants(
             location, category, RESTAURANTS_PER_REQUEST
         );
 
-        int savedCount = 0;
-        for (SuggestionRestaurant suggestion : suggestions) {
-            boolean saved = processRestaurant(suggestion, region, location, validationContext);
-            if (saved) {
-                savedCount++;
-            }
-        }
-
-        log.info("Saved {}/{} for {} - {}", savedCount, suggestions.size(), location, category);
-
-        return savedCount;
+        return processRestaurantsForLocation(location, category, suggestions);
     }
 
-    /**
-     * 배치에서 수집된 suggestions를 처리하여 저장
-     *
-     * 데이터 처리 전략:
-     * 1. Place enum 변환 및 캐시 준비
-     * 2. 카테고리 정보로 카테고리 조회 또는 생성 (대카테고리, 중카테고리)
-     * 3. Kakao Place API로 데이터 보강 (위치, 지도 URL, 외부 ID)
-     * 4. 모든 생성된 맛집 저장 (Kakao 보강 실패 시에도 저장)
-     *
-     * @param location 지역명 (Place enum에서 가져옴)
-     * @param category 음식 카테고리
-     * @param suggestions Gemini에서 생성된 레스토랑 목록
-     * @return 성공적으로 저장된 맛집 개수
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int processRestaurantsForLocation(
         String location,
         String category,
         List<SuggestionRestaurant> suggestions
     ) {
-        // 1. location을 Place enum으로 변환 (배치 검증용)
         Region region = getRegionFromLocationName(location);
-
-        // 2. Validator 캐시 준비: 해당 Place의 기존 레스토랑 로드 (N번 → 1번 DB 쿼리)
         RestaurantValidator.ValidationContext validationContext =
-                restaurantValidator.prepareForBatchValidation(region);
+                restaurantCollectionWriteService.prepareValidationContext(region);
 
-        // 3. 각 suggestion 처리 (카테고리 생성 + Gemini 데이터 + Kakao 데이터 보강)
         int savedCount = 0;
         for (SuggestionRestaurant suggestion : suggestions) {
-            boolean saved = processRestaurant(suggestion, region, location, validationContext);
+            LargeCategory largeCategory = getLargeCategoryFromDisplayName(suggestion.largeCategory());
+            RestaurantEnrichedData enrichedData = enrichRestaurantData(suggestion, location);
+            if (enrichedData.isSkipped()) {
+                continue;
+            }
+
+            boolean saved = restaurantCollectionWriteService.persistRestaurant(
+                    suggestion,
+                    region,
+                    largeCategory,
+                    enrichedData,
+                    validationContext
+            );
             if (saved) {
                 savedCount++;
             }
 
-            // API Rate Limit 방지를 위한 지연
             try {
                 Thread.sleep(RATE_LIMIT_DELAY_MS);
             } catch (InterruptedException e) {
@@ -302,12 +255,6 @@ public class RestaurantCollectionProcessor {
         return savedCount;
     }
 
-    /**
-     * location 이름을 Place enum으로 변환 (캐시 사용, O(1) 조회)
-     * @param locationName Place enum의 location 이름 (예: "홍대입구역")
-     * @return Place enum
-     * @throws CustomException 알 수 없는 location 이름인 경우
-     */
     private Region getRegionFromLocationName(String locationName) {
         Region region = PLACE_CACHE.get(locationName);
         if (region == null) {
@@ -317,12 +264,6 @@ public class RestaurantCollectionProcessor {
         return region;
     }
 
-    /**
-     * largeCategory displayName을 LargeCategory enum으로 변환 (캐시 사용, O(1) 조회)
-     * @param displayName LargeCategory enum의 displayName (예: "한식")
-     * @return LargeCategory enum
-     * @throws CustomException 알 수 없는 카테고리 이름인 경우
-     */
     private LargeCategory getLargeCategoryFromDisplayName(String displayName) {
         LargeCategory category = LARGE_CATEGORY_CACHE.get(displayName);
         if (category == null) {
@@ -332,83 +273,8 @@ public class RestaurantCollectionProcessor {
         return category;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected boolean processRestaurant(
-            SuggestionRestaurant suggestion,
-            Region restaurantRegion,
-            String locationName,
-            RestaurantValidator.ValidationContext validationContext
-    ) {
-        try {
-            Long categoryId = resolveCategoryId(suggestion);
-            EnrichedRestaurantData enrichedData = enrichRestaurantData(suggestion, locationName);
-
-            if (enrichedData.isSkipped()) {
-                return false;
-            }
-
-            if (enrichedData.externalId() == null || enrichedData.externalId().isBlank()) {
-                log.warn("Skipping restaurant due to missing externalId: {} in {}",
-                    suggestion.name(), locationName);
-                return false;
-            }
-
-            RestaurantValidator.ValidationResult validationResult =
-                    restaurantValidator.duplicateValidateWithCache(
-                            validationContext,
-                            suggestion,
-                            enrichedData.externalId()
-                    );
-
-            if (!validationResult.isValid()) {
-                return false;
-            }
-
-            CreateRestaurant createRestaurant = CreateRestaurant.of(
-                    suggestion,
-                    enrichedData.placeName(),
-                    categoryId,
-                    enrichedData.externalId(),
-                    enrichedData.mapUrl(),
-                    enrichedData.geoJsonLocation(),
-                    enrichedData.rating(),
-                    enrichedData.imageUrl(),
-                    enrichedData.representativeReview(),
-                    restaurantRegion,
-                    enrichedData.reviewCount(),
-                    enrichedData.blogReviewCount(),
-                    enrichedData.representMenu(),
-                    enrichedData.representMenuPrice(),
-                    enrichedData.priceLevel(),
-                    enrichedData.aiMateSummaryTitle(),
-                    enrichedData.aiMateSummaryContents(),
-                    enrichedData.timeSlot()
-            );
-
-            restaurantRepository.save(createRestaurant);
-
-            restaurantValidator.addToCache(
-                    validationContext,
-                    enrichedData.externalId(),
-                    suggestion.name(),
-                    suggestion.address()
-            );
-
-            return true;
-        } catch (Exception e) {
-            log.error("Failed to process restaurant: {} in {}", suggestion.name(), locationName, e);
-            // 예외 발생 시 이 트랜잭션만 롤백 (REQUIRES_NEW)
-            return false;
-        }
-    }
-
-    private Long resolveCategoryId(SuggestionRestaurant suggestion) {
-        LargeCategory largeCategory = getLargeCategoryFromDisplayName(suggestion.largeCategory());
-        return categoryService.findOrCreateCategory(largeCategory, suggestion.mediumCategory());
-    }
-
-    private EnrichedRestaurantData enrichRestaurantData(SuggestionRestaurant suggestion, String locationName) {
-        EnrichedRestaurantData enrichedData = EnrichedRestaurantData.fromSuggestion(suggestion);
+    private RestaurantEnrichedData enrichRestaurantData(SuggestionRestaurant suggestion, String locationName) {
+        RestaurantEnrichedData enrichedData = RestaurantEnrichedData.fromSuggestion(suggestion);
         Optional<KaKaoPlaceDocumentResult> placeOpt = kakaoPlaceClient.searchPlace(suggestion.name(), locationName);
 
         if (placeOpt.isEmpty()) {
@@ -419,7 +285,7 @@ public class RestaurantCollectionProcessor {
         KaKaoPlaceDocumentResult place = placeOpt.get();
         if (isCafeOrCoffee(place)) {
             log.info("Skipping cafe/coffee shop: {} (category: {})", suggestion.name(), place.categoryName());
-            return EnrichedRestaurantData.skipped();
+            return RestaurantEnrichedData.skipped();
         }
 
         applySearchData(enrichedData, place);
@@ -432,7 +298,7 @@ public class RestaurantCollectionProcessor {
         return categoryName != null && (categoryName.contains("카페") || categoryName.contains("커피"));
     }
 
-    private void applySearchData(EnrichedRestaurantData enrichedData, KaKaoPlaceDocumentResult place) {
+    private void applySearchData(RestaurantEnrichedData enrichedData, KaKaoPlaceDocumentResult place) {
         KakaoRestaurantData data = kakaoPlaceMapper.toDomainData(place);
         enrichedData.externalId = data.externalId();
         enrichedData.mapUrl = normalizeMapUrl(data.mapUrl());
@@ -440,7 +306,7 @@ public class RestaurantCollectionProcessor {
     }
 
     private void applyDetailData(
-            EnrichedRestaurantData enrichedData,
+            RestaurantEnrichedData enrichedData,
             SuggestionRestaurant suggestion,
             String locationName,
             String placeId
@@ -516,100 +382,5 @@ public class RestaurantCollectionProcessor {
             return null;
         }
         return price;
-    }
-
-    private static class EnrichedRestaurantData {
-        private String externalId;
-        private String mapUrl;
-        private GeoJson.Point geoJsonLocation;
-        private Double rating;
-        private String imageUrl;
-        private String placeName;
-        private String representativeReview;
-        private Integer reviewCount;
-        private Integer blogReviewCount;
-        private String representMenu;
-        private Integer representMenuPrice;
-        private String priceLevel;
-        private String aiMateSummaryTitle;
-        private List<String> aiMateSummaryContents;
-        private TimeSlot timeSlot;
-        private boolean skip;
-
-        private static EnrichedRestaurantData fromSuggestion(SuggestionRestaurant suggestion) {
-            EnrichedRestaurantData data = new EnrichedRestaurantData();
-            data.rating = suggestion.rating();
-            return data;
-        }
-
-        private static EnrichedRestaurantData skipped() {
-            EnrichedRestaurantData data = new EnrichedRestaurantData();
-            data.skip = true;
-            return data;
-        }
-
-        private String externalId() {
-            return skip ? null : externalId;
-        }
-
-        private String mapUrl() {
-            return skip ? null : mapUrl;
-        }
-
-        private GeoJson.Point geoJsonLocation() {
-            return skip ? null : geoJsonLocation;
-        }
-
-        private Double rating() {
-            return skip ? null : rating;
-        }
-
-        private String imageUrl() {
-            return skip ? null : imageUrl;
-        }
-
-        private String placeName() {
-            return skip ? null : placeName;
-        }
-
-        private String representativeReview() {
-            return skip ? null : representativeReview;
-        }
-
-        private Integer reviewCount() {
-            return skip ? null : reviewCount;
-        }
-
-        private Integer blogReviewCount() {
-            return skip ? null : blogReviewCount;
-        }
-
-        private String representMenu() {
-            return skip ? null : representMenu;
-        }
-
-        private Integer representMenuPrice() {
-            return skip ? null : representMenuPrice;
-        }
-
-        private String priceLevel() {
-            return skip ? null : priceLevel;
-        }
-
-        private String aiMateSummaryTitle() {
-            return skip ? null : aiMateSummaryTitle;
-        }
-
-        private List<String> aiMateSummaryContents() {
-            return skip ? null : aiMateSummaryContents;
-        }
-
-        private TimeSlot timeSlot() {
-            return skip ? null : timeSlot;
-        }
-
-        private boolean isSkipped() {
-            return skip;
-        }
     }
 }

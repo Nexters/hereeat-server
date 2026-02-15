@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -116,5 +117,53 @@ class RestaurantSyncJobServiceTest {
         assertThat(created.id()).isEqualTo(10L);
         assertThat(created.scope()).isEqualTo(RestaurantSyncScope.SINGLE);
         assertThat(created.status()).isEqualTo(RestaurantSyncJobStatus.PENDING);
+    }
+
+    @Test
+    void createAllJob_whenUniqueConstraintViolation_throwsConflict() {
+        setDefaults();
+        when(syncJobRepository.existsByScopeAndStatus(RestaurantSyncScope.ALL, RestaurantSyncJobStatus.RUNNING)).thenReturn(false);
+        when(syncJobRepository.existsByScopeAndStatus(RestaurantSyncScope.ALL, RestaurantSyncJobStatus.PENDING)).thenReturn(false);
+        when(syncJobRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate active job"));
+
+        assertThatThrownBy(() -> syncJobService.createAllJob(RestaurantSyncTriggerType.MANUAL))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SYNC_JOB_CONFLICT);
+    }
+
+    @Test
+    void createSingleJob_whenUniqueConstraintViolation_throwsConflict() {
+        setDefaults();
+        when(restaurantRepository.findById(1L)).thenReturn(Optional.of(new Restaurant(
+                1L,
+                "ext",
+                1L,
+                "name",
+                "address",
+                4.0,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        )));
+        when(syncJobRepository.existsByTargetRestaurantIdAndStatus(1L, RestaurantSyncJobStatus.RUNNING)).thenReturn(false);
+        when(syncJobRepository.existsByTargetRestaurantIdAndStatus(1L, RestaurantSyncJobStatus.PENDING)).thenReturn(false);
+        when(syncJobRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate active job"));
+
+        assertThatThrownBy(() -> syncJobService.createSingleJob(1L, RestaurantSyncTriggerType.MANUAL))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SYNC_JOB_CONFLICT);
     }
 }

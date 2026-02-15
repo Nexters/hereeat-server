@@ -6,6 +6,7 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncJobStatus;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
 import com.yogieat.restaurant.sync.service.RestaurantSyncJobRepository;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -29,9 +30,14 @@ public class RestaurantSyncJobCoreRepository implements RestaurantSyncJobReposit
     }
 
     @Override
-    public Optional<RestaurantSyncJob> findTopByStatusOrderByCreatedAtAsc(RestaurantSyncJobStatus status) {
-        return syncJobJpaRepository.findTopByStatusOrderByCreatedAtAsc(status)
-                .map(RestaurantSyncJobEntity::toDomain);
+    @Transactional
+    public Optional<RestaurantSyncJob> claimNextPendingJob() {
+        List<Long> claimedIds = syncJobJpaRepository.claimNextPendingJobIds();
+        if (claimedIds.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return findById(claimedIds.getFirst());
     }
 
     @Override
@@ -42,12 +48,6 @@ public class RestaurantSyncJobCoreRepository implements RestaurantSyncJobReposit
     @Override
     public boolean existsByTargetRestaurantIdAndStatus(Long targetRestaurantId, RestaurantSyncJobStatus status) {
         return syncJobJpaRepository.existsByTargetRestaurantIdAndStatus(targetRestaurantId, status);
-    }
-
-    @Override
-    @Transactional
-    public void markRunning(Long jobId) {
-        getJobEntityOrThrow(jobId).markRunning();
     }
 
     @Override

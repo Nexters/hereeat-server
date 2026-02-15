@@ -9,6 +9,7 @@ import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncTriggerType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,8 +31,12 @@ public class RestaurantSyncJobService {
             throw new CustomException(ErrorCode.SYNC_JOB_CONFLICT);
         }
 
-        RestaurantSyncJob syncJob = RestaurantSyncJob.create(RestaurantSyncScope.ALL, triggerType, null, chunkSize, parallelism);
-        return syncJobRepository.save(syncJob);
+        try {
+            RestaurantSyncJob syncJob = RestaurantSyncJob.create(RestaurantSyncScope.ALL, triggerType, null, chunkSize, parallelism);
+            return syncJobRepository.save(syncJob);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.SYNC_JOB_CONFLICT);
+        }
     }
 
     @Transactional
@@ -44,8 +49,12 @@ public class RestaurantSyncJobService {
             throw new CustomException(ErrorCode.SYNC_JOB_CONFLICT);
         }
 
-        RestaurantSyncJob syncJob = RestaurantSyncJob.create(RestaurantSyncScope.SINGLE, triggerType, restaurantId, chunkSize, parallelism);
-        return syncJobRepository.save(syncJob);
+        try {
+            RestaurantSyncJob syncJob = RestaurantSyncJob.create(RestaurantSyncScope.SINGLE, triggerType, restaurantId, chunkSize, parallelism);
+            return syncJobRepository.save(syncJob);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.SYNC_JOB_CONFLICT);
+        }
     }
 
     @Transactional(readOnly = true)
