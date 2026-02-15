@@ -44,7 +44,7 @@ services:
       - ${ENV_FILE_PATH:-~/.env}
     command: [ "postgres", "-c", "log_statement=all" ]
     volumes:
-      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DATASOURCE_DB_CORE_USERNAME} -d yogieat" ]

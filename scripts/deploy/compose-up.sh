@@ -71,10 +71,16 @@ if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     if [[ "${DB_EXISTS}" == "true" ]]; then
       echo "DB container '${DB_CONTAINER_NAME}' exists but is not running. Starting existing container..."
       if ! docker start "${DB_CONTAINER_NAME}"; then
-        echo "ERROR: failed to start existing DB container '${DB_CONTAINER_NAME}'."
+        echo "WARN: failed to start existing DB container '${DB_CONTAINER_NAME}'."
+        echo "      Recreating DB container with current compose configuration..."
         docker ps -a --filter "name=${DB_CONTAINER_NAME}" || true
         docker logs --tail=100 "${DB_CONTAINER_NAME}" || true
-        exit 1
+
+        if ! docker rm "${DB_CONTAINER_NAME}"; then
+          echo "ERROR: failed to remove broken DB container '${DB_CONTAINER_NAME}'."
+          exit 1
+        fi
+        docker compose --env-file "${ENV_FILE_PATH}" "${COMPOSE_FILES[@]}" up -d yogieat-db
       fi
     else
       echo "DB container '${DB_CONTAINER_NAME}' does not exist. Attempting auto-restore with compose..."
