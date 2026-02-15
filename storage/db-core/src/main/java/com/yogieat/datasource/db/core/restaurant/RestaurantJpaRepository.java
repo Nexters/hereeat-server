@@ -11,4 +11,5 @@ public interface RestaurantJpaRepository extends JpaRepository<RestaurantEntity,
     Optional<RestaurantEntity> findByExternalId(String externalId);
     List<RestaurantEntity> findByRegion(Region region);
     List<RestaurantEntity> findByIdIn(List<Long> ids);
+    long countByRegion(Region region);  // 지역별 맛집 수 조회
 }

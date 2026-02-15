@@ -122,7 +122,17 @@ public class RecommendResultFacade {
                 restaurant.location(),
                 category.largeCategory(),
                 category.mediumCategory(),
-                majorityDistanceRange
+                majorityDistanceRange,
+                // 추천 근거 데이터
+                restaurant.reviewCount(),
+                restaurant.blogReviewCount(),
+                restaurant.representMenu(),
+                restaurant.representMenuPrice(),
+                restaurant.priceLevel(),
+                restaurant.aiMateSummaryTitle(),
+                restaurant.aiMateSummaryContents(),
+                // 추천 근거 텍스트
+                result.reasonText()
         );
     }
 }

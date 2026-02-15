@@ -13,7 +13,9 @@ public record RecommendResult(
         // 추천 순위 (1, 2, 3)
         Integer rank,
         // 추천 점수
-        Double score
+        Double score,
+        // 추천 근거 텍스트
+        String reasonText
 ) {
     // Create
     public record Create(
@@ -22,7 +24,8 @@ public record RecommendResult(
             Double agreementRate,
             RecommendStatus status,
             Integer rank,
-            Double score
+            Double score,
+            String reasonText
     ) {
         // static factory method
         public static RecommendResult of(Long gatheringId,
@@ -30,8 +33,9 @@ public record RecommendResult(
                                   Double agreementRate,
                                   RecommendStatus status,
                                   Integer rank,
-                                  Double score) {
-            return new RecommendResult(null, gatheringId, restaurantId, agreementRate, status, rank, score);
+                                  Double score,
+                                  String reasonText) {
+            return new RecommendResult(null, gatheringId, restaurantId, agreementRate, status, rank, score, reasonText);
         }
     }
 }

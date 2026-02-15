@@ -62,4 +62,10 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .map(RestaurantEntity::toDomain)
                 .toList();
     }
+
+
+    @Override
+    public long countByRegion(Region region) {
+        return restaurantJpaRepository.countByRegion(region);
+    }
 }

@@ -41,7 +41,8 @@ public class PendingRecordCleanupProcessor {
                 0.0,
                 RecommendStatus.FAILED,
                 null,
-                0.0
+                0.0,
+                null  // reasonText
             );
             recommendResultRepository.save(failedResult);
 

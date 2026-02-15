@@ -14,6 +14,7 @@ import com.yogieat.external.kakao.KakaoPlaceMapper;
 import com.yogieat.external.kakao.result.KaKaoPlaceDocumentResult;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.external.kakao.result.KakaoRestaurantData;
+import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
@@ -80,26 +81,51 @@ public class RestaurantCollectionProcessor {
     private static final long BATCH_DELAY_MS = 15000; // 배치 간 휴식 시간 (10초)
 
     /**
+     * 지역별 맛집 수집 제한
+     * GANGNAM, HONGDAE: 100개
+     * 나머지 지역: 50개
+     */
+    private static final Map<Region, Integer> REGION_LIMITS = Map.of(
+        Region.GANGNAM, 100,
+        Region.HONGDAE, 100,
+        Region.GONGDEOK, 50,
+        Region.EULJIRO3GA, 50,
+        Region.SADANG, 50,
+        Region.JONGNO3GA, 50,
+        Region.JAMSIL, 50,
+        Region.SAMGAKJI, 50
+    );
+    private static final int DEFAULT_REGION_LIMIT = 50;  // 기본 제한
+
+    /**
      * Place enum에 정의된 모든 지역에 대해 맛집 데이터 수집
      * 배치 처리 최적화:
      * - Gemini API 호출 1회로 모든 location × category 조합 처리
      * - API 호출 10회 → 1회 (90% 감소)
      * - 처리 시간 대폭 단축 (rate limit 대기 제거)
+     * - 지역별 수집 제한 적용 (GANGNAM, HONGDAE: 100개, 나머지: 50개)
      */
     @Transactional
     public void collectAllRegions() {
         try {
+            // 1. 지역별 현재 맛집 수 조회 및 수집 필요 지역 필터링
+            List<String> locationsToCollect = filterLocationsNeedingCollection();
+
+            if (locationsToCollect.isEmpty()) {
+                return;
+            }
+
             List<Restaurant> restaurants = restaurantRepository.findAll();
 
             String restaurantNames = restaurants.stream()
                 .map(Restaurant::name)
                 .collect(Collectors.joining(", "));
 
-            // 1. 배치 API 호출: 모든 location × category 조합을 한 번에 요청
+            // 2. 배치 API 호출: 필터링된 location × category 조합만 요청
             Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
-                geminiClient.generateRestaurantsBatch(LOCATIONS, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
+                geminiClient.generateRestaurantsBatch(locationsToCollect, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
 
-            // 2. 각 location-category 조합별로 데이터 처리 (페이징)
+            // 3. 각 location-category 조합별로 데이터 처리 (페이징)
             int totalProcessed = 0;
             int totalSuccess = 0;
             int totalFailed = 0;
@@ -121,6 +147,12 @@ public class RestaurantCollectionProcessor {
                     LocationCategoryKey key = entry.getKey();
                     List<SuggestionRestaurant> suggestions = entry.getValue();
 
+                    // 지역별 제한 체크 (실시간)
+                    Region region = getRegionFromLocationName(key.location());
+                    if (isRegionLimitReached(region)) {
+                        continue;
+                    }
+
                     try {
                         int processed = processRestaurantsForLocation(key.location(), key.category(), suggestions);
                         totalProcessed += processed;
@@ -135,7 +167,6 @@ public class RestaurantCollectionProcessor {
                 // 배치 간 휴식 (마지막 배치가 아닌 경우)
                 if (endIndex < entries.size()) {
                     try {
-                        log.info("Batch completed. Waiting {} ms before next batch...", BATCH_DELAY_MS);
                         Thread.sleep(BATCH_DELAY_MS);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
@@ -151,6 +182,45 @@ public class RestaurantCollectionProcessor {
             log.error("Batch collection failed", e);
             throw new CustomException(ErrorCode.RESTAURANT_COLLECTION_FAILED);
         }
+    }
+
+
+    /**
+     * 수집이 필요한 지역 목록 필터링
+     * 각 지역의 현재 맛집 수가 제한에 도달하지 않은 지역만 반환
+     *
+     * @return 수집이 필요한 지역명 목록
+     */
+    private List<String> filterLocationsNeedingCollection() {
+        List<String> locationsToCollect = new ArrayList<>();
+
+        for (Region region : Region.values()) {
+            long currentCount = restaurantRepository.countByRegion(region);
+            int limit = REGION_LIMITS.getOrDefault(region, DEFAULT_REGION_LIMIT);
+
+            if (currentCount < limit) {
+                locationsToCollect.add(region.getName());
+                log.info("Region {} needs collection: {}/{} restaurants",
+                    region.getName(), currentCount, limit);
+            } else {
+                log.info("Region {} reached limit: {}/{} restaurants (skipping)",
+                    region.getName(), currentCount, limit);
+            }
+        }
+
+        return locationsToCollect;
+    }
+
+    /**
+     * 지역의 맛집 수집 제한에 도달했는지 확인
+     *
+     * @param region 확인할 지역
+     * @return 제한 도달 여부
+     */
+    private boolean isRegionLimitReached(Region region) {
+        long currentCount = restaurantRepository.countByRegion(region);
+        int limit = REGION_LIMITS.getOrDefault(region, DEFAULT_REGION_LIMIT);
+        return currentCount >= limit;
     }
 
     /**
@@ -280,6 +350,17 @@ public class RestaurantCollectionProcessor {
             String placeName = null;
             String representativeReview = null;
 
+            // 3-1. 추천 근거 데이터 변수 초기화
+            Integer reviewCount = null;
+            Integer blogReviewCount = null;
+            String representMenu = null;
+            Integer representMenuPrice = null;
+            String priceLevel = null;
+            String aiMateSummaryTitle = null;
+            List<String> aiMateSummaryContents = null;
+            // 추천 시간대
+            TimeSlot timeSlot = null;
+
             // 4. Kakao Search API로 기본 정보 보강 시도
             Optional<KaKaoPlaceDocumentResult> placeOpt = kakaoPlaceClient.searchPlace(
                 suggestion.name(), locationName
@@ -287,6 +368,15 @@ public class RestaurantCollectionProcessor {
 
             if (placeOpt.isPresent()) {
                 KaKaoPlaceDocumentResult place = placeOpt.get();
+
+                // 4-0. 카페/커피숍 필터링
+                String categoryName = place.categoryName();
+                if (categoryName != null &&
+                    (categoryName.contains("카페") || categoryName.contains("커피"))) {
+                    log.info("Skipping cafe/coffee shop: {} (category: {})",
+                        suggestion.name(), categoryName);
+                    return false;
+                }
 
                 // 4-1. Kakao 검색 데이터로 보강
                 KakaoRestaurantData data = kakaoPlaceMapper.toDomainData(place);
@@ -328,6 +418,31 @@ public class RestaurantCollectionProcessor {
                     if (detail.representativeReview() != null && !detail.representativeReview().isBlank()) {
                         representativeReview = detail.representativeReview();
                     }
+
+                    // 5-5. 추천 근거 데이터 추출
+                    reviewCount = detail.reviewCount();
+                    blogReviewCount = detail.blogReviewCount();
+                    representMenu = detail.representMenu();
+                    representMenuPrice = detail.representMenuPrice();
+                    priceLevel = detail.priceLevel();
+                    aiMateSummaryTitle = detail.aiMateSummaryTitle();
+                    aiMateSummaryContents = detail.aiMateSummaryContents();
+                    // 추천 시간대 추출
+                    timeSlot = detail.timeSlot();
+
+                    // 5-6. ai_mate 데이터 필터링
+                    if (aiMateSummaryTitle == null || aiMateSummaryTitle.isBlank()) {
+                        log.info("Skipping restaurant due to missing ai_mate data: {}",
+                            suggestion.name());
+                        return false;
+                    }
+
+                    // 5-7. 리뷰 수 필터링: review_count >= 30 AND blog_review_count >= 30
+                    if (reviewCount == null || reviewCount < 30 || blogReviewCount == null || blogReviewCount < 30) {
+                        log.info("Skipping restaurant due to insufficient reviews: {} (reviews: {}, blog: {})",
+                            suggestion.name(), reviewCount, blogReviewCount);
+                        return false;
+                    }
                 }
             } else {
                 log.warn("Kakao place not found for: {} in {}", suggestion.name(), locationName);
@@ -359,7 +474,17 @@ public class RestaurantCollectionProcessor {
                 rating,
                 imageUrl,
                 representativeReview,
-                restaurantRegion
+                restaurantRegion,
+                // 추천 근거 데이터
+                reviewCount,
+                blogReviewCount,
+                representMenu,
+                representMenuPrice,
+                priceLevel,
+                aiMateSummaryTitle,
+                aiMateSummaryContents,
+                // 추천 시간대
+                timeSlot
             );
 
             // 9. 도메인 레포지토리를 통해 저장

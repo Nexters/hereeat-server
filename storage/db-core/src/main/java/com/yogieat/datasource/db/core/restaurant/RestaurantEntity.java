@@ -3,6 +3,7 @@ package com.yogieat.datasource.db.core.restaurant;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.datasource.db.core.common.BaseEntity;
+import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import jakarta.persistence.Column;
@@ -68,6 +69,22 @@ public class RestaurantEntity extends BaseEntity {
     // 매핑 필드
     private Long categoryId; // nullable
 
+    // 추천 근거 데이터 (신규 필드)
+    private Integer reviewCount;
+    private Integer blogReviewCount;
+    private String representMenu;
+    private Integer representMenuPrice;
+    @Column(columnDefinition = "VARCHAR(10)")
+    private String priceLevel;
+    private String aiMateSummaryTitle;
+    @Column(columnDefinition = "TEXT")
+    private String aiMateSummaryContents;  // JSON 문자열
+
+    // 추천 시간대 (신규 필드)
+    @Column(name = "time_slot", columnDefinition = "VARCHAR(20)")
+    @Enumerated(EnumType.STRING)
+    private TimeSlot timeSlot;
+
     @Builder(access = AccessLevel.PRIVATE)
     private RestaurantEntity(
             String externalId,
@@ -80,7 +97,17 @@ public class RestaurantEntity extends BaseEntity {
             String representativeReview,
             String description,
             Region region,
-            Point location) {
+            Point location,
+            // 추천 근거 데이터
+            Integer reviewCount,
+            Integer blogReviewCount,
+            String representMenu,
+            Integer representMenuPrice,
+            String priceLevel,
+            String aiMateSummaryTitle,
+            String aiMateSummaryContents,
+            // 추천 시간대
+            TimeSlot timeSlot) {
         this.externalId = externalId;
         this.name = name;
         this.address = address;
@@ -92,6 +119,14 @@ public class RestaurantEntity extends BaseEntity {
         this.description = description;
         this.region = region;
         this.location = location;
+        this.reviewCount = reviewCount;
+        this.blogReviewCount = blogReviewCount;
+        this.representMenu = representMenu;
+        this.representMenuPrice = representMenuPrice;
+        this.priceLevel = priceLevel;
+        this.aiMateSummaryTitle = aiMateSummaryTitle;
+        this.aiMateSummaryContents = aiMateSummaryContents;
+        this.timeSlot = timeSlot;
     }
 
     /**
@@ -117,6 +152,16 @@ public class RestaurantEntity extends BaseEntity {
                         createRestaurant.location() != null
                                 ? toJtsPoint(createRestaurant.location())
                                 : null)
+                // 추천 근거 데이터
+                .reviewCount(createRestaurant.reviewCount())
+                .blogReviewCount(createRestaurant.blogReviewCount())
+                .representMenu(createRestaurant.representMenu())
+                .representMenuPrice(createRestaurant.representMenuPrice())
+                .priceLevel(createRestaurant.priceLevel())
+                .aiMateSummaryTitle(createRestaurant.aiMateSummaryTitle())
+                .aiMateSummaryContents(createRestaurant.aiMateSummaryContents())
+                // 추천 시간대
+                .timeSlot(createRestaurant.timeSlot())
                 .build();
     }
 
@@ -135,7 +180,17 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getRegion(),
                 entity.location != null
                     ? new GeoJson.Point(List.of(entity.location.getX(), entity.location.getY()))
-                    : null
+                    : null,
+                // 추천 근거 데이터
+                entity.getReviewCount(),
+                entity.getBlogReviewCount(),
+                entity.getRepresentMenu(),
+                entity.getRepresentMenuPrice(),
+                entity.getPriceLevel(),
+                entity.getAiMateSummaryTitle(),
+                entity.getAiMateSummaryContents(),
+                // 추천 시간대
+                entity.getTimeSlot()
         );
     }
 

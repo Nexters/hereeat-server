@@ -1,10 +1,11 @@
 package com.yogieat.external.kakao.result;
 
+import com.yogieat.gathering.domain.value.TimeSlot;
 import java.util.List;
 
 /**
  * Kakao Place API panel3 endpoint response data
- * Contains detailed information about a place including rating, photos, and menus
+ * Contains detailed information about a place including rating, photos, menus, and AI summary
  */
 public record KakaoPlaceDetailData(
         String confirmId,
@@ -15,7 +16,17 @@ public record KakaoPlaceDetailData(
         Double rating,
         String mainPhotoUrl,
         List<String> photoUrls,
-        String representativeReview
+        String representativeReview,
+        // 추천 근거 데이터 (신규 필드)
+        Integer reviewCount,
+        Integer blogReviewCount,
+        String representMenu,
+        Integer representMenuPrice,
+        String priceLevel,
+        String aiMateSummaryTitle,
+        List<String> aiMateSummaryContents,
+        // 추천 시간대 (신규 필드)
+        TimeSlot timeSlot
 ) {
     /**
      * Create a minimal detail data when panel3 call fails
@@ -23,6 +34,14 @@ public record KakaoPlaceDetailData(
     public static KakaoPlaceDetailData empty(String confirmId) {
         return new KakaoPlaceDetailData(
                 confirmId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                null,
                 null,
                 null,
                 null,

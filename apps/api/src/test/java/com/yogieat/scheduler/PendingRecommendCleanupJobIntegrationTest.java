@@ -140,7 +140,8 @@ class PendingRecommendCleanupJobIntegrationTest {
             0.0,
             RecommendStatus.PENDING,
             null,
-            0.0
+            0.0,
+            null  // reasonText
         );
     }
 }

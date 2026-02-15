@@ -14,5 +14,6 @@ public interface RestaurantRepository {
     List<Restaurant> findByRegion(Region region);
     Optional<Restaurant> findById(Long id);
     List<Restaurant> findByIds(List<Long> ids);
+    long countByRegion(Region region);  // 지역별 맛집 수 조회 (신규)
 
 }

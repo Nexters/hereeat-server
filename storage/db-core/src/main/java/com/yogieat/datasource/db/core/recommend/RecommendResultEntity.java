@@ -38,6 +38,9 @@ public class RecommendResultEntity extends BaseEntity {
     @Column(name = "score")
     private Double score;
 
+    @Column(name = "reason_text", columnDefinition = "TEXT")
+    private String reasonText;
+
     @Builder(access = AccessLevel.PRIVATE)
     public RecommendResultEntity(
             Long gatheringId,
@@ -45,13 +48,15 @@ public class RecommendResultEntity extends BaseEntity {
             Double agreementRate,
             RecommendStatus status,
             Integer rank,
-            Double score) {
+            Double score,
+            String reasonText) {
         this.gatheringId = gatheringId;
         this.restaurantId = restaurantId;
         this.agreementRate = agreementRate;
         this.status = status;
         this.rank = rank;
         this.score = score;
+        this.reasonText = reasonText;
     }
 
     public static RecommendResultEntity from(RecommendResult recommendResult) {
@@ -62,6 +67,7 @@ public class RecommendResultEntity extends BaseEntity {
                 .status(recommendResult.status())
                 .rank(recommendResult.rank())
                 .score(recommendResult.score())
+                .reasonText(recommendResult.reasonText())
                 .build();
     }
 
@@ -73,7 +79,8 @@ public class RecommendResultEntity extends BaseEntity {
                 entity.getAgreementRate(),
                 entity.getStatus(),
                 entity.getRank(),
-                entity.getScore()
+                entity.getScore(),
+                entity.getReasonText()
         );
     }
 }
