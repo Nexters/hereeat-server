@@ -48,6 +48,9 @@ resolve_env_file() {
 }
 
 configure_scope_and_files() {
+  COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-yogieat}"
+  export COMPOSE_PROJECT_NAME
+
   DEPLOY_SCOPE="${DEPLOY_SCOPE:-app}"
   [[ "${DEPLOY_SCOPE}" == "app" || "${DEPLOY_SCOPE}" == "full" ]] \
     || error "DEPLOY_SCOPE must be one of [app, full]"
@@ -109,6 +112,9 @@ ensure_db_running_for_app_scope() {
   DB_READY_TIMEOUT_SECONDS="${DB_READY_TIMEOUT_SECONDS:-60}"
 
   if is_container_running "${DB_CONTAINER_NAME}"; then
+    echo "DB container '${DB_CONTAINER_NAME}' is already running. Re-syncing with compose to ensure network/service metadata..."
+    compose_cmd up -d yogieat-db
+    wait_for_db_ready "${DB_CONTAINER_NAME}" "${DB_READY_TIMEOUT_SECONDS}"
     return 0
   fi
 
@@ -132,6 +138,8 @@ ensure_db_running_for_app_scope() {
     compose_cmd up -d yogieat-db
   fi
 
+  # Always align DB container with current compose project/network settings.
+  compose_cmd up -d yogieat-db
   wait_for_db_ready "${DB_CONTAINER_NAME}" "${DB_READY_TIMEOUT_SECONDS}"
   echo "DB auto-restore succeeded: ${DB_CONTAINER_NAME}"
 }
