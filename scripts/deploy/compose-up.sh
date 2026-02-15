@@ -31,6 +31,20 @@ fi
 
 COMPOSE_FILES=(-f docker-compose.yaml)
 
+DEPLOY_ENV="${DEPLOY_ENV:-dev}"
+case "${DEPLOY_ENV}" in
+  dev)
+    COMPOSE_FILES+=(-f docker-compose.dev.yaml)
+    ;;
+  prod)
+    COMPOSE_FILES+=(-f docker-compose.prod.yaml)
+    ;;
+  *)
+    echo "ERROR: DEPLOY_ENV must be one of [dev, prod]"
+    exit 1
+    ;;
+esac
+
 ENABLE_EDGE_SSL="${ENABLE_EDGE_SSL:-false}"
 if [[ "${DEPLOY_SCOPE}" == "app" && "${ENABLE_EDGE_SSL}" == "true" ]]; then
   echo "ERROR: ENABLE_EDGE_SSL=true is not allowed when DEPLOY_SCOPE=app"
@@ -111,8 +125,10 @@ fi
 echo "Deploy API image: ${API_IMAGE_FULL_URL}"
 echo "Deploy Batch image: ${BATCH_IMAGE_FULL_URL}"
 echo "Deploy scope: ${DEPLOY_SCOPE}"
+echo "Deploy env: ${DEPLOY_ENV}"
 echo "Enable edge SSL: ${ENABLE_EDGE_SSL}"
 echo "Env file path: ${ENV_FILE_PATH}"
+echo "Compose files: ${COMPOSE_FILES[*]}"
 echo "Target services: yogieat-api yogieat-batch-sync"
 if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
   echo "Auto restore DB: ${AUTO_RESTORE_DB:-true}"

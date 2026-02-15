@@ -17,6 +17,8 @@
 
 ## 3. 적용된 파일
 - 기본 Compose: `docker/docker-compose.yaml`
+- DEV 리소스 오버레이: `docker/docker-compose.dev.yaml`
+- PROD 리소스 오버레이: `docker/docker-compose.prod.yaml`
 - 인스턴스 수동 배포 스크립트: `scripts/deploy/compose-up.sh`
 - CI/CD 워크플로우
   - `.github/workflows/develop_build_deploy.yml`
@@ -37,7 +39,7 @@ Dockerfile은 동일하고 `JAR_FILE` build-arg만 다르게 사용한다.
 1. Gradle build
 2. API/BATCH 이미지 각각 build & push
 3. 서버로 `docker/` 디렉터리 및 `scripts/deploy/` rsync
-4. 서버에서 `DEPLOY_SCOPE=app`으로 `scripts/deploy/compose-up.sh` 실행
+4. 서버에서 `DEPLOY_SCOPE=app`, `DEPLOY_ENV=(dev|prod)`로 `scripts/deploy/compose-up.sh` 실행
 
 ## 5. 인스턴스 실행 방법
 
@@ -60,6 +62,7 @@ DOCKERHUB_BATCH_IMAGE_NAME=yogieat-server-batch-sync \
 API_HOST_PORT=8080 \
 BATCH_SERVER_PORT=9090 \
 DEPLOY_SCOPE=app \
+DEPLOY_ENV=dev \
 ENV_FILE_PATH=~/.env \
 ../scripts/deploy/compose-up.sh
 ```
@@ -68,6 +71,20 @@ ENV_FILE_PATH=~/.env \
 - `docker compose ... up -d --no-deps yogieat-api yogieat-batch-sync`
 - 즉, DB 컨테이너는 배포에서 제외된다.
 - 단, `yogieat-db`가 없으면 배포 스크립트가 `docker compose ... up -d yogieat-db`를 먼저 실행해 자동 복구한다.
+- `DEPLOY_ENV=dev`면 `docker-compose.dev.yaml`, `DEPLOY_ENV=prod`면 `docker-compose.prod.yaml`를 추가 적용한다.
+
+### 5.2 환경별 리소스 제한
+- DEV (`docker/docker-compose.dev.yaml`)
+  - `yogieat-api`: `cpus=0.55`, `mem_limit=512m`, `mem_reservation=128m`
+  - `yogieat-batch-sync`: `cpus=0.15`, `mem_limit=192m`, `mem_reservation=64m`
+  - `yogieat-db`: `cpus=0.25`, `mem_limit=256m`, `mem_reservation=64m`
+- PROD (`docker/docker-compose.prod.yaml`)
+  - `yogieat-api`: `cpus=1.80`, `mem_limit=1100m`, `mem_reservation=512m`
+  - `yogieat-batch-sync`: `cpus=0.40`, `mem_limit=256m`, `mem_reservation=128m`
+  - `yogieat-db`: `cpus=0.60`, `mem_limit=512m`, `mem_reservation=128m`
+
+`DEPLOY_SCOPE=app` 배포는 API/BATCH 중심으로 동작하며, DB는 필요 시 자동 복구(기동/재생성)된다.
+DB 설정을 강제로 재적용하려면 유지보수 창에 `DEPLOY_SCOPE=full` 배포를 사용한다.
 
 ## 6. 라우팅/SSL 설계 결정 포인트
 
