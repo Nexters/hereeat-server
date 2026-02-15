@@ -1,6 +1,7 @@
 package com.yogieat.kakao.kakao.map;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import java.util.ArrayList;
@@ -67,8 +68,12 @@ public class KakaoPlaceDetailParser {
             // TimeSlot 추출 (폴백 전략: blog_summaries → visitor 데이터)
             TimeSlot timeSlot = extractTimeSlot(panel);
 
-            log.debug("Successfully parsed place: placeId={}, rating={}, photos={}, review={}, reviewCount={}, blogReviewCount={}, timeSlot={}",
-                    confirmId, rating, photoUrls.size(), representativeReview != null, reviewCount, blogReviewCount, timeSlot);
+            // 카테고리 추출 (name2 → LargeCategory 매핑, name3 → mediumCategory)
+            LargeCategory apiLargeCategory = extractApiLargeCategory(panel);
+            String apiMediumCategory = extractApiMediumCategory(panel, apiLargeCategory);
+
+            log.debug("Successfully parsed place: placeId={}, rating={}, photos={}, review={}, reviewCount={}, blogReviewCount={}, timeSlot={}, apiLargeCategory={}, apiMediumCategory={}",
+                    confirmId, rating, photoUrls.size(), representativeReview != null, reviewCount, blogReviewCount, timeSlot, apiLargeCategory, apiMediumCategory);
 
             return new KakaoPlaceDetailData(
                     confirmId,
@@ -87,7 +92,9 @@ public class KakaoPlaceDetailParser {
                     priceLevel,
                     aiMateSummaryTitle,
                     aiMateSummaryContents,
-                    timeSlot
+                    timeSlot,
+                    apiLargeCategory,
+                    apiMediumCategory
             );
         } catch (Exception e) {
             log.error("Failed to parse panel3 response for placeId: {}", requestedPlaceId, e);
@@ -323,26 +330,32 @@ public class KakaoPlaceDetailParser {
 
     /**
      * 대표 메뉴 추출 (첫 번째 메뉴 아이템)
-     * JSON 경로: /menu/menus/items[0]
+     * JSON 경로: /menu/menus/items[0] 또는 /menu/yogiyo_menus/items[0]
      * @return [메뉴명, 가격] 배열
      */
     private String[] extractRepresentMenu(JsonNode panel) {
-        JsonNode menus = panel.at("/menu/menus");
-        if (menus != null && menus.isArray()) {
-            for (JsonNode menu : menus) {
-                JsonNode items = menu.get("items");
-                if (items == null || !items.isArray() || items.isEmpty()) {
-                    continue;
-                }
-
-                JsonNode firstItem = items.get(0);
-                String name = extractText(firstItem, "name");
-                Integer price = extractInteger(firstItem.get("price"));
-                if (name != null && !name.isBlank()) {
-                    return new String[]{name, price != null ? price.toString() : null};
-                }
+        // 1순위: /menu/menus/items
+        JsonNode items = panel.at("/menu/menus/items");
+        if (items != null && items.isArray() && !items.isEmpty()) {
+            JsonNode firstItem = items.get(0);
+            String name = extractText(firstItem, "name");
+            Integer price = extractInteger(firstItem.get("price"));
+            if (name != null && !name.isBlank()) {
+                return new String[]{name, price != null ? price.toString() : null};
             }
         }
+
+        // 2순위: /menu/yogiyo_menus/items (폴백)
+        JsonNode yogiyoItems = panel.at("/menu/yogiyo_menus/items");
+        if (yogiyoItems != null && yogiyoItems.isArray() && !yogiyoItems.isEmpty()) {
+            JsonNode firstItem = yogiyoItems.get(0);
+            String name = extractText(firstItem, "name");
+            Integer price = extractInteger(firstItem.get("price"));
+            if (name != null && !name.isBlank()) {
+                return new String[]{name, price != null ? price.toString() : null};
+            }
+        }
+
         return new String[]{null, null};
     }
 
@@ -527,8 +540,8 @@ public class KakaoPlaceDetailParser {
 
             // LUNCH: 12시 이전 오픈, 16시 이후 마감
             boolean coversLunch = openHour <= 12 && closeHour >= 16;
-            // DINNER: 17시 이전 오픈, 21시 이후 마감
-            boolean coversDinner = openHour <= 17 && closeHour >= 21;
+            // DINNER: 20시 이전 오픈, 21시 이후 마감 (18시 오픈 저녁 전용 맛집 포함)
+            boolean coversDinner = openHour <= 20 && closeHour >= 21;
 
             if (coversLunch && coversDinner) {
                 return TimeSlot.BOTH;
@@ -651,5 +664,34 @@ public class KakaoPlaceDetailParser {
             return TimeSlot.DINNER;
         }
         return TimeSlot.BOTH;
+    }
+
+    /**
+     * API 응답에서 LargeCategory 추출
+     * JSON 경로: /summary/category/name2
+     * name2를 LargeCategory enum으로 매핑 시도, 실패 시 null 반환
+     */
+    private LargeCategory extractApiLargeCategory(JsonNode panel) {
+        String name2 = extractText(panel.at("/summary/category"), "name2");
+        if (name2 == null || name2.isBlank()) {
+            return null;
+        }
+        return LargeCategory.fromDisplayName(name2);
+    }
+
+    /**
+     * API 응답에서 mediumCategory 추출
+     * JSON 경로: /summary/category/name3
+     * LargeCategory 매핑 성공 시에만 name3 반환, 실패 시 null 반환
+     *
+     * @param panel JSON 응답
+     * @param apiLargeCategory 매핑된 LargeCategory (null이면 name3도 반환하지 않음)
+     * @return mediumCategory 문자열 또는 null
+     */
+    private String extractApiMediumCategory(JsonNode panel, LargeCategory apiLargeCategory) {
+        if (apiLargeCategory == null) {
+            return null;
+        }
+        return extractText(panel.at("/summary/category"), "name3");
     }
 }

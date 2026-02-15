@@ -124,6 +124,8 @@ class RestaurantSyncServiceTest {
                 "₩₩",
                 "요약",
                 List.of("a", "b"),
+                null,
+                null,
                 null
         );
     }
@@ -146,6 +148,8 @@ class RestaurantSyncServiceTest {
                 "₩₩",
                 "요약",
                 List.of("a", "b"),
+                null,
+                null,
                 null
         );
     }

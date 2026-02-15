@@ -29,6 +29,7 @@ public class RestaurantCollectionWriteService {
             SuggestionRestaurant suggestion,
             Region restaurantRegion,
             LargeCategory largeCategory,
+            String mediumCategory,
             RestaurantEnrichedData enrichedData,
             RestaurantValidator.ValidationContext validationContext
     ) {
@@ -37,7 +38,7 @@ public class RestaurantCollectionWriteService {
                 return false;
             }
 
-            Long categoryId = categoryService.findOrCreateCategory(largeCategory, suggestion.mediumCategory());
+            Long categoryId = categoryService.findOrCreateCategory(largeCategory, mediumCategory);
             RestaurantValidator.ValidationResult validationResult =
                     restaurantValidator.duplicateValidateWithCache(
                             validationContext,

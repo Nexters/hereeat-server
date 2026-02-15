@@ -45,7 +45,7 @@ class RestaurantCollectionWriteServiceTest {
         when(restaurantValidator.duplicateValidateWithCache(context, suggestion, "ext-1"))
                 .thenReturn(RestaurantValidator.ValidationResult.valid());
 
-        boolean saved = writeService.persistRestaurant(suggestion, Region.GANGNAM, LargeCategory.KOREAN, data, context);
+        boolean saved = writeService.persistRestaurant(suggestion, Region.GANGNAM, LargeCategory.KOREAN, suggestion.mediumCategory(), data, context);
 
         assertThat(saved).isTrue();
         verify(restaurantRepository).save(any());
@@ -63,7 +63,7 @@ class RestaurantCollectionWriteServiceTest {
         when(restaurantValidator.duplicateValidateWithCache(context, suggestion, "ext-1"))
                 .thenReturn(RestaurantValidator.ValidationResult.duplicate("dup"));
 
-        boolean saved = writeService.persistRestaurant(suggestion, Region.GANGNAM, LargeCategory.KOREAN, data, context);
+        boolean saved = writeService.persistRestaurant(suggestion, Region.GANGNAM, LargeCategory.KOREAN, suggestion.mediumCategory(), data, context);
 
         assertThat(saved).isFalse();
         verify(restaurantRepository, never()).save(any());

@@ -225,16 +225,24 @@ public class RestaurantCollectionProcessor {
 
         int savedCount = 0;
         for (SuggestionRestaurant suggestion : suggestions) {
-            LargeCategory largeCategory = getLargeCategoryFromDisplayName(suggestion.largeCategory());
             RestaurantEnrichedData enrichedData = enrichRestaurantData(suggestion, location);
             if (enrichedData.isSkipped()) {
                 continue;
             }
 
+            // 카테고리 결정: API 카테고리 우선, 없으면 Suggestion 값 사용
+            LargeCategory largeCategory = enrichedData.apiLargeCategory() != null
+                    ? enrichedData.apiLargeCategory()
+                    : getLargeCategoryFromDisplayName(suggestion.largeCategory());
+            String mediumCategory = enrichedData.apiMediumCategory() != null
+                    ? enrichedData.apiMediumCategory()
+                    : suggestion.mediumCategory();
+
             boolean saved = restaurantCollectionWriteService.persistRestaurant(
                     suggestion,
                     region,
                     largeCategory,
+                    mediumCategory,
                     enrichedData,
                     validationContext
             );
@@ -336,6 +344,8 @@ public class RestaurantCollectionProcessor {
         enrichedData.aiMateSummaryTitle = detail.aiMateSummaryTitle();
         enrichedData.aiMateSummaryContents = detail.aiMateSummaryContents();
         enrichedData.timeSlot = detail.timeSlot();
+        enrichedData.apiLargeCategory = detail.apiLargeCategory();
+        enrichedData.apiMediumCategory = detail.apiMediumCategory();
 
         if (!hasText(enrichedData.aiMateSummaryTitle)) {
             log.info("Skipping restaurant due to missing ai_mate data: {}", suggestion.name());

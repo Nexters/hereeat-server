@@ -1,5 +1,6 @@
 package com.yogieat.restaurant.service;
 
+import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.common.GeoJson;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
@@ -21,6 +22,9 @@ final class RestaurantEnrichedData {
     String aiMateSummaryTitle;
     List<String> aiMateSummaryContents;
     TimeSlot timeSlot;
+    // 카카오 API에서 추출한 카테고리 정보 (null이면 기존 Suggestion 값 사용)
+    LargeCategory apiLargeCategory;
+    String apiMediumCategory;
     boolean skip;
 
     private RestaurantEnrichedData() {
@@ -96,6 +100,14 @@ final class RestaurantEnrichedData {
 
     TimeSlot timeSlot() {
         return skip ? null : timeSlot;
+    }
+
+    LargeCategory apiLargeCategory() {
+        return skip ? null : apiLargeCategory;
+    }
+
+    String apiMediumCategory() {
+        return skip ? null : apiMediumCategory;
     }
 
     boolean isSkipped() {
