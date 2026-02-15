@@ -84,22 +84,22 @@ jobs:
       - name: Copy docker directory to Server
         uses: burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avzr --delete
+          switches: -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group
           remote_host: ${{ secrets.SERVER_HOST }}
           remote_user: ${{ secrets.SERVER_USERNAME }}
           remote_key: ${{ secrets.SERVER_PRIVATE_KEY }}
-          path: ./docker
-          remote_path: ~/
+          path: ./docker/
+          remote_path: /home/ubuntu/docker/
 
       - name: Copy deploy script to Server
         uses: burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avzr --delete
+          switches: -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group
           remote_host: ${{ secrets.SERVER_HOST }}
           remote_user: ${{ secrets.SERVER_USERNAME }}
           remote_key: ${{ secrets.SERVER_PRIVATE_KEY }}
-          path: ./scripts/deploy
-          remote_path: ~/scripts
+          path: ./scripts/deploy/
+          remote_path: /home/ubuntu/scripts/deploy/
 
       - name: Deploy to Instance Server
         uses: appleboy/ssh-action@v1.0.3

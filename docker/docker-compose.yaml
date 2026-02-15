@@ -58,6 +58,7 @@ services:
 
 networks:
   yogieat-network:
+    name: yogieat-network
     driver: bridge
 
 volumes:
