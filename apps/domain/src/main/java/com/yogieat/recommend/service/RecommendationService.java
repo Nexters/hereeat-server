@@ -503,7 +503,7 @@ public class RecommendationService {
         StringBuilder sb = new StringBuilder();
 
         // 1. 참여자 선호 정보
-        if (preferenceCount > 0) {
+        if (preferenceCount > 0 && totalParticipants > 1) {
             sb.append(totalParticipants).append("명 중 ")
               .append(preferenceCount).append("명이 ")
               .append(categoryName).append("을 골라서\n");
@@ -515,7 +515,7 @@ public class RecommendationService {
         }
 
         // 3. 마무리 멘트
-        sb.append("를 추천해요");
+        sb.append("을(를) 추천해요");
 
         return sb.toString();
     }
