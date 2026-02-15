@@ -433,21 +433,18 @@ public class RecommendationService {
     }
 
     private static double getAgreementRate(List<Participant> participants, PreferenceScore preferenceScore) {
-        double preferenceOnlyScore = preferenceScore.totalPreferenceScore();
-        double agreementRate;
+        int totalParticipants = participants.size();
 
-        if (preferenceOnlyScore > 0) {
-            // 선호도가 있으면 선호도 기반 계산
-            double maxPossibleScore = participants.size() * 3.0;
-            agreementRate = (preferenceOnlyScore / maxPossibleScore) * 100.0;
-        } else {
-            // 선호도가 없으면 불호 기반 계산 (수용 가능 비율)
-            int dislikeCount = preferenceScore.dislikeCount();
-            agreementRate = ((double)(participants.size() - dislikeCount) / participants.size()) * 100.0;
+        if (totalParticipants == 0) {
+            return 0.0;
         }
 
-        agreementRate = Math.round(agreementRate * 100.0) / 100.0;
-        return agreementRate;
+        // 의견 일치율 = 해당 카테고리를 선택한 참여자 비율
+        int preferenceCount = preferenceScore.preferenceCount();
+        double agreementRate = ((double) preferenceCount / totalParticipants) * 100.0;
+
+        // 소수점 둘째 자리 반올림
+        return Math.round(agreementRate * 100.0) / 100.0;
     }
 
 
