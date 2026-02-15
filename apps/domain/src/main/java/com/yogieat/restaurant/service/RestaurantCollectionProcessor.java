@@ -1,8 +1,6 @@
 package com.yogieat.restaurant.service;
 
 import com.yogieat.category.domain.value.LargeCategory;
-import com.yogieat.category.service.CategoryService;
-import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
@@ -14,7 +12,6 @@ import com.yogieat.external.kakao.KakaoPlaceMapper;
 import com.yogieat.external.kakao.result.KaKaoPlaceDocumentResult;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.external.kakao.result.KakaoRestaurantData;
-import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
 import java.util.ArrayList;
@@ -27,8 +24,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -40,8 +35,7 @@ public class RestaurantCollectionProcessor {
     private final KakaoPlaceDetailClient kakaoPlaceDetailClient;
     private final KakaoPlaceMapper kakaoPlaceMapper;
     private final RestaurantRepository restaurantRepository;
-    private final CategoryService categoryService;
-    private final RestaurantValidator restaurantValidator;
+    private final RestaurantCollectionWriteService restaurantCollectionWriteService;
 
     /**
      * Place enum에서 지원하는 지역 목록
@@ -77,29 +71,43 @@ public class RestaurantCollectionProcessor {
     private static final int RESTAURANTS_PER_REQUEST = 5;
     private static final long RATE_LIMIT_DELAY_MS = 5000; // Gemini API rate limit을 위한 지연 시간 (5초)
     private static final int LOCATION_CATEGORY_BATCH_SIZE = 5; // 한 번에 처리할 location-category 조합 개수
-    private static final long BATCH_DELAY_MS = 15000; // 배치 간 휴식 시간 (10초)
+    private static final long BATCH_DELAY_MS = 15000; // 배치 간 휴식 시간 (15초)
+    private static final int MIN_REVIEW_COUNT = 30;
 
     /**
-     * Place enum에 정의된 모든 지역에 대해 맛집 데이터 수집
-     * 배치 처리 최적화:
-     * - Gemini API 호출 1회로 모든 location × category 조합 처리
-     * - API 호출 10회 → 1회 (90% 감소)
-     * - 처리 시간 대폭 단축 (rate limit 대기 제거)
+     * 지역별 맛집 수집 제한
+     * GANGNAM, HONGDAE: 100개
+     * 나머지 지역: 50개
      */
-    @Transactional
+    private static final Map<Region, Integer> REGION_LIMITS = Map.of(
+        Region.GANGNAM, 100,
+        Region.HONGDAE, 100,
+        Region.GONGDEOK, 50,
+        Region.EULJIRO3GA, 50,
+        Region.SADANG, 50,
+        Region.JONGNO3GA, 50,
+        Region.JAMSIL, 50,
+        Region.SAMGAKJI, 50
+    );
+    private static final int DEFAULT_REGION_LIMIT = 50;  // 기본 제한
+
     public void collectAllRegions() {
         try {
-            List<Restaurant> restaurants = restaurantRepository.findAll();
+            Map<Region, Long> regionCounts = loadRegionCounts();
+            List<String> locationsToCollect = filterLocationsNeedingCollection(regionCounts);
 
+            if (locationsToCollect.isEmpty()) {
+                return;
+            }
+
+            List<Restaurant> restaurants = restaurantRepository.findAll();
             String restaurantNames = restaurants.stream()
                 .map(Restaurant::name)
                 .collect(Collectors.joining(", "));
 
-            // 1. 배치 API 호출: 모든 location × category 조합을 한 번에 요청
             Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
-                geminiClient.generateRestaurantsBatch(LOCATIONS, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
+                geminiClient.generateRestaurantsBatch(locationsToCollect, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
 
-            // 2. 각 location-category 조합별로 데이터 처리 (페이징)
             int totalProcessed = 0;
             int totalSuccess = 0;
             int totalFailed = 0;
@@ -121,21 +129,26 @@ public class RestaurantCollectionProcessor {
                     LocationCategoryKey key = entry.getKey();
                     List<SuggestionRestaurant> suggestions = entry.getValue();
 
+                    Region region = getRegionFromLocationName(key.location());
+                    if (isRegionLimitReached(region, regionCounts)) {
+                        continue;
+                    }
+
                     try {
                         int processed = processRestaurantsForLocation(key.location(), key.category(), suggestions);
                         totalProcessed += processed;
+                        if (processed > 0) {
+                            regionCounts.compute(region, (r, count) -> count == null ? (long) processed : count + processed);
+                        }
                         totalSuccess++;
-
                     } catch (Exception e) {
                         log.error("Failed: {} - {}", key.location(), key.category(), e);
                         totalFailed++;
                     }
                 }
 
-                // 배치 간 휴식 (마지막 배치가 아닌 경우)
                 if (endIndex < entries.size()) {
                     try {
-                        log.info("Batch completed. Waiting {} ms before next batch...", BATCH_DELAY_MS);
                         Thread.sleep(BATCH_DELAY_MS);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
@@ -153,69 +166,90 @@ public class RestaurantCollectionProcessor {
         }
     }
 
+    private Map<Region, Long> loadRegionCounts() {
+        return restaurantRepository.findAll().stream()
+                .collect(Collectors.groupingBy(
+                        Restaurant::region,
+                        Collectors.counting()
+                ));
+    }
+
+    private List<String> filterLocationsNeedingCollection(Map<Region, Long> regionCounts) {
+        List<String> locationsToCollect = new ArrayList<>();
+
+        for (Region region : Region.values()) {
+            long currentCount = regionCounts.getOrDefault(region, 0L);
+            int limit = REGION_LIMITS.getOrDefault(region, DEFAULT_REGION_LIMIT);
+
+            if (currentCount < limit) {
+                locationsToCollect.add(region.getName());
+                log.info("Region {} needs collection: {}/{} restaurants",
+                    region.getName(), currentCount, limit);
+            } else {
+                log.info("Region {} reached limit: {}/{} restaurants (skipping)",
+                    region.getName(), currentCount, limit);
+            }
+        }
+
+        return locationsToCollect;
+    }
+
+    private boolean isRegionLimitReached(Region region, Map<Region, Long> regionCounts) {
+        long currentCount = regionCounts.getOrDefault(region, 0L);
+        int limit = REGION_LIMITS.getOrDefault(region, DEFAULT_REGION_LIMIT);
+        return currentCount >= limit;
+    }
+
     /**
      * 특정 지역과 카테고리에 대한 맛집 데이터 수집 (단일 API 호출용 - 레거시)
      *
      * @deprecated Use batch processing via collectAllRegions() for better performance
      */
     @Deprecated
-    @Transactional
     public int collectRestaurantsForLocation(String location, String category) {
-        Region region = getRegionFromLocationName(location);
-        restaurantValidator.prepareForBatchValidation(region);
-
         List<SuggestionRestaurant> suggestions = geminiClient.generateRestaurants(
             location, category, RESTAURANTS_PER_REQUEST
         );
 
-        int savedCount = 0;
-        for (SuggestionRestaurant suggestion : suggestions) {
-            boolean saved = processRestaurant(suggestion, region, location);
-            if (saved) {
-                savedCount++;
-            }
-        }
-
-        log.info("Saved {}/{} for {} - {}", savedCount, suggestions.size(), location, category);
-
-        return savedCount;
+        return processRestaurantsForLocation(location, category, suggestions);
     }
 
-    /**
-     * 배치에서 수집된 suggestions를 처리하여 저장
-     *
-     * 데이터 처리 전략:
-     * 1. Place enum 변환 및 캐시 준비
-     * 2. 카테고리 정보로 카테고리 조회 또는 생성 (대카테고리, 중카테고리)
-     * 3. Kakao Place API로 데이터 보강 (위치, 지도 URL, 외부 ID)
-     * 4. 모든 생성된 맛집 저장 (Kakao 보강 실패 시에도 저장)
-     *
-     * @param location 지역명 (Place enum에서 가져옴)
-     * @param category 음식 카테고리
-     * @param suggestions Gemini에서 생성된 레스토랑 목록
-     * @return 성공적으로 저장된 맛집 개수
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int processRestaurantsForLocation(
         String location,
         String category,
         List<SuggestionRestaurant> suggestions
     ) {
-        // 1. location을 Place enum으로 변환 (배치 검증용)
         Region region = getRegionFromLocationName(location);
+        RestaurantValidator.ValidationContext validationContext =
+                restaurantCollectionWriteService.prepareValidationContext(region);
 
-        // 2. Validator 캐시 준비: 해당 Place의 기존 레스토랑 로드 (N번 → 1번 DB 쿼리)
-        restaurantValidator.prepareForBatchValidation(region);
-
-        // 3. 각 suggestion 처리 (카테고리 생성 + Gemini 데이터 + Kakao 데이터 보강)
         int savedCount = 0;
         for (SuggestionRestaurant suggestion : suggestions) {
-            boolean saved = processRestaurant(suggestion, region, location);
+            RestaurantEnrichedData enrichedData = enrichRestaurantData(suggestion, location);
+            if (enrichedData.isSkipped()) {
+                continue;
+            }
+
+            // 카테고리 결정: API 카테고리 우선, 없으면 Suggestion 값 사용
+            LargeCategory largeCategory = enrichedData.apiLargeCategory() != null
+                    ? enrichedData.apiLargeCategory()
+                    : getLargeCategoryFromDisplayName(suggestion.largeCategory());
+            String mediumCategory = enrichedData.apiMediumCategory() != null
+                    ? enrichedData.apiMediumCategory()
+                    : suggestion.mediumCategory();
+
+            boolean saved = restaurantCollectionWriteService.persistRestaurant(
+                    suggestion,
+                    region,
+                    largeCategory,
+                    mediumCategory,
+                    enrichedData,
+                    validationContext
+            );
             if (saved) {
                 savedCount++;
             }
 
-            // API Rate Limit 방지를 위한 지연
             try {
                 Thread.sleep(RATE_LIMIT_DELAY_MS);
             } catch (InterruptedException e) {
@@ -229,12 +263,6 @@ public class RestaurantCollectionProcessor {
         return savedCount;
     }
 
-    /**
-     * location 이름을 Place enum으로 변환 (캐시 사용, O(1) 조회)
-     * @param locationName Place enum의 location 이름 (예: "홍대입구역")
-     * @return Place enum
-     * @throws CustomException 알 수 없는 location 이름인 경우
-     */
     private Region getRegionFromLocationName(String locationName) {
         Region region = PLACE_CACHE.get(locationName);
         if (region == null) {
@@ -244,12 +272,6 @@ public class RestaurantCollectionProcessor {
         return region;
     }
 
-    /**
-     * largeCategory displayName을 LargeCategory enum으로 변환 (캐시 사용, O(1) 조회)
-     * @param displayName LargeCategory enum의 displayName (예: "한식")
-     * @return LargeCategory enum
-     * @throws CustomException 알 수 없는 카테고리 이름인 경우
-     */
     private LargeCategory getLargeCategoryFromDisplayName(String displayName) {
         LargeCategory category = LARGE_CATEGORY_CACHE.get(displayName);
         if (category == null) {
@@ -259,121 +281,116 @@ public class RestaurantCollectionProcessor {
         return category;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected boolean processRestaurant(SuggestionRestaurant suggestion, Region restaurantRegion, String locationName) {
-        try {
-            // 1. largeCategory displayName을 LargeCategory enum으로 변환
-            LargeCategory largeCategory = getLargeCategoryFromDisplayName(suggestion.largeCategory());
+    private RestaurantEnrichedData enrichRestaurantData(SuggestionRestaurant suggestion, String locationName) {
+        RestaurantEnrichedData enrichedData = RestaurantEnrichedData.fromSuggestion(suggestion);
+        Optional<KaKaoPlaceDocumentResult> placeOpt = kakaoPlaceClient.searchPlace(suggestion.name(), locationName);
 
-            // 2. Gemini suggestion으로부터 카테고리 조회 또는 생성
-            Long categoryId = categoryService.findOrCreateCategory(
-                largeCategory,
-                suggestion.mediumCategory()
-            );
-
-            // 3. 데이터 보강용 변수 초기화
-            String externalId = null;
-            String mapUrl = null;
-            GeoJson.Point geoJsonLocation = null;
-            Double rating = suggestion.rating(); // Gemini 평점으로 시작
-            String imageUrl = null;
-            String placeName = null;
-            String representativeReview = null;
-
-            // 4. Kakao Search API로 기본 정보 보강 시도
-            Optional<KaKaoPlaceDocumentResult> placeOpt = kakaoPlaceClient.searchPlace(
-                suggestion.name(), locationName
-            );
-
-            if (placeOpt.isPresent()) {
-                KaKaoPlaceDocumentResult place = placeOpt.get();
-
-                // 4-1. Kakao 검색 데이터로 보강
-                KakaoRestaurantData data = kakaoPlaceMapper.toDomainData(place);
-                externalId = data.externalId();
-                String originalMapUrl = data.mapUrl();
-                if (originalMapUrl.startsWith("https:")) {
-                    mapUrl = originalMapUrl;
-                } else if (originalMapUrl.startsWith("http:")) {
-                    mapUrl = "https:" + originalMapUrl.substring("http:".length());
-                } else if (originalMapUrl.startsWith("//")) {
-                    mapUrl = "https:" + originalMapUrl;
-                } else {
-                    mapUrl = originalMapUrl;
-                }
-                geoJsonLocation = data.location();
-
-                // 5. Kakao Detail API (panel3)로 평점 및 사진 보강 시도
-                Optional<KakaoPlaceDetailData> detailOpt = kakaoPlaceDetailClient.fetchPlaceDetail(place.id());
-                if (detailOpt.isPresent()) {
-                    KakaoPlaceDetailData detail = detailOpt.get();
-
-                    // 5-1. 필터링 체크: rating이 null이면 음식점이 아니거나 평점이 범위 밖
-                    if (detail.rating() == null) {
-                        log.info("Skipping restaurant due to filtering (non-restaurant or invalid rating): {} in {}",
-                            suggestion.name(), locationName);
-                        return false;
-                    }
-
-                    // 5-2. panel3 평점 사용 (Gemini보다 정확)
-                    rating = detail.rating();
-                    placeName = detail.placeName();
-
-                    // 5-3. 메인 사진 URL이 있으면 사용
-                    if (detail.mainPhotoUrl() != null && !detail.mainPhotoUrl().isBlank()) {
-                        imageUrl = detail.mainPhotoUrl();
-                    }
-
-                    // 5-4. 대표 리뷰가 있으면 사용
-                    if (detail.representativeReview() != null && !detail.representativeReview().isBlank()) {
-                        representativeReview = detail.representativeReview();
-                    }
-                }
-            } else {
-                log.warn("Kakao place not found for: {} in {}", suggestion.name(), locationName);
-            }
-
-            // 6. externalId가 null이면 저장하지 않음 (Kakao 데이터 필수)
-            if (externalId == null || externalId.isBlank()) {
-                log.warn("Skipping restaurant due to missing externalId: {} in {}",
-                    suggestion.name(), locationName);
-                return false;
-            }
-
-            // 7. 저장 전 중복 검증 (캐시 사용)
-            RestaurantValidator.ValidationResult validationResult =
-                restaurantValidator.duplicateValidateWithCache(suggestion, externalId);
-
-            if (!validationResult.isValid()) {
-                return false;
-            }
-
-            // 8. Gemini + Kakao 보강 데이터로 Restaurant 생성
-            CreateRestaurant createRestaurant = CreateRestaurant.of(
-                suggestion,
-                placeName,
-                categoryId,
-                externalId,
-                mapUrl,
-                geoJsonLocation,
-                rating,
-                imageUrl,
-                representativeReview,
-                restaurantRegion
-            );
-
-            // 9. 도메인 레포지토리를 통해 저장
-            restaurantRepository.save(createRestaurant);
-
-            // 10. 같은 배치 내 중복 방지를 위해 캐시에 추가
-            restaurantValidator.addToCache(externalId, suggestion.name(), suggestion.address());
-
-            return true;
-
-        } catch (Exception e) {
-            log.error("Failed to process restaurant: {} in {}", suggestion.name(), locationName, e);
-            // 예외 발생 시 이 트랜잭션만 롤백 (REQUIRES_NEW)
-            return false;
+        if (placeOpt.isEmpty()) {
+            log.warn("Kakao place not found for: {} in {}", suggestion.name(), locationName);
+            return enrichedData;
         }
+
+        KaKaoPlaceDocumentResult place = placeOpt.get();
+        if (isCafeOrCoffee(place)) {
+            log.info("Skipping cafe/coffee shop: {} (category: {})", suggestion.name(), place.categoryName());
+            return RestaurantEnrichedData.skipped();
+        }
+
+        applySearchData(enrichedData, place);
+        applyDetailData(enrichedData, suggestion, locationName, place.id());
+        return enrichedData;
+    }
+
+    private boolean isCafeOrCoffee(KaKaoPlaceDocumentResult place) {
+        String categoryName = place.categoryName();
+        return categoryName != null && (categoryName.contains("카페") || categoryName.contains("커피"));
+    }
+
+    private void applySearchData(RestaurantEnrichedData enrichedData, KaKaoPlaceDocumentResult place) {
+        KakaoRestaurantData data = kakaoPlaceMapper.toDomainData(place);
+        enrichedData.externalId = data.externalId();
+        enrichedData.mapUrl = normalizeMapUrl(data.mapUrl());
+        enrichedData.geoJsonLocation = data.location();
+    }
+
+    private void applyDetailData(
+            RestaurantEnrichedData enrichedData,
+            SuggestionRestaurant suggestion,
+            String locationName,
+            String placeId
+    ) {
+        Optional<KakaoPlaceDetailData> detailOpt = kakaoPlaceDetailClient.fetchPlaceDetail(placeId);
+        if (detailOpt.isEmpty()) {
+            return;
+        }
+
+        KakaoPlaceDetailData detail = detailOpt.get();
+        if (detail.rating() == null) {
+            log.info("Skipping restaurant due to filtering (non-restaurant or invalid rating): {} in {}",
+                    suggestion.name(), locationName);
+            enrichedData.skip = true;
+            return;
+        }
+
+        enrichedData.rating = detail.rating();
+        enrichedData.placeName = detail.placeName();
+        enrichedData.imageUrl = hasText(detail.mainPhotoUrl()) ? detail.mainPhotoUrl() : null;
+        enrichedData.representativeReview = hasText(detail.representativeReview()) ? detail.representativeReview() : null;
+        enrichedData.reviewCount = detail.reviewCount();
+        enrichedData.blogReviewCount = detail.blogReviewCount();
+        enrichedData.representMenu = detail.representMenu();
+        enrichedData.representMenuPrice = normalizeMenuPrice(detail.representMenuPrice());
+        enrichedData.priceLevel = detail.priceLevel();
+        enrichedData.aiMateSummaryTitle = detail.aiMateSummaryTitle();
+        enrichedData.aiMateSummaryContents = detail.aiMateSummaryContents();
+        enrichedData.timeSlot = detail.timeSlot();
+        enrichedData.apiLargeCategory = detail.apiLargeCategory();
+        enrichedData.apiMediumCategory = detail.apiMediumCategory();
+
+        if (!hasText(enrichedData.aiMateSummaryTitle)) {
+            log.info("Skipping restaurant due to missing ai_mate data: {}", suggestion.name());
+            enrichedData.skip = true;
+            return;
+        }
+
+        if (isInsufficientReviewCount(enrichedData.reviewCount, enrichedData.blogReviewCount)) {
+            log.info("Skipping restaurant due to insufficient reviews: {} (reviews: {}, blog: {})",
+                    suggestion.name(), enrichedData.reviewCount, enrichedData.blogReviewCount);
+            enrichedData.skip = true;
+        }
+    }
+
+    private String normalizeMapUrl(String originalMapUrl) {
+        if (originalMapUrl == null || originalMapUrl.isBlank()) {
+            return originalMapUrl;
+        }
+        if (originalMapUrl.startsWith("https:")) {
+            return originalMapUrl;
+        }
+        if (originalMapUrl.startsWith("http:")) {
+            return "https:" + originalMapUrl.substring("http:".length());
+        }
+        if (originalMapUrl.startsWith("//")) {
+            return "https:" + originalMapUrl;
+        }
+        return originalMapUrl;
+    }
+
+    private boolean isInsufficientReviewCount(Integer reviewCount, Integer blogReviewCount) {
+        return reviewCount == null
+                || reviewCount < MIN_REVIEW_COUNT
+                || blogReviewCount == null
+                || blogReviewCount < MIN_REVIEW_COUNT;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private Integer normalizeMenuPrice(Integer price) {
+        if (price == null || price <= 0) {
+            return null;
+        }
+        return price;
     }
 }

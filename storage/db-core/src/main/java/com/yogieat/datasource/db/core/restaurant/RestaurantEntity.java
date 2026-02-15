@@ -3,8 +3,10 @@ package com.yogieat.datasource.db.core.restaurant;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.datasource.db.core.common.BaseEntity;
+import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
+import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -40,6 +42,21 @@ import org.locationtech.jts.geom.PrecisionModel;
             name = "idx_restaurant_category_id",
             columnList = "category_id",
             unique = false
+        ),
+        @Index(
+            name = "idx_restaurant_deleted_at",
+            columnList = "deleted_at",
+            unique = false
+        ),
+        @Index(
+            name = "idx_restaurant_deleted_at_id",
+            columnList = "deleted_at, id",
+            unique = false
+        ),
+        @Index(
+            name = "idx_restaurant_region_deleted_at",
+            columnList = "region, deleted_at",
+            unique = false
         )
     }
 )
@@ -68,6 +85,22 @@ public class RestaurantEntity extends BaseEntity {
     // 매핑 필드
     private Long categoryId; // nullable
 
+    // 추천 근거 데이터 (신규 필드)
+    private Integer reviewCount;
+    private Integer blogReviewCount;
+    private String representMenu;
+    private Integer representMenuPrice;
+    @Column(columnDefinition = "VARCHAR(10)")
+    private String priceLevel;
+    private String aiMateSummaryTitle;
+    @Column(columnDefinition = "TEXT")
+    private String aiMateSummaryContents;  // JSON 문자열
+
+    // 추천 시간대 (신규 필드)
+    @Column(name = "time_slot", columnDefinition = "VARCHAR(20)")
+    @Enumerated(EnumType.STRING)
+    private TimeSlot timeSlot;
+
     @Builder(access = AccessLevel.PRIVATE)
     private RestaurantEntity(
             String externalId,
@@ -80,7 +113,17 @@ public class RestaurantEntity extends BaseEntity {
             String representativeReview,
             String description,
             Region region,
-            Point location) {
+            Point location,
+            // 추천 근거 데이터
+            Integer reviewCount,
+            Integer blogReviewCount,
+            String representMenu,
+            Integer representMenuPrice,
+            String priceLevel,
+            String aiMateSummaryTitle,
+            String aiMateSummaryContents,
+            // 추천 시간대
+            TimeSlot timeSlot) {
         this.externalId = externalId;
         this.name = name;
         this.address = address;
@@ -92,6 +135,14 @@ public class RestaurantEntity extends BaseEntity {
         this.description = description;
         this.region = region;
         this.location = location;
+        this.reviewCount = reviewCount;
+        this.blogReviewCount = blogReviewCount;
+        this.representMenu = representMenu;
+        this.representMenuPrice = representMenuPrice;
+        this.priceLevel = priceLevel;
+        this.aiMateSummaryTitle = aiMateSummaryTitle;
+        this.aiMateSummaryContents = aiMateSummaryContents;
+        this.timeSlot = timeSlot;
     }
 
     /**
@@ -117,6 +168,16 @@ public class RestaurantEntity extends BaseEntity {
                         createRestaurant.location() != null
                                 ? toJtsPoint(createRestaurant.location())
                                 : null)
+                // 추천 근거 데이터
+                .reviewCount(createRestaurant.reviewCount())
+                .blogReviewCount(createRestaurant.blogReviewCount())
+                .representMenu(createRestaurant.representMenu())
+                .representMenuPrice(createRestaurant.representMenuPrice())
+                .priceLevel(createRestaurant.priceLevel())
+                .aiMateSummaryTitle(createRestaurant.aiMateSummaryTitle())
+                .aiMateSummaryContents(createRestaurant.aiMateSummaryContents())
+                // 추천 시간대
+                .timeSlot(createRestaurant.timeSlot())
                 .build();
     }
 
@@ -135,12 +196,70 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getRegion(),
                 entity.location != null
                     ? new GeoJson.Point(List.of(entity.location.getX(), entity.location.getY()))
-                    : null
+                    : null,
+                // 추천 근거 데이터
+                entity.getReviewCount(),
+                entity.getBlogReviewCount(),
+                entity.getRepresentMenu(),
+                entity.getRepresentMenuPrice(),
+                entity.getPriceLevel(),
+                entity.getAiMateSummaryTitle(),
+                entity.getAiMateSummaryContents(),
+                // 추천 시간대
+                entity.getTimeSlot()
         );
     }
 
     private static Point toJtsPoint(GeoJson.Point point) {
         List<Double> coordinates = point.getCoordinates();
         return GEOMETRY_FACTORY.createPoint(new Coordinate(coordinates.getFirst(), coordinates.get(1)));
+    }
+
+    public void applySyncPatch(RestaurantSyncPatch patch) {
+        if (patch.externalId() != null && !patch.externalId().isBlank()) {
+            this.externalId = patch.externalId();
+        }
+        if (patch.name() != null && !patch.name().isBlank()) {
+            this.name = patch.name();
+        }
+        if (patch.mapUrl() != null && !patch.mapUrl().isBlank()) {
+            this.mapUrl = patch.mapUrl();
+        }
+        if (patch.location() != null) {
+            this.location = toJtsPoint(patch.location());
+        }
+        if (patch.rating() != null) {
+            this.rating = patch.rating();
+        }
+        if (patch.imageUrl() != null && !patch.imageUrl().isBlank()) {
+            this.imageUrl = patch.imageUrl();
+        }
+        if (patch.representativeReview() != null && !patch.representativeReview().isBlank()) {
+            this.representativeReview = patch.representativeReview();
+        }
+        if (patch.reviewCount() != null) {
+            this.reviewCount = patch.reviewCount();
+        }
+        if (patch.blogReviewCount() != null) {
+            this.blogReviewCount = patch.blogReviewCount();
+        }
+        if (patch.representMenu() != null && !patch.representMenu().isBlank()) {
+            this.representMenu = patch.representMenu();
+        }
+        if (patch.representMenuPrice() != null) {
+            this.representMenuPrice = patch.representMenuPrice();
+        }
+        if (patch.priceLevel() != null && !patch.priceLevel().isBlank()) {
+            this.priceLevel = patch.priceLevel();
+        }
+        if (patch.aiMateSummaryTitle() != null && !patch.aiMateSummaryTitle().isBlank()) {
+            this.aiMateSummaryTitle = patch.aiMateSummaryTitle();
+        }
+        if (patch.aiMateSummaryContents() != null && !patch.aiMateSummaryContents().isBlank()) {
+            this.aiMateSummaryContents = patch.aiMateSummaryContents();
+        }
+        if (patch.timeSlot() != null) {
+            this.timeSlot = patch.timeSlot();
+        }
     }
 }

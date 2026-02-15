@@ -9,7 +9,8 @@ on:
 
 env:
   DOCKERHUB_USERNAME: yogieat
-  DOCKERHUB_IMAGE_NAME: yogieat-server
+  DOCKERHUB_API_IMAGE_NAME: yogieat-server-api
+  DOCKERHUB_BATCH_IMAGE_NAME: yogieat-server-batch-sync
 
 jobs:
   deploy:
@@ -25,9 +26,18 @@ jobs:
           key: ${{ secrets.SERVER_PRIVATE_KEY }}
           script: |
             echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ env.DOCKERHUB_USERNAME }}" --password-stdin
-            echo "Deploying with IMAGE_FULL_URL=${{ steps.metadata.outputs.tags }}"
-            cd ~
-            IMAGE_FULL_URL="${{ steps.metadata.outputs.tags }}" DOCKERHUB_IMAGE_NAME="${{ env.DOCKERHUB_IMAGE_NAME }}" docker compose -f docker-compose.yaml up -d
+            API_IMAGE="${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_API_IMAGE_NAME }}:${{ github.event.inputs.version }}"
+            BATCH_IMAGE="${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}:${{ github.event.inputs.version }}"
+            echo "Deploying API image: ${API_IMAGE}"
+            echo "Deploying Batch image: ${BATCH_IMAGE}"
+            cd ~/docker
+            API_IMAGE_FULL_URL="${API_IMAGE}" \
+            BATCH_IMAGE_FULL_URL="${BATCH_IMAGE}" \
+            DOCKERHUB_API_IMAGE_NAME="${{ env.DOCKERHUB_API_IMAGE_NAME }}" \
+            DOCKERHUB_BATCH_IMAGE_NAME="${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}" \
+            DEPLOY_SCOPE="app" \
+            DEPLOY_ENV="prod" \
+            ../scripts/deploy/compose-up.sh
             docker image prune -a -f
 
       - name: Discord notification
@@ -41,6 +51,8 @@ jobs:
             **브랜치**: ${{ github.ref_name }}
             **커밋**: ${{ github.sha }}
             **커밋 메시지**: ${{ github.event.head_commit.message }}
-            **이미지**: ${{ steps.metadata.outputs.tags }}
+            **버전**: ${{ github.event.inputs.version }}
+            **API 이미지**: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_API_IMAGE_NAME }}:${{ github.event.inputs.version }}
+            **BATCH 이미지**: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}:${{ github.event.inputs.version }}
           color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
           username: GitHub Actions

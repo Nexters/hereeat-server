@@ -3,6 +3,9 @@ package com.yogieat.restaurant.service;
 import com.yogieat.common.Region;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
+import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
+import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
+import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,5 +17,13 @@ public interface RestaurantRepository {
     List<Restaurant> findByRegion(Region region);
     Optional<Restaurant> findById(Long id);
     List<Restaurant> findByIds(List<Long> ids);
+    long countByRegion(Region region);  // 지역별 맛집 수 조회 (신규)
+    Optional<Restaurant> findByExternalId(String externalId);
+    List<Long> findActiveRestaurantIdsAfter(Long lastId, int limit);
+    long countActiveRestaurants();
+    List<RestaurantSyncTarget> findSyncTargetsByIds(List<Long> ids);
+    void batchApplySyncPatch(List<RestaurantSyncPatchCommand> commands);
+    void batchSoftDeleteByIds(List<Long> restaurantIds);
+    void applySyncPatch(Long restaurantId, RestaurantSyncPatch patch);
 
 }

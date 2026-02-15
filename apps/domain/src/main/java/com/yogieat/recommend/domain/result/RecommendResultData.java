@@ -69,7 +69,17 @@ public record RecommendResultData() {
             GeoJson.Point location,
             LargeCategory largeCategory,
             String mediumCategory,
-            DistanceRange majorityDistanceRange
+            DistanceRange majorityDistanceRange,
+            // 추천 근거 데이터 (신규 필드)
+            Integer reviewCount,
+            Integer blogReviewCount,
+            String representMenu,
+            Integer representMenuPrice,
+            String priceLevel,
+            String aiMateSummaryTitle,
+            String aiMateSummaryContents,
+            // 추천 근거 텍스트 (신규)
+            String reasonText
     ) {
         public static Ranking of(
                 Integer rank,
@@ -85,7 +95,17 @@ public record RecommendResultData() {
                 GeoJson.Point location,
                 LargeCategory largeCategory,
                 String mediumCategory,
-                DistanceRange majorityDistanceRange
+                DistanceRange majorityDistanceRange,
+                // 추천 근거 데이터
+                Integer reviewCount,
+                Integer blogReviewCount,
+                String representMenu,
+                Integer representMenuPrice,
+                String priceLevel,
+                String aiMateSummaryTitle,
+                String aiMateSummaryContents,
+                // 추천 근거 텍스트
+                String reasonText
         ) {
             return new Ranking(
                     rank,
@@ -101,7 +121,15 @@ public record RecommendResultData() {
                     location,
                     largeCategory,
                     mediumCategory,
-                    majorityDistanceRange
+                    majorityDistanceRange,
+                    reviewCount,
+                    blogReviewCount,
+                    representMenu,
+                    representMenuPrice,
+                    priceLevel,
+                    aiMateSummaryTitle,
+                    aiMateSummaryContents,
+                    reasonText
             );
         }
     }

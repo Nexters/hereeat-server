@@ -21,15 +21,21 @@ public class ErrorHttpStatusMapper {
                  GATHERING_SCHEDULED_DATE_PAST,
                  PARTICIPANT_DISLIKES_EXCEEDED,
                  PARTICIPANT_PREFERENCES_EXCEEDED,
+                 PARTICIPANT_NICKNAME_REQUIRED,
+                 PARTICIPANT_NICKNAME_TOO_LONG,
+                 PARTICIPANT_NICKNAME_INVALID,
                  INVALID_CATEGORY_AGGREGATION,
                  INVALID_PREFERENCE_SCORE -> HttpStatus.BAD_REQUEST;
             case METHOD_NOT_ALLOWED -> HttpStatus.METHOD_NOT_ALLOWED;
             case USER_NOT_FOUND,
                  CATEGORY_NOT_FOUND,
                  RESTAURANT_NOT_FOUND,
+                 SYNC_JOB_NOT_FOUND,
                  GATHERING_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case GEMINI_API_ERROR,
                  KAKAO_API_ERROR -> HttpStatus.SERVICE_UNAVAILABLE;
+            case DUPLICATE_NICKNAME,
+                 SYNC_JOB_CONFLICT -> HttpStatus.CONFLICT;
             case KAKAO_RATE_LIMIT_EXCEEDED -> HttpStatus.TOO_MANY_REQUESTS;
             case LOCK_TIMEOUT -> HttpStatus.REQUEST_TIMEOUT;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;

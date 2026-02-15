@@ -1,10 +1,12 @@
 package com.yogieat.external.kakao.result;
 
+import com.yogieat.category.domain.value.LargeCategory;
+import com.yogieat.gathering.domain.value.TimeSlot;
 import java.util.List;
 
 /**
  * Kakao Place API panel3 endpoint response data
- * Contains detailed information about a place including rating, photos, and menus
+ * Contains detailed information about a place including rating, photos, menus, and AI summary
  */
 public record KakaoPlaceDetailData(
         String confirmId,
@@ -15,7 +17,20 @@ public record KakaoPlaceDetailData(
         Double rating,
         String mainPhotoUrl,
         List<String> photoUrls,
-        String representativeReview
+        String representativeReview,
+        // 추천 근거 데이터 (신규 필드)
+        Integer reviewCount,
+        Integer blogReviewCount,
+        String representMenu,
+        Integer representMenuPrice,
+        String priceLevel,
+        String aiMateSummaryTitle,
+        List<String> aiMateSummaryContents,
+        // 추천 시간대 (신규 필드)
+        TimeSlot timeSlot,
+        // 카카오 API에서 추출한 카테고리 정보 (null이면 기존 Suggestion 값 사용)
+        LargeCategory apiLargeCategory,
+        String apiMediumCategory
 ) {
     /**
      * Create a minimal detail data when panel3 call fails
@@ -30,6 +45,16 @@ public record KakaoPlaceDetailData(
                 null,
                 null,
                 List.of(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                null,
+                null,
                 null
         );
     }

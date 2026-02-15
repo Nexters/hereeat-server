@@ -39,7 +39,8 @@ class PendingRecordCleanupProcessorTest {
             0.0,
             RecommendStatus.PENDING,
             null,
-            0.0
+            0.0,
+            null  // reasonText
         );
 
         // When: 레코드 정리 실행
@@ -68,7 +69,8 @@ class PendingRecordCleanupProcessorTest {
             0.0,
             RecommendStatus.PENDING,
             null,
-            0.0
+            0.0,
+            null  // reasonText
         );
 
         doThrow(new RuntimeException("DB connection error"))
@@ -96,7 +98,8 @@ class PendingRecordCleanupProcessorTest {
             0.0,
             RecommendStatus.PENDING,
             null,
-            0.0
+            0.0,
+            null  // reasonText
         );
 
         when(recommendResultRepository.save(any(RecommendResult.class)))
@@ -123,7 +126,8 @@ class PendingRecordCleanupProcessorTest {
             0.0,
             RecommendStatus.PENDING,
             null,
-            0.0
+            0.0,
+            null  // reasonText
         );
 
         when(recommendResultFailedRepository.save(any(RecommendResultFailed.class)))

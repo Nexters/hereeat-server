@@ -26,6 +26,9 @@ public class ParticipantEntity extends BaseEntity {
     @Column(name = "gathering_id")
     private Long gatheringId;
 
+    @Column(name = "nickname", length = 8)
+    private String nickname;
+
     @Column(name = "distance_range")
     @Enumerated(EnumType.STRING)
     private DistanceRange distanceRange;
@@ -44,12 +47,14 @@ public class ParticipantEntity extends BaseEntity {
     public ParticipantEntity(
             Long userId,
             Long gatheringId,
+            String nickname,
             DistanceRange distanceRange,
             String preferences,
             String dislikes,
             Role role) {
         this.userId = userId;
         this.gatheringId = gatheringId;
+        this.nickname = nickname;
         this.distanceRange = distanceRange;
         this.preferences = preferences;
         this.dislikes = dislikes;
@@ -60,6 +65,7 @@ public class ParticipantEntity extends BaseEntity {
         return ParticipantEntity.builder()
                 .userId(participant.userId())
                 .gatheringId(participant.gatheringId())
+                .nickname(participant.nickname())
                 .distanceRange(participant.distanceRange())
                 .preferences(participant.preferences())
                 .dislikes(participant.dislikes())
@@ -72,6 +78,7 @@ public class ParticipantEntity extends BaseEntity {
                 entity.getId(),
                 entity.getUserId(),
                 entity.getGatheringId(),
+                entity.getNickname(),
                 entity.getDistanceRange(),
                 entity.getPreferences(),
                 entity.getDislikes(),

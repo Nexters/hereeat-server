@@ -5,6 +5,7 @@ import com.yogieat.controller.v1.participant.response.CreateParticipantResponse;
 import com.yogieat.participant.service.ParticipantFacade;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,7 +23,7 @@ public class ParticipantController {
     @Operation(summary = "모임 참여", description = "사용자가 모임에 참여합니다.")
     @PostMapping
     public CreateParticipantResponse participateInGathering(
-            @RequestBody CreateParticipantRequest request
+            @RequestBody @Valid CreateParticipantRequest request
     ) {
         return CreateParticipantResponse.from(
                 participantFacade.participate(request.toCommand())

@@ -33,7 +33,8 @@ public class RecommendResultService {
                 0.0,            // agreementRate
                 RecommendStatus.PENDING,
                 null,           // rank: null for PENDING
-                0.0             // score
+                0.0,            // score
+                null            // reasonText
         );
 
         recommendResultRepository.saveAll(List.of(pendingResult));

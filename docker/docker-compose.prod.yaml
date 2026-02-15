@@ -1,0 +1,15 @@
+services:
+  yogieat-api:
+    cpus: "1.50"
+    mem_limit: "850m"
+    mem_reservation: "384m"
+
+  yogieat-batch-sync:
+    cpus: "0.30"
+    mem_limit: "192m"
+    mem_reservation: "96m"
+
+  yogieat-db:
+    cpus: "0.60"
+    mem_limit: "384m"
+    mem_reservation: "128m"
