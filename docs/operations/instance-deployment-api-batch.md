@@ -79,9 +79,9 @@ ENV_FILE_PATH=~/.env \
   - `yogieat-batch-sync`: `cpus=0.15`, `mem_limit=192m`, `mem_reservation=64m`
   - `yogieat-db`: `cpus=0.25`, `mem_limit=256m`, `mem_reservation=64m`
 - PROD (`docker/docker-compose.prod.yaml`)
-  - `yogieat-api`: `cpus=1.80`, `mem_limit=1100m`, `mem_reservation=512m`
-  - `yogieat-batch-sync`: `cpus=0.40`, `mem_limit=256m`, `mem_reservation=128m`
-  - `yogieat-db`: `cpus=0.60`, `mem_limit=512m`, `mem_reservation=128m`
+  - `yogieat-api`: `cpus=1.50`, `mem_limit=850m`, `mem_reservation=384m`
+  - `yogieat-batch-sync`: `cpus=0.30`, `mem_limit=192m`, `mem_reservation=96m`
+  - `yogieat-db`: `cpus=0.60`, `mem_limit=384m`, `mem_reservation=128m`
 
 `DEPLOY_SCOPE=app` 배포는 API/BATCH 중심으로 동작하며, DB는 필요 시 자동 복구(기동/재생성)된다.
 DB 설정을 강제로 재적용하려면 유지보수 창에 `DEPLOY_SCOPE=full` 배포를 사용한다.
