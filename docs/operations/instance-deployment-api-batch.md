@@ -65,6 +65,7 @@ ENV_FILE_PATH=../.env \
 `DEPLOY_SCOPE=app`일 때는 내부적으로 아래와 같이 동작한다.
 - `docker compose ... up -d --no-deps yogieat-api yogieat-batch-sync`
 - 즉, DB 컨테이너는 배포에서 제외된다.
+- 단, `yogieat-db`가 없으면 배포 스크립트가 `docker compose ... up -d yogieat-db`를 먼저 실행해 자동 복구한다.
 
 ## 6. 라우팅/SSL 설계 결정 포인트
 
@@ -77,6 +78,7 @@ ENV_FILE_PATH=../.env \
 - 운영은 인스턴스의 `nginx + letsencrypt`로 TLS 종료한다.
 - 운영 배포에서 `ENABLE_EDGE_SSL=true`는 사용하지 않는다.
 - `DEPLOY_SCOPE=app`에서 `ENABLE_EDGE_SSL=true`를 주면 스크립트가 실패하도록 보호 로직이 있다.
+- 자동 DB 복구를 끄려면 `AUTO_RESTORE_DB=false`를 전달한다.
 
 ## 7. 보안 권장사항
 1. Security Group
@@ -116,6 +118,12 @@ docker logs -f yogieat-server-batch-sync
     1. `DEPLOY_SCOPE=app`으로 배포 실행
     2. `docker ps --format '{{.Names}}' | grep -x yogieat-db`로 DB 실행 확인
     3. `ENABLE_EDGE_SSL`은 비활성(`false`) 유지
+
+- 증상: 인스턴스 재시작 후 DB 컨테이너가 없어져 앱 배포 실패
+  - 대응:
+    1. 기본값(`AUTO_RESTORE_DB=true`)으로 푸시 배포를 재실행
+    2. 스크립트가 DB 컨테이너를 자동으로 복구 기동
+    3. 필요 시 `DB_READY_TIMEOUT_SECONDS`로 대기시간 조정 (기본 60초)
 
 ## 11. 주의사항
 - 이 저장소 변경은 배포 아티팩트를 준비한 것이며, 실제 서버 반영은 CI 실행 또는 서버에서 compose 명령 실행이 필요하다.
