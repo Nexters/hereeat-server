@@ -52,15 +52,34 @@ if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
   AUTO_RESTORE_DB="${AUTO_RESTORE_DB:-true}"
   DB_READY_TIMEOUT_SECONDS="${DB_READY_TIMEOUT_SECONDS:-60}"
 
-  if ! docker ps --format '{{.Names}}' | grep -xq "${DB_CONTAINER_NAME}"; then
+  DB_IS_RUNNING=false
+  DB_EXISTS=false
+  if docker ps --format '{{.Names}}' | grep -xq "${DB_CONTAINER_NAME}"; then
+    DB_IS_RUNNING=true
+  fi
+  if docker ps -a --format '{{.Names}}' | grep -xq "${DB_CONTAINER_NAME}"; then
+    DB_EXISTS=true
+  fi
+
+  if [[ "${DB_IS_RUNNING}" != "true" ]]; then
     if [[ "${AUTO_RESTORE_DB}" != "true" ]]; then
       echo "ERROR: required DB container '${DB_CONTAINER_NAME}' is not running."
       echo "       AUTO_RESTORE_DB=false, so deploy is stopped."
       exit 1
     fi
 
-    echo "DB container '${DB_CONTAINER_NAME}' is not running. Attempting auto-restore..."
-    docker compose --env-file "${ENV_FILE_PATH}" "${COMPOSE_FILES[@]}" up -d yogieat-db
+    if [[ "${DB_EXISTS}" == "true" ]]; then
+      echo "DB container '${DB_CONTAINER_NAME}' exists but is not running. Starting existing container..."
+      if ! docker start "${DB_CONTAINER_NAME}"; then
+        echo "ERROR: failed to start existing DB container '${DB_CONTAINER_NAME}'."
+        docker ps -a --filter "name=${DB_CONTAINER_NAME}" || true
+        docker logs --tail=100 "${DB_CONTAINER_NAME}" || true
+        exit 1
+      fi
+    else
+      echo "DB container '${DB_CONTAINER_NAME}' does not exist. Attempting auto-restore with compose..."
+      docker compose --env-file "${ENV_FILE_PATH}" "${COMPOSE_FILES[@]}" up -d yogieat-db
+    fi
 
     STARTED_AT="$(date +%s)"
     while true; do
