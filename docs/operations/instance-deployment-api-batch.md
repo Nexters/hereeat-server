@@ -60,7 +60,7 @@ DOCKERHUB_BATCH_IMAGE_NAME=yogieat-server-batch-sync \
 API_HOST_PORT=8080 \
 BATCH_SERVER_PORT=9090 \
 DEPLOY_SCOPE=app \
-ENV_FILE_PATH=..~/.env \
+ENV_FILE_PATH=~/.env \
 ../scripts/deploy/compose-up.sh
 ```
 
