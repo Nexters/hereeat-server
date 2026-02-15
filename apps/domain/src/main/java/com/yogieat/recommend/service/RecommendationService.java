@@ -5,6 +5,9 @@ import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.category.service.CategoryService;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
+import com.yogieat.gathering.domain.Gathering;
+import com.yogieat.gathering.domain.value.TimeSlot;
+import com.yogieat.gathering.service.GatheringRepository;
 import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.domain.value.DistanceRange;
 import com.yogieat.participant.service.ParticipantAnalyzer;
@@ -36,6 +39,7 @@ public class RecommendationService {
     private final RecommendResultRepository recommendResultRepository;
     private final RecommendResultFailedRepository recommendResultFailedRepository;
     private final ParticipantAnalyzer participantAnalyzer;
+    private final GatheringRepository gatheringRepository;
 
     @Transactional
     public void processRecommendation(Long gatheringId, Region region) {
@@ -59,14 +63,18 @@ public class RecommendationService {
                 recommendResultRepository.deleteByGatheringId(gatheringId);
             }
 
-            // 2. 참여자 조회
+            // 2. Gathering 조회 (TimeSlot 필터링용)
+            Gathering gathering = gatheringRepository.findById(gatheringId).orElse(null);
+            TimeSlot gatheringTimeSlot = gathering != null ? gathering.timeSlot() : null;
+
+            // 3. 참여자 조회
             List<Participant> participants = participantRepository.findByGatheringId(gatheringId);
             if (participants.isEmpty()) {
                 saveFailedResult(gatheringId, FailureReason.NO_PARTICIPANTS, "No participants found");
                 return;
             }
 
-            // 3. Restaurant 조회
+            // 4. Restaurant 조회
             List<Restaurant> restaurants = restaurantRepository.findByRegion(region);
             if (restaurants.isEmpty()) {
                 saveFailedResult(gatheringId, FailureReason.NO_RESTAURANTS,
@@ -74,27 +82,28 @@ public class RecommendationService {
                 return;
             }
 
-            // 4. Category 조회 및 캐싱 (Spring Cache 적용)
+            // 5. Category 조회 및 캐싱 (Spring Cache 적용)
             Map<Long, Category> categoryMap = categoryService.findAll().stream()
                     .collect(Collectors.toMap(Category::id, category -> category));
 
-            // 5. DistanceRange 다수결 결정
+            // 6. DistanceRange 다수결 결정
             DistanceRange majorityRange = participantAnalyzer.determineMajorityDistanceRange(participants);
 
-            // 6. 선호도/불호 사전 집계 (성능 최적화: O(P×3) 한 번으로 O(R×P×3) 제거)
+            // 7. 선호도/불호 사전 집계 (성능 최적화: O(P×3) 한 번으로 O(R×P×3) 제거)
             Map<String, PreferenceScore> preferenceScoreMap = aggregatePreferenceScores(participants);
 
-            // 6-1. 불호 카테고리 추출
+            // 7-1. 불호 카테고리 추출
             Set<String> dislikedCategories = extractDislikedCategories(participants);
 
-            // 7. Region별 중심 좌표
+            // 8. Region별 중심 좌표
             GeoJson.Point centerPoint = region.getCoordinatesStandard();
 
-            // 8. 다단계 Fallback으로 Top 3 레스토랑 추천
+            // 9. 다단계 Fallback으로 Top 3 레스토랑 추천 (TimeSlot 필터링 포함)
             List<ScoredRestaurant> top3 = findTopRestaurantsWithFallback(
                 restaurants, categoryMap, preferenceScoreMap,
                 dislikedCategories,
-                participants, majorityRange, centerPoint
+                participants, majorityRange, centerPoint,
+                gatheringTimeSlot
             );
 
             if (top3.isEmpty()) {
@@ -269,6 +278,7 @@ public class RecommendationService {
      * @param participants 참여자 목록
      * @param majorityRange 다수결 거리 범위
      * @param centerPoint 지역 중심 좌표
+     * @param gatheringTimeSlot 모임 시간대 (LUNCH/DINNER/BOTH)
      * @return Top 3 레스토랑 목록 (점수 높은 순)
      */
     private List<ScoredRestaurant> findTopRestaurantsWithFallback(
@@ -278,14 +288,16 @@ public class RecommendationService {
             Set<String> dislikedCategories,
             List<Participant> participants,
             DistanceRange majorityRange,
-            GeoJson.Point centerPoint) {
+            GeoJson.Point centerPoint,
+            TimeSlot gatheringTimeSlot) {
 
         // 1단계: 선호도 점수 > 0인 레스토랑만
         List<ScoredRestaurant> results = scoreAndFilterRestaurants(
             restaurants, categoryMap, preferenceScoreMap,
             dislikedCategories,
             participants, majorityRange, centerPoint,
-            FilterStrategy.PREFERENCE_SCORE_POSITIVE
+            FilterStrategy.PREFERENCE_SCORE_POSITIVE,
+            gatheringTimeSlot
         );
 
         if (!results.isEmpty()) {
@@ -299,7 +311,8 @@ public class RecommendationService {
             restaurants, categoryMap, preferenceScoreMap,
             dislikedCategories,
             participants, majorityRange, centerPoint,
-            FilterStrategy.DISLIKED_EXCLUDED
+            FilterStrategy.DISLIKED_EXCLUDED,
+            gatheringTimeSlot
         );
 
         if (!results.isEmpty()) {
@@ -320,6 +333,7 @@ public class RecommendationService {
      * @param majorityRange 다수결 거리 범위
      * @param centerPoint 지역 중심 좌표
      * @param strategy 필터링 전략
+     * @param gatheringTimeSlot 모임 시간대 (LUNCH/DINNER/BOTH)
      * @return Top 3 레스토랑 목록 (점수 높은 순)
      */
     private List<ScoredRestaurant> scoreAndFilterRestaurants(
@@ -330,7 +344,8 @@ public class RecommendationService {
             List<Participant> participants,
             DistanceRange majorityRange,
             GeoJson.Point centerPoint,
-            FilterStrategy strategy) {
+            FilterStrategy strategy,
+            TimeSlot gatheringTimeSlot) {
 
         PriorityQueue<ScoredRestaurant> top3Heap = new PriorityQueue<>(
             Comparator.comparingDouble(ScoredRestaurant::totalScore)
@@ -339,6 +354,11 @@ public class RecommendationService {
         int totalParticipants = participants.size();
 
         for (Restaurant restaurant : restaurants) {
+            // TimeSlot 필터링 (최우선)
+            if (!isTimeSlotCompatible(gatheringTimeSlot, restaurant.timeSlot())) {
+                continue;
+            }
+
             Category category = categoryMap.get(restaurant.categoryId());
             if (category == null) {
                 continue;
@@ -379,6 +399,12 @@ public class RecommendationService {
 
             // 의견일치율 계산
             double agreementRate = getAgreementRate(participants, preferenceScore);
+
+            // 5. 의견일치율 가산점 (0~100% → 0~1점)
+            totalScore += agreementRate / 100.0;
+
+            // 6. 소수점 셋째 자리 반올림
+            totalScore = Math.round(totalScore * 1000.0) / 1000.0;
 
             // 추천 근거 텍스트 생성 (신규)
             String reasonText = buildReasonText(
@@ -422,6 +448,35 @@ public class RecommendationService {
 
         agreementRate = Math.round(agreementRate * 100.0) / 100.0;
         return agreementRate;
+    }
+
+
+    /**
+     * TimeSlot 호환성 체크
+     * 모임의 TimeSlot과 맛집의 TimeSlot이 호환되는지 확인
+     *
+     * @param gatheringSlot 모임의 TimeSlot
+     * @param restaurantSlot 맛집의 TimeSlot
+     * @return 호환 여부 (true: 추천 대상, false: 필터링)
+     */
+    private boolean isTimeSlotCompatible(TimeSlot gatheringSlot, TimeSlot restaurantSlot) {
+        // null이면 필터링 안함 (하위 호환성)
+        if (gatheringSlot == null || restaurantSlot == null) {
+            return true;
+        }
+
+        // 맛집이 BOTH면 항상 호환
+        if (restaurantSlot == TimeSlot.BOTH) {
+            return true;
+        }
+
+        // 모임이 BOTH면 모두 허용
+        if (gatheringSlot == TimeSlot.BOTH) {
+            return true;
+        }
+
+        // 같은 TimeSlot만 호환
+        return gatheringSlot == restaurantSlot;
     }
 
     /**

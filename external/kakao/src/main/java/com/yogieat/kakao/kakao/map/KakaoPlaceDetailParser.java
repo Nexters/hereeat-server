@@ -444,22 +444,100 @@ public class KakaoPlaceDetailParser {
     }
 
 
-    // ===== TimeSlot 추출 메서드들 =====
-
     /**
      * TimeSlot 추출 (폴백 전략 적용)
-     * 1순위: blog_summaries 방문 목적 키워드
-     * 2순위: visitor 데이터 분석
+     * 1순위: open_hours 영업시간
+     * 2순위: blog_summaries 방문 목적 키워드
+     * 3순위: visitor 데이터 분석
      */
     private TimeSlot extractTimeSlot(JsonNode panel) {
-        // 1순위: blog_summaries 방문 목적 키워드
+        // 1순위: open_hours 영업시간
+        TimeSlot fromOpenHours = extractTimeSlotFromOpenHours(panel);
+        if (fromOpenHours != null) {
+            return fromOpenHours;
+        }
+
+        // 2순위: blog_summaries 방문 목적 키워드
         TimeSlot fromKeywords = extractTimeSlotFromBlogSummaries(panel);
         if (fromKeywords != null) {
             return fromKeywords;
         }
 
-        // 2순위: visitor 데이터 분석
+        // 3순위: visitor 데이터 분석
         return extractTimeSlotFromVisitorData(panel);
+    }
+
+
+    /**
+     * open_hours에서 영업시간 추출하여 TimeSlot 판단
+     * JSON 경로: /open_hours/week_from_today/week_periods[0]/days[0]/on_days/start_end_time_desc
+     * 예: "11:00 ~ 22:00"
+     */
+    private TimeSlot extractTimeSlotFromOpenHours(JsonNode panel) {
+        JsonNode openHours = panel.path("open_hours");
+        if (openHours == null || openHours.isMissingNode()) {
+            return null;
+        }
+
+        JsonNode weekPeriods = openHours.path("week_from_today").path("week_periods");
+        if (!weekPeriods.isArray() || weekPeriods.isEmpty()) {
+            return null;
+        }
+
+        JsonNode days = weekPeriods.get(0).path("days");
+        if (!days.isArray() || days.isEmpty()) {
+            return null;
+        }
+
+        String timeDesc = days.get(0).path("on_days").path("start_end_time_desc").asText(null);
+        if (timeDesc == null || timeDesc.isBlank()) {
+            return null;
+        }
+
+        return parseTimeRange(timeDesc);
+    }
+
+    /**
+     * 영업시간 문자열을 파싱하여 TimeSlot 결정
+     * @param timeDesc "11:00 ~ 22:00" 형태의 문자열
+     * @return TimeSlot (LUNCH, DINNER, BOTH, or null)
+     */
+    private TimeSlot parseTimeRange(String timeDesc) {
+        try {
+            String[] parts = timeDesc.split("~");
+            if (parts.length != 2) {
+                return null;
+            }
+
+            int openHour = parseHour(parts[0].trim());
+            int closeHour = parseHour(parts[1].trim());
+
+            // LUNCH: 12시 이전 오픈, 16시 이후 마감
+            boolean coversLunch = openHour <= 12 && closeHour >= 16;
+            // DINNER: 17시 이전 오픈, 21시 이후 마감
+            boolean coversDinner = openHour <= 17 && closeHour >= 21;
+
+            if (coversLunch && coversDinner) {
+                return TimeSlot.BOTH;
+            } else if (coversLunch) {
+                return TimeSlot.LUNCH;
+            } else if (coversDinner) {
+                return TimeSlot.DINNER;
+            }
+            return null;
+        } catch (NumberFormatException e) {
+            log.debug("Failed to parse time range: {}", timeDesc);
+            return null;
+        }
+    }
+
+    /**
+     * 시간 문자열에서 시(hour) 추출
+     * @param time "11:00" 형태의 문자열
+     * @return 시간 (0-23)
+     */
+    private int parseHour(String time) {
+        return Integer.parseInt(time.split(":")[0]);
     }
 
     /**
