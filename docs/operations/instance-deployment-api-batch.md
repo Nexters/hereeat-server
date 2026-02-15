@@ -11,7 +11,7 @@
 
 ### 운영(권장)
 1. Client -> 443 -> `nginx + letsencrypt`
-2. `nginx` -> `yogieat-api:8080`
+2. `nginx` -> `127.0.0.1:9090` (Docker API 컨테이너 8080으로 포워딩)
 2. `yogieat-batch-sync` -> `yogieat-db` (내부 네트워크)
 3. `yogieat-api` -> `yogieat-db` (내부 네트워크)
 
@@ -49,12 +49,14 @@ export API_IMAGE_FULL_URL=yogieat/yogieat-server-api:<tag>
 export BATCH_IMAGE_FULL_URL=yogieat/yogieat-server-batch-sync:<tag>
 export DOCKERHUB_API_IMAGE_NAME=yogieat-server-api
 export DOCKERHUB_BATCH_IMAGE_NAME=yogieat-server-batch-sync
+export API_HOST_PORT=9090
 
 cd ~/docker
 API_IMAGE_FULL_URL=yogieat/yogieat-server-api:<tag> \
 BATCH_IMAGE_FULL_URL=yogieat/yogieat-server-batch-sync:<tag> \
 DOCKERHUB_API_IMAGE_NAME=yogieat-server-api \
 DOCKERHUB_BATCH_IMAGE_NAME=yogieat-server-batch-sync \
+API_HOST_PORT=9090 \
 DEPLOY_SCOPE=app \
 ENV_FILE_PATH=../.env \
 ../scripts/deploy/compose-up.sh
@@ -80,7 +82,7 @@ ENV_FILE_PATH=../.env \
 1. Security Group
 - 22: 운영자 IP만 허용
 - 80/443: 전체 허용(nginx/letsencrypt 사용)
-- 8080: 외부 차단
+- 9090: 외부 차단(로컬 바인딩 권장)
 - 5432: 외부 차단
 
 2. 환경변수/비밀
