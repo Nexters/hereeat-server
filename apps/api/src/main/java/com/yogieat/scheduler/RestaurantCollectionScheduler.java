@@ -16,7 +16,7 @@ public class RestaurantCollectionScheduler {
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
     /**
-     * 3시, 6시, 9시, 12시, 15시, 18시, 21시에 맛집 정보 수집 배치 실행
+     * 0시, 3시, 6시, 9시, 12시, 15시, 18시, 21시에 맛집 정보 수집 배치 실행
      * Cron: 초 분 시 일 월 요일
      */
     @Scheduled(cron = "0 0 0,3,6,9,12,15,18,21 * * ?")

@@ -6,6 +6,8 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncJobStatus;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
 import com.yogieat.restaurant.sync.service.RestaurantSyncJobRepository;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,13 @@ public class RestaurantSyncJobCoreRepository implements RestaurantSyncJobReposit
     @Override
     public boolean existsByTargetRestaurantIdAndStatus(Long targetRestaurantId, RestaurantSyncJobStatus status) {
         return syncJobJpaRepository.existsByTargetRestaurantIdAndStatus(targetRestaurantId, status);
+    }
+
+    @Override
+    @Transactional
+    public int failStaleRunningJobs(Duration staleThreshold, String errorSummary) {
+        LocalDateTime cutoff = LocalDateTime.now().minus(staleThreshold);
+        return syncJobJpaRepository.failStaleRunningJobs(cutoff, errorSummary);
     }
 
     @Override

@@ -17,5 +17,6 @@ sync:
     chunk-size: 50
     parallelism: 4
     poll-delay-ms: 5000
+    stale-running-threshold-minutes: 60
     weekly-cron: "0 0 21 ? * SUN"
     weekly-zone: "Asia/Seoul"

@@ -7,6 +7,7 @@ public record SyncJobProperties(
         Integer chunkSize,
         Integer parallelism,
         Long pollDelayMs,
+        Long staleRunningThresholdMinutes,
         String weeklyCron,
         String weeklyZone
 ) {
@@ -20,6 +21,10 @@ public record SyncJobProperties(
 
     public long resolvedPollDelayMs() {
         return pollDelayMs == null ? 5000L : pollDelayMs;
+    }
+
+    public long resolvedStaleRunningThresholdMinutes() {
+        return staleRunningThresholdMinutes == null ? 60L : staleRunningThresholdMinutes;
     }
 
     public String resolvedWeeklyCron() {

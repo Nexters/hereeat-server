@@ -7,6 +7,7 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
 import com.yogieat.restaurant.sync.service.RestaurantSyncJobRepository;
 import com.yogieat.restaurant.sync.service.RestaurantSyncService;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class RestaurantSyncJobWorker {
+    private static final String STALE_RUNNING_ERROR_SUMMARY = "stale RUNNING job recovered by worker";
 
     private final RestaurantSyncJobRepository syncJobRepository;
     private final RestaurantRepository restaurantRepository;
@@ -37,6 +39,8 @@ public class RestaurantSyncJobWorker {
 
         RestaurantSyncJob currentJob = null;
         try {
+            cleanupStaleRunningJobs();
+
             currentJob = syncJobRepository.claimNextPendingJob().orElse(null);
             if (currentJob == null) {
                 return;
@@ -55,6 +59,16 @@ public class RestaurantSyncJobWorker {
             }
         } finally {
             running.set(false);
+        }
+    }
+
+    private void cleanupStaleRunningJobs() {
+        Duration threshold = Duration.ofMinutes(syncJobProperties.resolvedStaleRunningThresholdMinutes());
+        int recovered = syncJobRepository.failStaleRunningJobs(threshold, STALE_RUNNING_ERROR_SUMMARY);
+        if (recovered > 0) {
+            log.warn("Recovered {} stale RUNNING sync jobs (threshold={}m)",
+                    recovered,
+                    threshold.toMinutes());
         }
     }
 

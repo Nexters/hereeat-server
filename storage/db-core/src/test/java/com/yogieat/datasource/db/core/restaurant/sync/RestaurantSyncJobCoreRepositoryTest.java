@@ -10,6 +10,7 @@ import com.yogieat.common.error.ErrorCode;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncTriggerType;
+import java.time.Duration;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,17 @@ class RestaurantSyncJobCoreRepositoryTest {
     void claimNextPendingJob_ShouldReturnEmpty_WhenNoPendingJob() {
         when(syncJobJpaRepository.claimNextPendingJobIds()).thenReturn(java.util.List.of());
         assertThat(coreRepository.claimNextPendingJob()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("failStaleRunningJobs는 stale RUNNING job 정리 건수를 반환한다")
+    void failStaleRunningJobs_ShouldReturnUpdatedCount() {
+        when(syncJobJpaRepository.failStaleRunningJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(2);
+
+        int updated = coreRepository.failStaleRunningJobs(Duration.ofMinutes(60), "stale");
+
+        assertThat(updated).isEqualTo(2);
     }
 
     @Test

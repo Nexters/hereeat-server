@@ -2,10 +2,12 @@ package com.yogieat.datasource.db.core.restaurant.sync;
 
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncJobStatus;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface RestaurantSyncJobJpaRepository extends JpaRepository<RestaurantSyncJobEntity, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -28,6 +30,18 @@ public interface RestaurantSyncJobJpaRepository extends JpaRepository<Restaurant
             returning job.id
             """, nativeQuery = true)
     List<Long> claimNextPendingJobIds();
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            update t_restaurant_sync_job
+            set status = 'FAILED',
+                finished_at = now(),
+                error_summary = :errorSummary,
+                updated_at = now()
+            where status = 'RUNNING'
+              and (started_at is null or started_at < :cutoff)
+            """, nativeQuery = true)
+    int failStaleRunningJobs(@Param("cutoff") LocalDateTime cutoff, @Param("errorSummary") String errorSummary);
 
     boolean existsByScopeAndStatus(RestaurantSyncScope scope, RestaurantSyncJobStatus status);
 
