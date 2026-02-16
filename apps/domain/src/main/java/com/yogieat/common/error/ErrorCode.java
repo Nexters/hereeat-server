@@ -45,7 +45,7 @@ public enum ErrorCode {
     GATHERING_SCHEDULED_DATE_PAST("GA007", "과거 날짜로는 모임을 생성할 수 없습니다"),
 
     // Participant
-    PARTICIPANT_DISLIKES_EXCEEDED("P001", "비선호 음식은 최소 1개, 최대 4개까지 입력 가능합니다"),
+    PARTICIPANT_DISLIKES_EXCEEDED("P001", "비선호 음식은 최소 1개, 최대 2개까지 입력 가능합니다"),
     PARTICIPANT_PREFERENCES_EXCEEDED("P002", "선호 음식은 최대 3개까지 입력 가능합니다"),
     PARTICIPANT_NICKNAME_REQUIRED("P003", "닉네임은 필수입니다"),
     PARTICIPANT_NICKNAME_TOO_LONG("P004", "닉네임은 최대 8자까지 입력 가능합니다"),
