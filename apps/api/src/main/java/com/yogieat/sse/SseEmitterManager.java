@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -13,7 +14,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Component
 public class SseEmitterManager {
 
-    private static final long SSE_TIMEOUT = 60_000L * 5; // 5분
+    private static final long SSE_TIMEOUT = 60_000L * 60; // 1시간 (heartbeat가 연결 유지 담당)
 
     private final Map<String, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
@@ -63,6 +64,33 @@ public class SseEmitterManager {
         deadEmitters.forEach(emitter -> removeEmitter(accessKey, emitter));
     }
 
+    @Scheduled(fixedRate = 30_000)
+    public void sendHeartbeat() {
+        emitters.forEach((accessKey, accessKeyEmitters) -> {
+            List<SseEmitter> deadEmitters = new CopyOnWriteArrayList<>();
+            for (SseEmitter emitter : accessKeyEmitters) {
+                try {
+                    emitter.send(SseEmitter.event()
+                            .name("heartbeat")
+                            .data("ping"));
+                } catch (IOException e) {
+                    deadEmitters.add(emitter);
+                }
+            }
+
+            if (!deadEmitters.isEmpty()) {
+                log.info("Cleaning up {} dead connection(s) for accessKey: {}",
+                        deadEmitters.size(), accessKey);
+            }
+
+            deadEmitters.forEach(emitter -> removeEmitter(accessKey, emitter));
+        });
+
+        if (!emitters.isEmpty()) {
+            log.debug("SSE heartbeat sent - active accessKeys: {}", emitters.size());
+        }
+    }
+
     public void complete(String accessKey) {
         List<SseEmitter> accessKeyEmitters = emitters.remove(accessKey);
         if (accessKeyEmitters != null) {
@@ -74,9 +102,18 @@ public class SseEmitterManager {
     private void removeEmitter(String accessKey, SseEmitter emitter) {
         List<SseEmitter> accessKeyEmitters = emitters.get(accessKey);
         if (accessKeyEmitters != null) {
-            accessKeyEmitters.remove(emitter);
+            boolean removed = accessKeyEmitters.remove(emitter);
+
+            if (!removed) {
+                return;
+            }
+
+            log.info("Removed emitter - accessKey: {}, remaining: {}",
+                    accessKey, accessKeyEmitters.size());
+
             if (accessKeyEmitters.isEmpty()) {
                 emitters.remove(accessKey);
+                log.info("All connections closed for accessKey: {}", accessKey);
             }
         }
     }
