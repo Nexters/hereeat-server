@@ -144,22 +144,20 @@ class CreateParticipantRequestTest {
     }
 
     @Test
-    @DisplayName("dislikes가 4개이면 생성에 성공한다")
+    @DisplayName("dislikes가 3개 이상이면 예외가 발생한다")
     void dislikesFour_shouldCreateSuccessfully() {
         // Given
         String accessKey = "test-access-key";
         String nickname = "닉네임";
         Double distance = 500.0;
-        List<String> dislikes = List.of("양파", "마늘", "파", "생강");
+        List<String> dislikes = List.of("양파", "마늘", "파");
         List<String> preferences = List.of("치킨");
 
-        // When
-        CreateParticipantRequest request =
-                CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences);
-
-        // Then
-        assertThat(request).isNotNull();
-        assertThat(request.dislikes()).hasSize(4);
+        // When & Then
+        assertThatThrownBy(
+                () -> CreateParticipantRequest.of(accessKey, nickname, distance, dislikes, preferences))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);
     }
 
     @Test
