@@ -43,6 +43,7 @@ public class RecommendResultFacade {
     private final LockManager lockManager;
     private final ApplicationEventPublisher eventPublisher;
     private final GatheringEventNotifier gatheringEventNotifier;
+    private final RecommendValidator recommendValidator;
 
     @Transactional(readOnly = true)
     public RecommendResultData.Get getRecommendResults(String accessKey) {
@@ -111,14 +112,11 @@ public class RecommendResultFacade {
             long currentCount = participantService.countByGatheringId(gathering.id());
 
             // 3. 과반수 조건 검증 (currentCount * 2 >= peopleCount)
-            if (currentCount * 2 < gathering.peopleCount()) {
-                throw new CustomException(ErrorCode.PARTICIPANT_MAJORITY_NOT_REACHED);
-            }
+            recommendValidator.validateMajorityReached(currentCount, gathering.peopleCount());
 
             // 4. 이미 추천 진행 중 또는 완료된 경우 중복 방지
-            if (recommendResultService.existsByGatheringId(gathering.id())) {
-                throw new CustomException(ErrorCode.RECOMMEND_ALREADY_PROCEEDED);
-            }
+            recommendValidator.validateNotAlreadyProceeded(
+                    recommendResultService.existsByGatheringId(gathering.id()));
 
             // 5. SSE 알림
             GatheringResult.ParticipantCount status =
