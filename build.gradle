@@ -12,7 +12,9 @@ description = 'yogieat'
 // Common configuration for all subprojects
 subprojects {
     // Apply java-library plugin for library modules, java plugin for application modules
-    if (project.path.startsWith(':apps:api') || project.path.startsWith(':batch:sync')) {
+    if (project.path.startsWith(':apps:api')
+            || project.path.startsWith(':apps:admin')
+            || project.path.startsWith(':batch:sync')) {
         apply plugin: 'java'
     } else {
         apply plugin: 'java-library'

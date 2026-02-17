@@ -1,8 +1,8 @@
-# API + Batch 인스턴스 배포/운영 가이드
+# API + Admin + Batch 인스턴스 배포/운영 가이드
 
 ## 1. 결론 요약
 - `batch:sync`는 API와 **별도 애플리케이션 프로세스**로 실행해야 한다.
-- 운영 배포는 `DEPLOY_SCOPE=app` 기준으로 **API/BATCH만 재배포**한다.
+- 운영 배포는 `DEPLOY_SCOPE=app` 기준으로 **API/Admin/BATCH만 재배포**한다.
 - `yogieat-db`는 기존 컨테이너를 유지하며 배포 과정에서 생성/재시작/삭제하지 않는다.
 - Batch는 외부 라우팅 대상이 아니므로 포트를 열지 않는다.
 - 운영 SSL 종료는 인스턴스의 `nginx + letsencrypt`를 사용하며, 배포에서 edge(Caddy) 경로는 비활성화한다.
@@ -11,9 +11,23 @@
 
 ### 운영(권장)
 1. Client -> 443 -> `nginx + letsencrypt`
-2. `nginx` -> `127.0.0.1:8080` (Docker API 컨테이너 8080으로 포워딩)
-2. `yogieat-batch-sync` -> `yogieat-db` (내부 네트워크)
-3. `yogieat-api` -> `yogieat-db` (내부 네트워크)
+2. `nginx` path 라우팅
+   - `/api/v1/admin/*` -> `127.0.0.1:8081` (Docker Admin 컨테이너)
+   - 그 외 `/api/*` -> `127.0.0.1:8080` (Docker API 컨테이너)
+4. `yogieat-batch-sync` -> `yogieat-db` (내부 네트워크)
+5. `yogieat-api` -> `yogieat-db` (내부 네트워크)
+6. `yogieat-admin` -> `yogieat-db` (내부 네트워크)
+
+#### nginx location 예시
+```nginx
+location /api/v1/admin/ {
+    proxy_pass http://127.0.0.1:8081;
+}
+
+location /api/ {
+    proxy_pass http://127.0.0.1:8080;
+}
+```
 
 ## 3. 적용된 파일
 - 기본 Compose: `docker/docker-compose.yaml`
@@ -29,15 +43,17 @@
 
 ### 이미지 분리
 - API 이미지: `yogieat/yogieat-server-api:<tag>`
+- Admin 이미지: `yogieat/yogieat-server-admin:<tag>`
 - Batch 이미지: `yogieat/yogieat-server-batch-sync:<tag>`
 
 Dockerfile은 동일하고 `JAR_FILE` build-arg만 다르게 사용한다.
 - API: `apps/api/build/libs/*.jar`
+- Admin: `apps/admin/build/libs/*.jar`
 - Batch: `batch/sync/build/libs/*.jar`
 
 ### CI/CD 동작
 1. Gradle build
-2. API/BATCH 이미지 각각 build & push
+2. API/Admin/BATCH 이미지 각각 build & push
 3. 서버로 `docker/` 디렉터리 및 `scripts/deploy/` rsync
 4. 서버에서 `DEPLOY_SCOPE=app`, `DEPLOY_ENV=(dev|prod)`로 `scripts/deploy/compose-up.sh` 실행
 
@@ -48,18 +64,24 @@ Dockerfile은 동일하고 `JAR_FILE` build-arg만 다르게 사용한다.
 
 ```bash
 export API_IMAGE_FULL_URL=yogieat/yogieat-server-api:<tag>
+export ADMIN_IMAGE_FULL_URL=yogieat/yogieat-server-admin:<tag>
 export BATCH_IMAGE_FULL_URL=yogieat/yogieat-server-batch-sync:<tag>
 export DOCKERHUB_API_IMAGE_NAME=yogieat-server-api
+export DOCKERHUB_ADMIN_IMAGE_NAME=yogieat-server-admin
 export DOCKERHUB_BATCH_IMAGE_NAME=yogieat-server-batch-sync
 export API_HOST_PORT=8080
+export ADMIN_HOST_PORT=8081
 export BATCH_SERVER_PORT=9090
 
 cd ~/docker
 API_IMAGE_FULL_URL=yogieat/yogieat-server-api:<tag> \
+ADMIN_IMAGE_FULL_URL=yogieat/yogieat-server-admin:<tag> \
 BATCH_IMAGE_FULL_URL=yogieat/yogieat-server-batch-sync:<tag> \
 DOCKERHUB_API_IMAGE_NAME=yogieat-server-api \
+DOCKERHUB_ADMIN_IMAGE_NAME=yogieat-server-admin \
 DOCKERHUB_BATCH_IMAGE_NAME=yogieat-server-batch-sync \
 API_HOST_PORT=8080 \
+ADMIN_HOST_PORT=8081 \
 BATCH_SERVER_PORT=9090 \
 DEPLOY_SCOPE=app \
 DEPLOY_ENV=dev \
@@ -68,30 +90,35 @@ ENV_FILE_PATH=~/.env \
 ```
 
 `DEPLOY_SCOPE=app`일 때는 내부적으로 아래와 같이 동작한다.
-- `docker compose ... up -d --no-deps yogieat-api yogieat-batch-sync`
+- `docker compose ... up -d --no-deps yogieat-api yogieat-admin yogieat-batch-sync`
 - 즉, DB 컨테이너는 배포에서 제외된다.
 - 단, `yogieat-db`가 없으면 배포 스크립트가 `docker compose ... up -d yogieat-db`를 먼저 실행해 자동 복구한다.
 - `DEPLOY_ENV=dev`면 `docker-compose.dev.yaml`, `DEPLOY_ENV=prod`면 `docker-compose.prod.yaml`를 추가 적용한다.
 
 ### 5.2 환경별 리소스 제한
 - DEV (`docker/docker-compose.dev.yaml`)
-  - `yogieat-api`: `cpus=0.55`, `mem_limit=512m`, `mem_reservation=128m`
-  - `yogieat-batch-sync`: `cpus=0.15`, `mem_limit=192m`, `mem_reservation=64m`
+  - 서버 스펙 목표: `1 vCPU / 1GB`
+  - `yogieat-api`: `cpus=0.45`, `mem_limit=384m`, `mem_reservation=128m`
+  - `yogieat-admin`: `cpus=0.15`, `mem_limit=192m`, `mem_reservation=64m`
+  - `yogieat-batch-sync`: `cpus=0.10`, `mem_limit=128m`, `mem_reservation=64m`
   - `yogieat-db`: `cpus=0.25`, `mem_limit=256m`, `mem_reservation=64m`
 - PROD (`docker/docker-compose.prod.yaml`)
-  - `yogieat-api`: `cpus=1.50`, `mem_limit=850m`, `mem_reservation=384m`
+  - 서버 스펙 목표: `4 vCPU / 2GB`
+  - `yogieat-api`: `cpus=1.80`, `mem_limit=960m`, `mem_reservation=384m`
+  - `yogieat-admin`: `cpus=0.40`, `mem_limit=320m`, `mem_reservation=128m`
   - `yogieat-batch-sync`: `cpus=0.30`, `mem_limit=192m`, `mem_reservation=96m`
-  - `yogieat-db`: `cpus=0.60`, `mem_limit=384m`, `mem_reservation=128m`
+  - `yogieat-db`: `cpus=0.80`, `mem_limit=448m`, `mem_reservation=128m`
 
-`DEPLOY_SCOPE=app` 배포는 API/BATCH 중심으로 동작하며, DB는 필요 시 자동 복구(기동/재생성)된다.
+`DEPLOY_SCOPE=app` 배포는 API/Admin/BATCH 중심으로 동작하며, DB는 필요 시 자동 복구(기동/재생성)된다.
 DB 설정을 강제로 재적용하려면 유지보수 창에 `DEPLOY_SCOPE=full` 배포를 사용한다.
 
 ## 6. 라우팅/SSL 설계 결정 포인트
 
 ### 라우팅
 - 외부 진입점은 API만 허용
+- Admin은 별도 포트(기본 8081)를 통해 인스턴스 내부 프록시(nginx)에서 라우팅한다.
 - Batch는 외부 요청을 받지 않음
-- API/Batch/DB는 동일 bridge network(`yogieat-network`) 사용
+- API/Admin/Batch/DB는 동일 bridge network(`yogieat-network`) 사용
 
 ### SSL
 - 운영은 인스턴스의 `nginx + letsencrypt`로 TLS 종료한다.
@@ -104,10 +131,12 @@ DB 설정을 강제로 재적용하려면 유지보수 창에 `DEPLOY_SCOPE=full
 - 22: 운영자 IP만 허용
 - 80/443: 전체 허용(nginx/letsencrypt 사용)
 - 8080: 외부 차단(로컬 바인딩 권장)
+- 8081: 외부 차단(로컬 바인딩 권장)
 - 5432: 외부 차단
 
 2. 환경변수/비밀
 - `.env`로 DB 계정/암호 주입
+- `.env`에 Admin JWT 서명키 주입 (`JWT_SECRET`, 최소 32자)
 - Docker Hub 토큰은 GitHub Secrets로 관리
 
 ## 8. 운영 체크리스트
@@ -119,6 +148,8 @@ docker ps
 ```bash
 docker logs -f yogieat-server-api
 
+docker logs -f yogieat-server-admin
+
 docker logs -f yogieat-server-batch-sync
 ```
 3. 배치 동작 확인
@@ -127,7 +158,7 @@ docker logs -f yogieat-server-batch-sync
 - `docs/operations/restaurant-sync-performance-checklist.md` 기준으로 전/후 비교 수행
 
 ## 9. 롤백
-- 이전 태그로 `API_IMAGE_FULL_URL`, `BATCH_IMAGE_FULL_URL` 재지정 후 compose up 재실행
+- 이전 태그로 `API_IMAGE_FULL_URL`, `ADMIN_IMAGE_FULL_URL`, `BATCH_IMAGE_FULL_URL` 재지정 후 compose up 재실행
 - 데이터 스키마 변경이 수반되지 않는 한 애플리케이션 레벨 롤백 가능
 
 ## 10. 장애 대응

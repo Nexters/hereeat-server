@@ -58,6 +58,14 @@ public enum ErrorCode {
     // Recommend
     INVALID_CATEGORY_AGGREGATION("REC001", "카테고리 집계 데이터가 올바르지 않습니다"),
     INVALID_PREFERENCE_SCORE("REC002", "선호도 점수 상태가 올바르지 않습니다"),
+
+    // Admin
+    ADMIN_NOT_FOUND("A001", "해당 관리자를 찾을 수 없습니다"),
+    ADMIN_INVALID_PASSWORD("A002", "비밀번호가 일치하지 않습니다"),
+    ADMIN_UNAUTHORIZED("A003", "인증이 필요합니다"),
+    ADMIN_FORBIDDEN("A004", "접근 권한이 없습니다"),
+    ADMIN_TOKEN_EXPIRED("A005", "토큰이 만료되었습니다"),
+    ADMIN_TOKEN_INVALID("A006", "유효하지 않은 토큰입니다"),
     ;
 
     private final String code;

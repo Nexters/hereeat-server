@@ -25,13 +25,14 @@ compose_cmd() {
 }
 
 validate_required_env() {
-  [[ -n "${API_IMAGE_FULL_URL:-}" && -n "${BATCH_IMAGE_FULL_URL:-}" ]] \
-    || error "API_IMAGE_FULL_URL and BATCH_IMAGE_FULL_URL must be set"
+  [[ -n "${API_IMAGE_FULL_URL:-}" && -n "${ADMIN_IMAGE_FULL_URL:-}" && -n "${BATCH_IMAGE_FULL_URL:-}" ]] \
+    || error "API_IMAGE_FULL_URL, ADMIN_IMAGE_FULL_URL and BATCH_IMAGE_FULL_URL must be set"
 
   DOCKERHUB_API_IMAGE_NAME="${DOCKERHUB_API_IMAGE_NAME:-yogieat-server-api}"
+  DOCKERHUB_ADMIN_IMAGE_NAME="${DOCKERHUB_ADMIN_IMAGE_NAME:-yogieat-server-admin}"
   DOCKERHUB_BATCH_IMAGE_NAME="${DOCKERHUB_BATCH_IMAGE_NAME:-yogieat-server-batch-sync}"
-  export API_IMAGE_FULL_URL BATCH_IMAGE_FULL_URL
-  export DOCKERHUB_API_IMAGE_NAME DOCKERHUB_BATCH_IMAGE_NAME
+  export API_IMAGE_FULL_URL ADMIN_IMAGE_FULL_URL BATCH_IMAGE_FULL_URL
+  export DOCKERHUB_API_IMAGE_NAME DOCKERHUB_ADMIN_IMAGE_NAME DOCKERHUB_BATCH_IMAGE_NAME
 }
 
 resolve_env_file() {
@@ -146,13 +147,14 @@ ensure_db_running_for_app_scope() {
 
 print_deploy_summary() {
   echo "Deploy API image: ${API_IMAGE_FULL_URL}"
+  echo "Deploy Admin image: ${ADMIN_IMAGE_FULL_URL}"
   echo "Deploy Batch image: ${BATCH_IMAGE_FULL_URL}"
   echo "Deploy scope: ${DEPLOY_SCOPE}"
   echo "Deploy env: ${DEPLOY_ENV}"
   echo "Enable edge SSL: ${ENABLE_EDGE_SSL}"
   echo "Env file path: ${ENV_FILE_PATH}"
   echo "Compose files: ${COMPOSE_FILES[*]}"
-  echo "Target services: yogieat-api yogieat-batch-sync"
+  echo "Target services: yogieat-api yogieat-admin yogieat-batch-sync"
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     echo "Auto restore DB: ${AUTO_RESTORE_DB:-true}"
   fi
@@ -170,7 +172,7 @@ main() {
   print_deploy_summary
 
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
-    compose_cmd up -d --no-deps yogieat-api yogieat-batch-sync
+    compose_cmd up -d --no-deps yogieat-api yogieat-admin yogieat-batch-sync
   else
     compose_cmd up -d
   fi
