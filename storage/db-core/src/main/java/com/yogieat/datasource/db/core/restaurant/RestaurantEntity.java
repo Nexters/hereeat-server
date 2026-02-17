@@ -206,7 +206,10 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getAiMateSummaryTitle(),
                 entity.getAiMateSummaryContents(),
                 // 추천 시간대
-                entity.getTimeSlot()
+                entity.getTimeSlot(),
+                // 추천 알고리즘용 시간 데이터
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
         );
     }
 
