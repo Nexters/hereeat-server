@@ -100,21 +100,15 @@ public class SseEmitterManager {
     }
 
     private void removeEmitter(String accessKey, SseEmitter emitter) {
-        List<SseEmitter> accessKeyEmitters = emitters.get(accessKey);
-        if (accessKeyEmitters != null) {
-            boolean removed = accessKeyEmitters.remove(emitter);
-
-            if (!removed) {
-                return;
+        emitters.computeIfPresent(accessKey, (k, v) -> {
+            if (v.remove(emitter)) {
+                log.info("Removed emitter - accessKey: {}, remaining: {}", k, v.size());
+                if (v.isEmpty()) {
+                    log.info("All connections closed for accessKey: {}", k);
+                    return null;
+                }
             }
-
-            log.info("Removed emitter - accessKey: {}, remaining: {}",
-                    accessKey, accessKeyEmitters.size());
-
-            if (accessKeyEmitters.isEmpty()) {
-                emitters.remove(accessKey);
-                log.info("All connections closed for accessKey: {}", accessKey);
-            }
-        }
+            return v;
+        });
     }
 }
