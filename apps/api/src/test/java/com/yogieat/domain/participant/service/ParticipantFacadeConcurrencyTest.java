@@ -69,7 +69,8 @@ class ParticipantFacadeConcurrencyTest {
                             participantFacade.participate(command);
                             successCount.incrementAndGet();
                         } catch (CustomException e) {
-                            if (e.getErrorCode() == ErrorCode.GATHERING_FULL) {
+                            if (e.getErrorCode() == ErrorCode.GATHERING_FULL
+                                    || e.getErrorCode() == ErrorCode.RECOMMEND_ALREADY_PROCEEDED) {
                                 failCount.incrementAndGet();
                             }
                         } finally {

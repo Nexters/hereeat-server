@@ -51,6 +51,7 @@ public enum ErrorCode {
     PARTICIPANT_NICKNAME_TOO_LONG("P004", "닉네임은 최대 8자까지 입력 가능합니다"),
     PARTICIPANT_NICKNAME_INVALID("P005", "닉네임에 숫자 또는 특수문자는 사용할 수 없습니다"),
     DUPLICATE_NICKNAME("P006", "이미 입장한 사용자입니다"),
+    PARTICIPANT_MAJORITY_NOT_REACHED("P007", "추천 진행을 위한 과반수 인원이 채워지지 않았습니다"),
 
     // Lock
     LOCK_TIMEOUT("L001", "락 획득 시간이 초과되었습니다"),
@@ -58,6 +59,7 @@ public enum ErrorCode {
     // Recommend
     INVALID_CATEGORY_AGGREGATION("REC001", "카테고리 집계 데이터가 올바르지 않습니다"),
     INVALID_PREFERENCE_SCORE("REC002", "선호도 점수 상태가 올바르지 않습니다"),
+    RECOMMEND_ALREADY_PROCEEDED("REC003", "이미 추천이 진행 중이거나 완료되었습니다"),
     ;
 
     private final String code;
