@@ -77,7 +77,7 @@ public record RecommendResultData() {
             Integer representMenuPrice,
             String priceLevel,
             String aiMateSummaryTitle,
-            String aiMateSummaryContents,
+            List<String> aiMateSummaryContents,
             // 추천 근거 텍스트 (신규)
             String reasonText
     ) {
@@ -103,7 +103,7 @@ public record RecommendResultData() {
                 Integer representMenuPrice,
                 String priceLevel,
                 String aiMateSummaryTitle,
-                String aiMateSummaryContents,
+                List<String> aiMateSummaryContents,
                 // 추천 근거 텍스트
                 String reasonText
         ) {

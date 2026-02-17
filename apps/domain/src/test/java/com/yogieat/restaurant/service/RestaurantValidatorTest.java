@@ -117,6 +117,8 @@ class RestaurantValidatorTest {
                 null,
                 null,
                 null,
+                null,
+                null,
                 null
         );
     }

@@ -6,6 +6,7 @@ import com.yogieat.common.Region;
 import com.yogieat.participant.domain.value.DistanceRange;
 import com.yogieat.recommend.domain.result.RecommendResultData;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 
 @Schema(description = "추천 결과 랭킹 정보")
 public record RankingRecommendResultResponse(
@@ -50,8 +51,8 @@ public record RankingRecommendResultResponse(
         String priceLevel,
         @Schema(description = "AI 요약 제목", example = "맑고 깊은 국물에 담긴 정성 한 그릇")
         String aiMateSummaryTitle,
-        @Schema(description = "AI 요약 내용 (JSON 배열 문자열)", example = "[\"양지곰탕 추천\", \"단체석\", \"콜키지 부과\"]")
-        String aiMateSummaryContents,
+        @Schema(description = "AI 요약 내용", example = "[\"양지곰탕 추천\", \"단체석\", \"콜키지 부과\"]")
+        List<String> aiMateSummaryContents,
         // 추천 근거 텍스트 (신규)
         @Schema(description = "추천 근거 텍스트", example = "5명 중 3명이 일식을 골라서\n400시간 숙성으로 완성한 겉바속촉 돈카츠\n를 추천해요")
         String reasonText
