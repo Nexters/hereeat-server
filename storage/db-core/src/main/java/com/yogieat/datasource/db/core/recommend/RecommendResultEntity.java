@@ -7,6 +7,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -15,7 +16,12 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "t_recommend_result")
+@Table(
+        name = "t_recommend_result",
+        indexes = {
+            @Index(name = "idx_recommend_result_gathering_id", columnList = "gathering_id")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RecommendResultEntity extends BaseEntity {
 
