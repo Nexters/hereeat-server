@@ -1,5 +1,7 @@
 package com.yogieat.datasource.db.core.restaurant;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.datasource.db.core.common.BaseEntity;
@@ -13,16 +15,19 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import java.util.Collections;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 
+@Slf4j
 @Getter
 @Entity
 @Table(
@@ -64,6 +69,7 @@ import org.locationtech.jts.geom.PrecisionModel;
 public class RestaurantEntity extends BaseEntity {
     private static final GeometryFactory GEOMETRY_FACTORY =
             new GeometryFactory(new PrecisionModel(), 4326);
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private String name;
     private String address;
@@ -204,7 +210,7 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getRepresentMenuPrice(),
                 entity.getPriceLevel(),
                 entity.getAiMateSummaryTitle(),
-                entity.getAiMateSummaryContents(),
+                parseAiMateSummaryContents(entity.getAiMateSummaryContents()),
                 // 추천 시간대
                 entity.getTimeSlot(),
                 // 추천 알고리즘용 시간 데이터
@@ -216,6 +222,18 @@ public class RestaurantEntity extends BaseEntity {
     private static Point toJtsPoint(GeoJson.Point point) {
         List<Double> coordinates = point.getCoordinates();
         return GEOMETRY_FACTORY.createPoint(new Coordinate(coordinates.getFirst(), coordinates.get(1)));
+    }
+
+    private static List<String> parseAiMateSummaryContents(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return OBJECT_MAPPER.readValue(json, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            log.warn("Failed to parse aiMateSummaryContents: {}", json);
+            return Collections.emptyList();
+        }
     }
 
     public void applySyncPatch(RestaurantSyncPatch patch) {

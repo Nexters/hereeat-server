@@ -1,7 +1,5 @@
 package com.yogieat.recommend.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yogieat.category.domain.Category;
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.category.service.CategoryService;
@@ -26,7 +24,6 @@ import com.yogieat.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -497,9 +494,11 @@ public class RecommendationService {
 
 
     /**
-     * 후보 중에서 다양성을 고려하여 Top 3 선정 (Post-processing Diversification)
-     * - 점수가 높은 순으로 순회하며, 메뉴 타입이 중복되지 않으면 가산점 부여
-     * - 다양성 부스트를 적용한 최종 점수로 Top 3 선정
+     * 후보 중에서 다양성을 고려하여 Top 3 선정 (MMR-style Greedy Selection)
+     *
+     * <p>각 슬롯마다 남은 전체 후보에 현재 선정 컨텍스트 기반 다양성 부스트를 적용하고,
+     * 그 중 최고 점수를 가진 후보를 선택한다. 이를 통해 낮은 base score를 가진 후보라도
+     * 다양성 부스트를 통해 상위권으로 진입할 수 있다.
      *
      * @param candidates 점수 내림차순 정렬된 후보 목록
      * @return 다양성이 고려된 Top 3
@@ -509,36 +508,40 @@ public class RecommendationService {
             return candidates;
         }
 
+        List<ScoredRestaurant> remaining = new ArrayList<>(candidates);
         List<ScoredRestaurant> result = new ArrayList<>();
         Set<String> selectedMenuTypes = new HashSet<>();
 
-        // Greedy 선택: 점수가 높은 순으로 순회하며, 다양성 부스트 적용
-        for (ScoredRestaurant candidate : candidates) {
-            if (result.size() >= TOP_K_SIZE) {
-                break;
+        while (result.size() < TOP_K_SIZE && !remaining.isEmpty()) {
+            // 매 슬롯마다 현재 선정 컨텍스트 기준으로 모든 후보 재평가
+            int bestIndex = 0;
+            double bestScore = Double.NEGATIVE_INFINITY;
+
+            for (int i = 0; i < remaining.size(); i++) {
+                ScoredRestaurant candidate = remaining.get(i);
+                String menuType = classifyMenuType(candidate.restaurant().representMenu());
+                double diversityBoost = selectedMenuTypes.contains(menuType) ? 0.0 : DIVERSITY_BONUS;
+                double boostedScore = roundToThreeDecimals(candidate.totalScore() + diversityBoost);
+
+                if (boostedScore > bestScore) {
+                    bestScore = boostedScore;
+                    bestIndex = i;
+                }
             }
 
-            String menuType = classifyMenuType(candidate.restaurant().representMenu());
+            ScoredRestaurant selected = remaining.remove(bestIndex);
+            String selectedMenuType = classifyMenuType(selected.restaurant().representMenu());
 
-            // 다양성 부스트 계산 (이미 선택된 타입이 아니면 가산점)
-            double diversityBoost = selectedMenuTypes.contains(menuType) ? 0.0 : DIVERSITY_BONUS;
-            double finalScore = roundToThreeDecimals(candidate.totalScore() + diversityBoost);
-
-            // 결과에 추가 (다양성 부스트가 적용된 새 점수로)
-            ScoredRestaurant boosted = new ScoredRestaurant(
-                    candidate.restaurant(),
-                    finalScore,
-                    candidate.agreementRate(),
-                    candidate.reasonText()
-            );
-
-            result.add(boosted);
-            selectedMenuTypes.add(menuType);
+            result.add(new ScoredRestaurant(
+                    selected.restaurant(),
+                    bestScore,
+                    selected.agreementRate(),
+                    selected.reasonText()
+            ));
+            selectedMenuTypes.add(selectedMenuType);
         }
 
-        // 최종 점수로 재정렬
         result.sort(Comparator.comparingDouble(ScoredRestaurant::totalScore).reversed());
-
         return result;
     }
 
@@ -632,12 +635,14 @@ public class RecommendationService {
      * @return 신뢰도 점수
      */
     private double calculateCredibilityScore(Double rating, Integer reviewCount, Integer blogReviewCount) {
-        if (rating == null || reviewCount == null || reviewCount == 0) {
+        if (rating == null || ((reviewCount == null || reviewCount == 0) && (blogReviewCount == null || blogReviewCount == 0))) {
             return 0.0;
         }
 
         // 카카오맵 리뷰 수 가중치 (로그 스케일로 급격한 증가 방지)
-        double kakaoWeight = Math.log10(reviewCount + 1);
+        double kakaoWeight = (reviewCount != null && reviewCount > 0)
+                ? Math.log10(reviewCount + 1)
+                : 0.0;
 
         // 블로그 리뷰 가중치 (블로그 리뷰는 더 상세하므로 가중치 적용)
         double blogWeight = 0.0;
@@ -715,61 +720,37 @@ public class RecommendationService {
 
     /**
      * AI 요약 기반 부스트 점수 계산
-     * aiMateSummaryContents JSON 배열에서 키워드를 추출하여 그룹 특성과 매칭
+     * aiMateSummaryContents 키워드 리스트로 그룹 특성과 매칭
      *
-     * @param aiMateSummaryContents AI 요약 내용 (JSON 문자열)
+     * @param summaryItems AI 요약 항목 리스트
      * @param participantCount 참여자 수
      * @return 부스트 점수 (-0.2 ~ +0.8)
      */
-    private double calculateAiSummaryBoost(String aiMateSummaryContents, int participantCount) {
-        if (aiMateSummaryContents == null || aiMateSummaryContents.isBlank()) {
+    private double calculateAiSummaryBoost(List<String> summaryItems, int participantCount) {
+        if (summaryItems == null || summaryItems.isEmpty()) {
             return 0.0;
         }
 
-        try {
-            List<String> summaryItems = parseJsonArray(aiMateSummaryContents);
-            if (summaryItems.isEmpty()) {
-                return 0.0;
+        double boost = 0.0;
+
+        // 그룹 친화 키워드 매칭 (GROUP_SIZE_THRESHOLD명 이상일 때)
+        if (participantCount >= GROUP_SIZE_THRESHOLD) {
+            if (containsAnyKeyword(summaryItems, "단체석", "대형 테이블", "모임", "단체")) {
+                boost += AI_GROUP_BOOST;
             }
-
-            double boost = 0.0;
-
-            // 그룹 친화 키워드 매칭 (GROUP_SIZE_THRESHOLD명 이상일 때)
-            if (participantCount >= GROUP_SIZE_THRESHOLD) {
-                if (containsAnyKeyword(summaryItems, "단체석", "대형 테이블", "모임", "단체")) {
-                    boost += AI_GROUP_BOOST;
-                }
-            }
-
-            // 긍정 키워드 가산
-            if (containsAnyKeyword(summaryItems, "추천", "인기", "맛집", "특별", "유명")) {
-                boost += AI_POSITIVE_BOOST;
-            }
-
-            // 부정 키워드 감점 (웨이팅이 있으면 모임에 불편)
-            if (containsAnyKeyword(summaryItems, "웨이팅 필수", "예약 필수", "대기 시간")) {
-                boost += AI_NEGATIVE_PENALTY;
-            }
-
-            return boost;
-        } catch (Exception e) {
-            log.warn("Failed to parse aiMateSummaryContents: {}", aiMateSummaryContents);
-            return 0.0;
-        }
-    }
-
-    private List<String> parseJsonArray(String jsonArrayStr) {
-        if (jsonArrayStr == null || jsonArrayStr.isBlank()) {
-            return Collections.emptyList();
         }
 
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            return mapper.readValue(jsonArrayStr, new TypeReference<List<String>>() {});
-        } catch (Exception e) {
-            log.warn("Failed to parse JSON array: {}", jsonArrayStr);
-            return Collections.emptyList();
+        // 긍정 키워드 가산
+        if (containsAnyKeyword(summaryItems, "추천", "인기", "맛집", "특별", "유명")) {
+            boost += AI_POSITIVE_BOOST;
         }
+
+        // 부정 키워드 감점 (웨이팅이 있으면 모임에 불편)
+        if (containsAnyKeyword(summaryItems, "웨이팅 필수", "예약 필수", "대기 시간")) {
+            boost += AI_NEGATIVE_PENALTY;
+        }
+
+        return boost;
     }
 
     /**

@@ -4,6 +4,7 @@ import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record Restaurant(
         Long id,
@@ -25,7 +26,7 @@ public record Restaurant(
         Integer representMenuPrice,
         String priceLevel,
         String aiMateSummaryTitle,
-        String aiMateSummaryContents,  // JSON 문자열
+        List<String> aiMateSummaryContents,
         // 추천 시간대 (신규 필드)
         TimeSlot timeSlot,
         // 추천 알고리즘용 시간 데이터 (Cold Start, Freshness)
