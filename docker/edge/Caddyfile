@@ -1,4 +1,7 @@
 {$EDGE_DOMAIN} {
     encode zstd gzip
+
+    @admin path /api/v1/admin*
+    reverse_proxy @admin yogieat-admin:8081
     reverse_proxy yogieat-api:8080
 }

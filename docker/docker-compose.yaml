@@ -14,6 +14,24 @@ services:
       - ${ENV_FILE_PATH:-~/.env}
     depends_on:
       - yogieat-db
+
+  yogieat-admin:
+    image: ${ADMIN_IMAGE_FULL_URL}
+    container_name: ${DOCKERHUB_ADMIN_IMAGE_NAME}
+    restart: always
+    ports:
+      - "${ADMIN_HOST_BIND_IP:-127.0.0.1}:${ADMIN_HOST_PORT:-8081}:8081"
+    environment:
+      - TZ=Asia/Seoul
+      - DATASOURCE_DB_CORE_JDBC_URL=jdbc:postgresql://yogieat-db:5432/yogieat
+      - SERVER_PORT=8081
+    networks:
+      - yogieat-network
+    env_file:
+      - ${ENV_FILE_PATH:-~/.env}
+    depends_on:
+      - yogieat-db
+
   yogieat-batch-sync:
     image: ${BATCH_IMAGE_FULL_URL}
     container_name: ${DOCKERHUB_BATCH_IMAGE_NAME}
