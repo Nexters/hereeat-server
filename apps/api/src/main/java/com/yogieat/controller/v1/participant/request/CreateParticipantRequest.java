@@ -20,7 +20,7 @@ public record CreateParticipantRequest(
         @Schema(description = "참여자 선호 음식 목록", example = "[\"한식\", \"일식\"]")
         List<String> preferences
 ) {
-    private static final int MAX_DISLIKES_SIZE = 4;
+    private static final int MAX_DISLIKES_SIZE = 2;
     private static final int MAX_PREFERENCES_SIZE = 3;
     private static final int MAX_NICKNAME_LENGTH = 8;
     private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ\\s]+$");

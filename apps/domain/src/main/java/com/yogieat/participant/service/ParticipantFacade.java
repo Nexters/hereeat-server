@@ -43,6 +43,11 @@ public class ParticipantFacade {
                     Gathering gathering =
                             gatheringService.getGatheringByAccessKey(command.accessKey());
 
+                    // 1-1. 추천 시작 여부 검증 (추천이 이미 시작되었으면 참여 불가)
+                    if (recommendResultService.existsByGatheringId(gathering.id())) {
+                        throw new CustomException(ErrorCode.RECOMMEND_ALREADY_PROCEEDED);
+                    }
+
                     // 2. 현재 참여자 수 조회 (락으로 보호됨)
                     long currentParticipantCount =
                             participantService.countByGatheringId(gathering.id());

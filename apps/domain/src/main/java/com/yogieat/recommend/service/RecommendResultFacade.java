@@ -5,6 +5,8 @@ import com.yogieat.category.service.CategoryService;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.gathering.domain.Gathering;
+import com.yogieat.gathering.domain.result.GatheringResult;
+import com.yogieat.gathering.service.GatheringEventNotifier;
 import com.yogieat.gathering.service.GatheringService;
 import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.domain.value.DistanceRange;
@@ -14,14 +16,17 @@ import com.yogieat.recommend.domain.RecommendResult;
 import com.yogieat.recommend.domain.result.RecommendResultData;
 import com.yogieat.recommend.domain.value.CategoryAggregation;
 import com.yogieat.recommend.domain.value.RecommendStatus;
+import com.yogieat.recommend.event.GatheringFullEvent;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantService;
+import com.yogieat.util.LockManager;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +40,10 @@ public class RecommendResultFacade {
     private final CategoryService categoryService;
     private final ParticipantService participantService;
     private final ParticipantAnalyzer participantAnalyzer;
+    private final LockManager lockManager;
+    private final ApplicationEventPublisher eventPublisher;
+    private final GatheringEventNotifier gatheringEventNotifier;
+    private final RecommendValidator recommendValidator;
 
     @Transactional(readOnly = true)
     public RecommendResultData.Get getRecommendResults(String accessKey) {
@@ -50,8 +59,7 @@ public class RecommendResultFacade {
         }
 
         // 4. PENDING 상태인 경우
-        if (recommendResults.get(0).status() == RecommendStatus.PENDING) {
-            log.info("Recommendation is still PENDING for gathering: {}", gathering.id());
+        if (recommendResults.getFirst().status() == RecommendStatus.PENDING) {
             return RecommendResultData.Get.ofPending();
         }
 
@@ -63,6 +71,9 @@ public class RecommendResultFacade {
 
         // 7. 카테고리별 선호도/불호 집계
         CategoryAggregation aggregation = participantAnalyzer.aggregateCategoryPreferences(participants);
+
+        // 7-1. DistanceRange별 집계
+        Map<String, Integer> distances = participantAnalyzer.aggregateDistanceRanges(participants);
 
         // 8. Restaurant 정보와 Category 정보 조회 및 캐싱
         List<Long> restaurantIds = recommendResults.stream()
@@ -89,8 +100,40 @@ public class RecommendResultFacade {
                 rankings,
                 aggregation.preferences(),
                 aggregation.dislikes(),
+                distances,
                 averageAgreementRate
         );
+    }
+
+    @Transactional
+    public void proceedRecommendation(String accessKey) {
+        lockManager.executeWithLock(accessKey, () -> {
+            // 1. Gathering 조회 (없음/삭제 시 예외 자동 발생)
+            Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
+
+            // 2. 현재 참여자 수 조회
+            long currentCount = participantService.countByGatheringId(gathering.id());
+
+            // 3. 과반수 조건 검증 (currentCount * 2 >= peopleCount)
+            recommendValidator.validateMajorityReached(currentCount, gathering.peopleCount());
+
+            // 4. 이미 추천 진행 중 또는 완료된 경우 중복 방지
+            recommendValidator.validateNotAlreadyProceeded(
+                    recommendResultService.existsByGatheringId(gathering.id()));
+
+            // 5. SSE 알림
+            GatheringResult.ParticipantCount status =
+                    GatheringResult.ParticipantCount.of(currentCount, gathering.peopleCount());
+            gatheringEventNotifier.notifyGatheringFull(accessKey, status);
+
+            // 6. PENDING 상태 생성 및 이벤트 발행
+            recommendResultService.createPendingStatus(gathering.id());
+            log.info("Publishing GatheringFullEvent by majority for gathering: {}", gathering.id());
+            eventPublisher.publishEvent(new GatheringFullEvent(
+                    this, gathering.id(), gathering.region(), gathering.peopleCount()
+            ));
+            return null;
+        });
     }
 
     private RecommendResultData.Ranking buildRankingResult(

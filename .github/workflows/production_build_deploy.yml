@@ -7,6 +7,7 @@ on:
 env:
   DOCKERHUB_USERNAME: yogieat
   DOCKERHUB_API_IMAGE_NAME: yogieat-server-api
+  DOCKERHUB_ADMIN_IMAGE_NAME: yogieat-server-admin
   DOCKERHUB_BATCH_IMAGE_NAME: yogieat-server-batch-sync
 
 jobs:
@@ -53,6 +54,7 @@ jobs:
         id: image-tags
         run: |
           echo "api_image=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_API_IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo "admin_image=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
           echo "batch_image=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
@@ -67,6 +69,17 @@ jobs:
           build-args: |
             JAR_FILE=apps/api/build/libs/*.jar
           tags: ${{ steps.image-tags.outputs.api_image }}
+          platforms: linux/amd64
+
+      - name: Build and push Admin image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          build-args: |
+            JAR_FILE=apps/admin/build/libs/*.jar
+          tags: ${{ steps.image-tags.outputs.admin_image }}
           platforms: linux/amd64
 
       - name: Build and push Batch image
@@ -108,17 +121,30 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_PRIVATE_KEY }}
           script: |
+            set -euo pipefail
             echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ env.DOCKERHUB_USERNAME }}" --password-stdin
             echo "Deploying API image: ${{ steps.image-tags.outputs.api_image }}"
+            echo "Deploying Admin image: ${{ steps.image-tags.outputs.admin_image }}"
             echo "Deploying Batch image: ${{ steps.image-tags.outputs.batch_image }}"
             cd ~/docker
             API_IMAGE_FULL_URL="${{ steps.image-tags.outputs.api_image }}" \
+            ADMIN_IMAGE_FULL_URL="${{ steps.image-tags.outputs.admin_image }}" \
             BATCH_IMAGE_FULL_URL="${{ steps.image-tags.outputs.batch_image }}" \
             DOCKERHUB_API_IMAGE_NAME="${{ env.DOCKERHUB_API_IMAGE_NAME }}" \
+            DOCKERHUB_ADMIN_IMAGE_NAME="${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}" \
             DOCKERHUB_BATCH_IMAGE_NAME="${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}" \
             DEPLOY_SCOPE="app" \
             DEPLOY_ENV="prod" \
             ../scripts/deploy/compose-up.sh
+
+            ACTUAL_API_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_API_IMAGE_NAME }}')"
+            ACTUAL_ADMIN_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}')"
+            ACTUAL_BATCH_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}')"
+
+            [ "${ACTUAL_API_IMAGE}" = "${{ steps.image-tags.outputs.api_image }}" ] || { echo "API image mismatch: expected=${{ steps.image-tags.outputs.api_image }}, actual=${ACTUAL_API_IMAGE}"; exit 1; }
+            [ "${ACTUAL_ADMIN_IMAGE}" = "${{ steps.image-tags.outputs.admin_image }}" ] || { echo "ADMIN image mismatch: expected=${{ steps.image-tags.outputs.admin_image }}, actual=${ACTUAL_ADMIN_IMAGE}"; exit 1; }
+            [ "${ACTUAL_BATCH_IMAGE}" = "${{ steps.image-tags.outputs.batch_image }}" ] || { echo "BATCH image mismatch: expected=${{ steps.image-tags.outputs.batch_image }}, actual=${ACTUAL_BATCH_IMAGE}"; exit 1; }
+
             docker image prune -a -f
 
       - name: Discord notification
@@ -133,6 +159,7 @@ jobs:
             **커밋**: ${{ github.sha }}
             **커밋 메시지**: ${{ github.event.head_commit.message }}
             **API 이미지**: ${{ steps.image-tags.outputs.api_image }}
+            **ADMIN 이미지**: ${{ steps.image-tags.outputs.admin_image }}
             **BATCH 이미지**: ${{ steps.image-tags.outputs.batch_image }}
           color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
           username: GitHub Actions

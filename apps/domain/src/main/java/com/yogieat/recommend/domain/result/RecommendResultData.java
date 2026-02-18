@@ -19,6 +19,7 @@ public record RecommendResultData() {
             List<Ranking> rankings,
             Map<String, Integer> preferences,
             Map<String, Integer> dislikes,
+            Map<String, Integer> distances,
             Double averageAgreementRate
     ) {
         public static Get of(
@@ -26,15 +27,17 @@ public record RecommendResultData() {
                 List<Ranking> rankings,
                 Map<String, Integer> preferences,
                 Map<String, Integer> dislikes,
+                Map<String, Integer> distances,
                 Double averageAgreementRate
         ) {
-            return new Get(status, rankings, preferences, dislikes, averageAgreementRate);
+            return new Get(status, rankings, preferences, dislikes, distances, averageAgreementRate);
         }
 
         public static Get ofPending() {
             return new Get(
                 RecommendStatus.PENDING,
                 Collections.emptyList(),
+                Collections.emptyMap(),
                 Collections.emptyMap(),
                 Collections.emptyMap(),
                 0.0
@@ -45,6 +48,7 @@ public record RecommendResultData() {
             return new Get(
                 null,
                 Collections.emptyList(),
+                Collections.emptyMap(),
                 Collections.emptyMap(),
                 Collections.emptyMap(),
                 0.0
@@ -77,7 +81,7 @@ public record RecommendResultData() {
             Integer representMenuPrice,
             String priceLevel,
             String aiMateSummaryTitle,
-            String aiMateSummaryContents,
+            List<String> aiMateSummaryContents,
             // 추천 근거 텍스트 (신규)
             String reasonText
     ) {
@@ -103,7 +107,7 @@ public record RecommendResultData() {
                 Integer representMenuPrice,
                 String priceLevel,
                 String aiMateSummaryTitle,
-                String aiMateSummaryContents,
+                List<String> aiMateSummaryContents,
                 // 추천 근거 텍스트
                 String reasonText
         ) {

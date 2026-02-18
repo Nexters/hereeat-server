@@ -10,6 +10,7 @@ on:
 env:
   DOCKERHUB_USERNAME: yogieat
   DOCKERHUB_API_IMAGE_NAME: yogieat-server-api
+  DOCKERHUB_ADMIN_IMAGE_NAME: yogieat-server-admin
   DOCKERHUB_BATCH_IMAGE_NAME: yogieat-server-batch-sync
 
 jobs:
@@ -17,6 +18,29 @@ jobs:
     runs-on: ubuntu-latest
     environment: PROD
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Copy docker directory to Server
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group
+          remote_host: ${{ secrets.SERVER_HOST }}
+          remote_user: ${{ secrets.SERVER_USERNAME }}
+          remote_key: ${{ secrets.SERVER_PRIVATE_KEY }}
+          path: ./docker/
+          remote_path: /home/ubuntu/docker/
+
+      - name: Copy deploy script to Server
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group
+          remote_host: ${{ secrets.SERVER_HOST }}
+          remote_user: ${{ secrets.SERVER_USERNAME }}
+          remote_key: ${{ secrets.SERVER_PRIVATE_KEY }}
+          path: ./scripts/deploy/
+          remote_path: /home/ubuntu/scripts/deploy/
+
       # EC2로 배포
       - name: Deploy to Instance Server
         uses: appleboy/ssh-action@v1.0.3
@@ -25,19 +49,33 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_PRIVATE_KEY }}
           script: |
+            set -euo pipefail
             echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ env.DOCKERHUB_USERNAME }}" --password-stdin
             API_IMAGE="${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_API_IMAGE_NAME }}:${{ github.event.inputs.version }}"
+            ADMIN_IMAGE="${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}:${{ github.event.inputs.version }}"
             BATCH_IMAGE="${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}:${{ github.event.inputs.version }}"
             echo "Deploying API image: ${API_IMAGE}"
+            echo "Deploying Admin image: ${ADMIN_IMAGE}"
             echo "Deploying Batch image: ${BATCH_IMAGE}"
             cd ~/docker
             API_IMAGE_FULL_URL="${API_IMAGE}" \
+            ADMIN_IMAGE_FULL_URL="${ADMIN_IMAGE}" \
             BATCH_IMAGE_FULL_URL="${BATCH_IMAGE}" \
             DOCKERHUB_API_IMAGE_NAME="${{ env.DOCKERHUB_API_IMAGE_NAME }}" \
+            DOCKERHUB_ADMIN_IMAGE_NAME="${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}" \
             DOCKERHUB_BATCH_IMAGE_NAME="${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}" \
             DEPLOY_SCOPE="app" \
             DEPLOY_ENV="prod" \
             ../scripts/deploy/compose-up.sh
+
+            ACTUAL_API_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_API_IMAGE_NAME }}')"
+            ACTUAL_ADMIN_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}')"
+            ACTUAL_BATCH_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}')"
+
+            [ "${ACTUAL_API_IMAGE}" = "${API_IMAGE}" ] || { echo "API image mismatch: expected=${API_IMAGE}, actual=${ACTUAL_API_IMAGE}"; exit 1; }
+            [ "${ACTUAL_ADMIN_IMAGE}" = "${ADMIN_IMAGE}" ] || { echo "ADMIN image mismatch: expected=${ADMIN_IMAGE}, actual=${ACTUAL_ADMIN_IMAGE}"; exit 1; }
+            [ "${ACTUAL_BATCH_IMAGE}" = "${BATCH_IMAGE}" ] || { echo "BATCH image mismatch: expected=${BATCH_IMAGE}, actual=${ACTUAL_BATCH_IMAGE}"; exit 1; }
+
             docker image prune -a -f
 
       - name: Discord notification
@@ -53,6 +91,7 @@ jobs:
             **커밋 메시지**: ${{ github.event.head_commit.message }}
             **버전**: ${{ github.event.inputs.version }}
             **API 이미지**: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_API_IMAGE_NAME }}:${{ github.event.inputs.version }}
+            **ADMIN 이미지**: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}:${{ github.event.inputs.version }}
             **BATCH 이미지**: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}:${{ github.event.inputs.version }}
           color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
           username: GitHub Actions

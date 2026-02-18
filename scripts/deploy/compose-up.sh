@@ -24,14 +24,35 @@ compose_cmd() {
   docker compose --env-file "${ENV_FILE_PATH}" "${COMPOSE_FILES[@]}" "$@"
 }
 
+ensure_container_on_network() {
+  local container_name="$1"
+  local network_name="$2"
+
+  if ! docker network inspect "${network_name}" >/dev/null 2>&1; then
+    warn "network '${network_name}' does not exist. creating..."
+    docker network create "${network_name}" >/dev/null \
+      || error "failed to create network '${network_name}'."
+  fi
+
+  if docker inspect --format '{{json .NetworkSettings.Networks}}' "${container_name}" 2>/dev/null \
+    | grep -Fq "\"${network_name}\":"; then
+    return 0
+  fi
+
+  warn "container '${container_name}' is not connected to network '${network_name}'. connecting..."
+  docker network connect "${network_name}" "${container_name}" >/dev/null \
+    || error "failed to connect container '${container_name}' to network '${network_name}'."
+}
+
 validate_required_env() {
-  [[ -n "${API_IMAGE_FULL_URL:-}" && -n "${BATCH_IMAGE_FULL_URL:-}" ]] \
-    || error "API_IMAGE_FULL_URL and BATCH_IMAGE_FULL_URL must be set"
+  [[ -n "${API_IMAGE_FULL_URL:-}" && -n "${ADMIN_IMAGE_FULL_URL:-}" && -n "${BATCH_IMAGE_FULL_URL:-}" ]] \
+    || error "API_IMAGE_FULL_URL, ADMIN_IMAGE_FULL_URL and BATCH_IMAGE_FULL_URL must be set"
 
   DOCKERHUB_API_IMAGE_NAME="${DOCKERHUB_API_IMAGE_NAME:-yogieat-server-api}"
+  DOCKERHUB_ADMIN_IMAGE_NAME="${DOCKERHUB_ADMIN_IMAGE_NAME:-yogieat-server-admin}"
   DOCKERHUB_BATCH_IMAGE_NAME="${DOCKERHUB_BATCH_IMAGE_NAME:-yogieat-server-batch-sync}"
-  export API_IMAGE_FULL_URL BATCH_IMAGE_FULL_URL
-  export DOCKERHUB_API_IMAGE_NAME DOCKERHUB_BATCH_IMAGE_NAME
+  export API_IMAGE_FULL_URL ADMIN_IMAGE_FULL_URL BATCH_IMAGE_FULL_URL
+  export DOCKERHUB_API_IMAGE_NAME DOCKERHUB_ADMIN_IMAGE_NAME DOCKERHUB_BATCH_IMAGE_NAME
 }
 
 resolve_env_file() {
@@ -110,20 +131,20 @@ ensure_db_running_for_app_scope() {
   DB_CONTAINER_NAME="${DB_CONTAINER_NAME:-yogieat-db}"
   AUTO_RESTORE_DB="${AUTO_RESTORE_DB:-true}"
   DB_READY_TIMEOUT_SECONDS="${DB_READY_TIMEOUT_SECONDS:-60}"
+  APP_NETWORK_NAME="${APP_NETWORK_NAME:-yogieat-network}"
 
   if is_container_running "${DB_CONTAINER_NAME}"; then
-    echo "DB container '${DB_CONTAINER_NAME}' is already running. Re-syncing with compose to ensure network/service metadata..."
-    compose_cmd up -d yogieat-db
-    wait_for_db_ready "${DB_CONTAINER_NAME}" "${DB_READY_TIMEOUT_SECONDS}"
+    ensure_container_on_network "${DB_CONTAINER_NAME}" "${APP_NETWORK_NAME}"
+    echo "DB container '${DB_CONTAINER_NAME}' is already running. Skipping DB reconciliation for app-only deploy."
     return 0
   fi
 
-  if [[ "${AUTO_RESTORE_DB}" != "true" ]]; then
-    error "required DB container '${DB_CONTAINER_NAME}' is not running.
-       AUTO_RESTORE_DB=false, so deploy is stopped."
-  fi
-
   if container_exists "${DB_CONTAINER_NAME}"; then
+    if [[ "${AUTO_RESTORE_DB}" != "true" ]]; then
+      error "required DB container '${DB_CONTAINER_NAME}' exists but is not running.
+       AUTO_RESTORE_DB=false, so deploy is stopped."
+    fi
+
     echo "DB container '${DB_CONTAINER_NAME}' exists but is not running. Starting existing container..."
     if ! docker start "${DB_CONTAINER_NAME}"; then
       warn "failed to start existing DB container '${DB_CONTAINER_NAME}'."
@@ -133,44 +154,101 @@ ensure_db_running_for_app_scope() {
       docker rm "${DB_CONTAINER_NAME}" || error "failed to remove broken DB container '${DB_CONTAINER_NAME}'."
       compose_cmd up -d yogieat-db
     fi
-  else
-    echo "DB container '${DB_CONTAINER_NAME}' does not exist. Attempting auto-restore with compose..."
-    compose_cmd up -d yogieat-db
+    ensure_container_on_network "${DB_CONTAINER_NAME}" "${APP_NETWORK_NAME}"
+    wait_for_db_ready "${DB_CONTAINER_NAME}" "${DB_READY_TIMEOUT_SECONDS}"
+    echo "DB start succeeded: ${DB_CONTAINER_NAME}"
+    return 0
   fi
 
-  # Always align DB container with current compose project/network settings.
+  if [[ "${AUTO_RESTORE_DB}" != "true" ]]; then
+    error "required DB container '${DB_CONTAINER_NAME}' does not exist.
+       AUTO_RESTORE_DB=false, so deploy is stopped."
+  fi
+
+  echo "DB container '${DB_CONTAINER_NAME}' does not exist. Attempting auto-restore with compose..."
   compose_cmd up -d yogieat-db
+  ensure_container_on_network "${DB_CONTAINER_NAME}" "${APP_NETWORK_NAME}"
   wait_for_db_ready "${DB_CONTAINER_NAME}" "${DB_READY_TIMEOUT_SECONDS}"
   echo "DB auto-restore succeeded: ${DB_CONTAINER_NAME}"
 }
 
+cleanup_stale_app_containers() {
+  AUTO_CLEANUP_STALE_APP_CONTAINERS="${AUTO_CLEANUP_STALE_APP_CONTAINERS:-true}"
+  if [[ "${AUTO_CLEANUP_STALE_APP_CONTAINERS}" != "true" ]]; then
+    echo "Skip stale app container cleanup: AUTO_CLEANUP_STALE_APP_CONTAINERS=false"
+    return 0
+  fi
+
+  local service_name container_name existing_container_id compose_container_id
+  local service_mappings=(
+    "yogieat-api:${DOCKERHUB_API_IMAGE_NAME}"
+    "yogieat-admin:${DOCKERHUB_ADMIN_IMAGE_NAME}"
+    "yogieat-batch-sync:${DOCKERHUB_BATCH_IMAGE_NAME}"
+  )
+
+  for mapping in "${service_mappings[@]}"; do
+    service_name="${mapping%%:*}"
+    container_name="${mapping##*:}"
+
+    if ! container_exists "${container_name}"; then
+      continue
+    fi
+
+    existing_container_id="$(docker inspect --format '{{.Id}}' "${container_name}" 2>/dev/null || true)"
+    compose_container_id="$(compose_cmd ps -q "${service_name}" 2>/dev/null || true)"
+
+    if [[ -n "${compose_container_id}" && "${compose_container_id}" == "${existing_container_id}" ]]; then
+      continue
+    fi
+
+    warn "Removing stale container '${container_name}' (service=${service_name}) to avoid name conflict."
+    docker rm -f "${container_name}" >/dev/null \
+      || error "failed to remove stale container '${container_name}'."
+  done
+}
+
 print_deploy_summary() {
   echo "Deploy API image: ${API_IMAGE_FULL_URL}"
+  echo "Deploy Admin image: ${ADMIN_IMAGE_FULL_URL}"
   echo "Deploy Batch image: ${BATCH_IMAGE_FULL_URL}"
   echo "Deploy scope: ${DEPLOY_SCOPE}"
   echo "Deploy env: ${DEPLOY_ENV}"
   echo "Enable edge SSL: ${ENABLE_EDGE_SSL}"
   echo "Env file path: ${ENV_FILE_PATH}"
   echo "Compose files: ${COMPOSE_FILES[*]}"
-  echo "Target services: yogieat-api yogieat-batch-sync"
+  echo "Target services: yogieat-api yogieat-admin yogieat-batch-sync"
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     echo "Auto restore DB: ${AUTO_RESTORE_DB:-true}"
+    echo "Auto cleanup stale app containers: ${AUTO_CLEANUP_STALE_APP_CONTAINERS:-true}"
+    echo "App network name: ${APP_NETWORK_NAME:-yogieat-network}"
   fi
+  echo "Pull images on deploy: ${PULL_IMAGES_ON_DEPLOY:-true}"
 }
 
 main() {
   validate_required_env
   resolve_env_file
   configure_scope_and_files
+  PULL_IMAGES_ON_DEPLOY="${PULL_IMAGES_ON_DEPLOY:-true}"
+  export PULL_IMAGES_ON_DEPLOY
 
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     ensure_db_running_for_app_scope
+    cleanup_stale_app_containers
   fi
 
   print_deploy_summary
 
+  if [[ "${PULL_IMAGES_ON_DEPLOY}" == "true" ]]; then
+    if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
+      compose_cmd pull yogieat-api yogieat-admin yogieat-batch-sync
+    else
+      compose_cmd pull
+    fi
+  fi
+
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
-    compose_cmd up -d --no-deps yogieat-api yogieat-batch-sync
+    compose_cmd up -d --no-deps yogieat-api yogieat-admin yogieat-batch-sync
   else
     compose_cmd up -d
   fi

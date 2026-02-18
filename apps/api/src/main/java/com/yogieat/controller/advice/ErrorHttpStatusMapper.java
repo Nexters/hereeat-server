@@ -24,6 +24,7 @@ public class ErrorHttpStatusMapper {
                  PARTICIPANT_NICKNAME_REQUIRED,
                  PARTICIPANT_NICKNAME_TOO_LONG,
                  PARTICIPANT_NICKNAME_INVALID,
+                 PARTICIPANT_MAJORITY_NOT_REACHED,
                  INVALID_CATEGORY_AGGREGATION,
                  INVALID_PREFERENCE_SCORE -> HttpStatus.BAD_REQUEST;
             case METHOD_NOT_ALLOWED -> HttpStatus.METHOD_NOT_ALLOWED;
@@ -35,7 +36,8 @@ public class ErrorHttpStatusMapper {
             case GEMINI_API_ERROR,
                  KAKAO_API_ERROR -> HttpStatus.SERVICE_UNAVAILABLE;
             case DUPLICATE_NICKNAME,
-                 SYNC_JOB_CONFLICT -> HttpStatus.CONFLICT;
+                 SYNC_JOB_CONFLICT,
+                 RECOMMEND_ALREADY_PROCEEDED -> HttpStatus.CONFLICT;
             case KAKAO_RATE_LIMIT_EXCEEDED -> HttpStatus.TOO_MANY_REQUESTS;
             case LOCK_TIMEOUT -> HttpStatus.REQUEST_TIMEOUT;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
