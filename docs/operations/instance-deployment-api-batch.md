@@ -95,6 +95,7 @@ ENV_FILE_PATH=~/.env \
 - 즉, DB 컨테이너는 배포에서 제외된다.
 - `yogieat-db`가 이미 running이면 스크립트는 DB를 건드리지 않고 그대로 진행한다.
 - 단, `yogieat-db`가 없으면 배포 스크립트가 `docker compose ... up -d yogieat-db`를 실행해 자동 복구한다.
+- compose 프로젝트가 관리하지 않는 동일 이름 앱 컨테이너가 있으면 자동 제거 후 배포한다 (`AUTO_CLEANUP_STALE_APP_CONTAINERS=true`).
 - `DEPLOY_ENV=dev`면 `docker-compose.dev.yaml`, `DEPLOY_ENV=prod`면 `docker-compose.prod.yaml`를 추가 적용한다.
 
 ### 5.2 환경별 리소스 제한

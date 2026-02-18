@@ -148,6 +148,41 @@ ensure_db_running_for_app_scope() {
   echo "DB auto-restore succeeded: ${DB_CONTAINER_NAME}"
 }
 
+cleanup_stale_app_containers() {
+  AUTO_CLEANUP_STALE_APP_CONTAINERS="${AUTO_CLEANUP_STALE_APP_CONTAINERS:-true}"
+  if [[ "${AUTO_CLEANUP_STALE_APP_CONTAINERS}" != "true" ]]; then
+    echo "Skip stale app container cleanup: AUTO_CLEANUP_STALE_APP_CONTAINERS=false"
+    return 0
+  fi
+
+  local service_name container_name existing_container_id compose_container_id
+  local service_mappings=(
+    "yogieat-api:${DOCKERHUB_API_IMAGE_NAME}"
+    "yogieat-admin:${DOCKERHUB_ADMIN_IMAGE_NAME}"
+    "yogieat-batch-sync:${DOCKERHUB_BATCH_IMAGE_NAME}"
+  )
+
+  for mapping in "${service_mappings[@]}"; do
+    service_name="${mapping%%:*}"
+    container_name="${mapping##*:}"
+
+    if ! container_exists "${container_name}"; then
+      continue
+    fi
+
+    existing_container_id="$(docker inspect --format '{{.Id}}' "${container_name}" 2>/dev/null || true)"
+    compose_container_id="$(compose_cmd ps -q "${service_name}" 2>/dev/null || true)"
+
+    if [[ -n "${compose_container_id}" && "${compose_container_id}" == "${existing_container_id}" ]]; then
+      continue
+    fi
+
+    warn "Removing stale container '${container_name}' (service=${service_name}) to avoid name conflict."
+    docker rm -f "${container_name}" >/dev/null \
+      || error "failed to remove stale container '${container_name}'."
+  done
+}
+
 print_deploy_summary() {
   echo "Deploy API image: ${API_IMAGE_FULL_URL}"
   echo "Deploy Admin image: ${ADMIN_IMAGE_FULL_URL}"
@@ -160,6 +195,7 @@ print_deploy_summary() {
   echo "Target services: yogieat-api yogieat-admin yogieat-batch-sync"
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     echo "Auto restore DB: ${AUTO_RESTORE_DB:-true}"
+    echo "Auto cleanup stale app containers: ${AUTO_CLEANUP_STALE_APP_CONTAINERS:-true}"
   fi
   echo "Pull images on deploy: ${PULL_IMAGES_ON_DEPLOY:-true}"
 }
@@ -173,6 +209,7 @@ main() {
 
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     ensure_db_running_for_app_scope
+    cleanup_stale_app_containers
   fi
 
   print_deploy_summary
