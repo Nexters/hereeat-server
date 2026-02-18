@@ -7,7 +7,7 @@ services:
       - "${API_HOST_BIND_IP:-127.0.0.1}:${API_HOST_PORT:-8080}:8080"
     environment:
       - TZ=Asia/Seoul
-      - DATASOURCE_DB_CORE_JDBC_URL=jdbc:postgresql://yogieat-db:5432/yogieat
+      - DATASOURCE_DB_CORE_JDBC_URL=${DATASOURCE_DB_CORE_JDBC_URL:-jdbc:postgresql://yogieat-db:5432/yogieat}
     networks:
       - yogieat-network
     env_file:
@@ -23,7 +23,7 @@ services:
       - "${ADMIN_HOST_BIND_IP:-127.0.0.1}:${ADMIN_HOST_PORT:-8081}:8081"
     environment:
       - TZ=Asia/Seoul
-      - DATASOURCE_DB_CORE_JDBC_URL=jdbc:postgresql://yogieat-db:5432/yogieat
+      - DATASOURCE_DB_CORE_JDBC_URL=${DATASOURCE_DB_CORE_JDBC_URL:-jdbc:postgresql://yogieat-db:5432/yogieat}
       - SERVER_PORT=8081
     networks:
       - yogieat-network
@@ -38,7 +38,7 @@ services:
     restart: always
     environment:
       - TZ=Asia/Seoul
-      - DATASOURCE_DB_CORE_JDBC_URL=jdbc:postgresql://yogieat-db:5432/yogieat
+      - DATASOURCE_DB_CORE_JDBC_URL=${DATASOURCE_DB_CORE_JDBC_URL:-jdbc:postgresql://yogieat-db:5432/yogieat}
       - SPRING_TASK_SCHEDULING_ENABLED=true
       - SERVER_PORT=${BATCH_SERVER_PORT:-9090}
     networks:

@@ -24,6 +24,26 @@ compose_cmd() {
   docker compose --env-file "${ENV_FILE_PATH}" "${COMPOSE_FILES[@]}" "$@"
 }
 
+ensure_container_on_network() {
+  local container_name="$1"
+  local network_name="$2"
+
+  if ! docker network inspect "${network_name}" >/dev/null 2>&1; then
+    warn "network '${network_name}' does not exist. creating..."
+    docker network create "${network_name}" >/dev/null \
+      || error "failed to create network '${network_name}'."
+  fi
+
+  if docker inspect --format '{{json .NetworkSettings.Networks}}' "${container_name}" 2>/dev/null \
+    | grep -Fq "\"${network_name}\":"; then
+    return 0
+  fi
+
+  warn "container '${container_name}' is not connected to network '${network_name}'. connecting..."
+  docker network connect "${network_name}" "${container_name}" >/dev/null \
+    || error "failed to connect container '${container_name}' to network '${network_name}'."
+}
+
 validate_required_env() {
   [[ -n "${API_IMAGE_FULL_URL:-}" && -n "${ADMIN_IMAGE_FULL_URL:-}" && -n "${BATCH_IMAGE_FULL_URL:-}" ]] \
     || error "API_IMAGE_FULL_URL, ADMIN_IMAGE_FULL_URL and BATCH_IMAGE_FULL_URL must be set"
@@ -111,8 +131,10 @@ ensure_db_running_for_app_scope() {
   DB_CONTAINER_NAME="${DB_CONTAINER_NAME:-yogieat-db}"
   AUTO_RESTORE_DB="${AUTO_RESTORE_DB:-true}"
   DB_READY_TIMEOUT_SECONDS="${DB_READY_TIMEOUT_SECONDS:-60}"
+  APP_NETWORK_NAME="${APP_NETWORK_NAME:-yogieat-network}"
 
   if is_container_running "${DB_CONTAINER_NAME}"; then
+    ensure_container_on_network "${DB_CONTAINER_NAME}" "${APP_NETWORK_NAME}"
     echo "DB container '${DB_CONTAINER_NAME}' is already running. Skipping DB reconciliation for app-only deploy."
     return 0
   fi
@@ -132,6 +154,7 @@ ensure_db_running_for_app_scope() {
       docker rm "${DB_CONTAINER_NAME}" || error "failed to remove broken DB container '${DB_CONTAINER_NAME}'."
       compose_cmd up -d yogieat-db
     fi
+    ensure_container_on_network "${DB_CONTAINER_NAME}" "${APP_NETWORK_NAME}"
     wait_for_db_ready "${DB_CONTAINER_NAME}" "${DB_READY_TIMEOUT_SECONDS}"
     echo "DB start succeeded: ${DB_CONTAINER_NAME}"
     return 0
@@ -144,6 +167,7 @@ ensure_db_running_for_app_scope() {
 
   echo "DB container '${DB_CONTAINER_NAME}' does not exist. Attempting auto-restore with compose..."
   compose_cmd up -d yogieat-db
+  ensure_container_on_network "${DB_CONTAINER_NAME}" "${APP_NETWORK_NAME}"
   wait_for_db_ready "${DB_CONTAINER_NAME}" "${DB_READY_TIMEOUT_SECONDS}"
   echo "DB auto-restore succeeded: ${DB_CONTAINER_NAME}"
 }
@@ -196,6 +220,7 @@ print_deploy_summary() {
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     echo "Auto restore DB: ${AUTO_RESTORE_DB:-true}"
     echo "Auto cleanup stale app containers: ${AUTO_CLEANUP_STALE_APP_CONTAINERS:-true}"
+    echo "App network name: ${APP_NETWORK_NAME:-yogieat-network}"
   fi
   echo "Pull images on deploy: ${PULL_IMAGES_ON_DEPLOY:-true}"
 }

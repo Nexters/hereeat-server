@@ -95,6 +95,7 @@ ENV_FILE_PATH=~/.env \
 - 즉, DB 컨테이너는 배포에서 제외된다.
 - `yogieat-db`가 이미 running이면 스크립트는 DB를 건드리지 않고 그대로 진행한다.
 - 단, `yogieat-db`가 없으면 배포 스크립트가 `docker compose ... up -d yogieat-db`를 실행해 자동 복구한다.
+- `yogieat-db`가 실행 중이지만 네트워크(`yogieat-network`)에 붙어있지 않으면 자동으로 연결한다.
 - compose 프로젝트가 관리하지 않는 동일 이름 앱 컨테이너가 있으면 자동 제거 후 배포한다 (`AUTO_CLEANUP_STALE_APP_CONTAINERS=true`).
 - `DEPLOY_ENV=dev`면 `docker-compose.dev.yaml`, `DEPLOY_ENV=prod`면 `docker-compose.prod.yaml`를 추가 적용한다.
 
@@ -139,6 +140,8 @@ DB 설정을 강제로 재적용하려면 유지보수 창에 `DEPLOY_SCOPE=full
 
 2. 환경변수/비밀
 - `.env`로 DB 계정/암호 주입
+- `DATASOURCE_DB_CORE_JDBC_URL`은 compose에서 `${DATASOURCE_DB_CORE_JDBC_URL:-jdbc:postgresql://yogieat-db:5432/yogieat}`로 처리된다.
+- `.env`에 해당 값이 있으면 우선 적용되고, 없으면 내부 DNS(`yogieat-db`) 기본값을 사용한다.
 - `.env`에 Admin JWT 서명키 주입 (`JWT_SECRET`, 최소 32자)
 - Docker Hub 토큰은 GitHub Secrets로 관리
 
