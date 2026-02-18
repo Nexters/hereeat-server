@@ -113,18 +113,16 @@ ensure_db_running_for_app_scope() {
   DB_READY_TIMEOUT_SECONDS="${DB_READY_TIMEOUT_SECONDS:-60}"
 
   if is_container_running "${DB_CONTAINER_NAME}"; then
-    echo "DB container '${DB_CONTAINER_NAME}' is already running. Re-syncing with compose to ensure network/service metadata..."
-    compose_cmd up -d yogieat-db
-    wait_for_db_ready "${DB_CONTAINER_NAME}" "${DB_READY_TIMEOUT_SECONDS}"
+    echo "DB container '${DB_CONTAINER_NAME}' is already running. Skipping DB reconciliation for app-only deploy."
     return 0
   fi
 
-  if [[ "${AUTO_RESTORE_DB}" != "true" ]]; then
-    error "required DB container '${DB_CONTAINER_NAME}' is not running.
-       AUTO_RESTORE_DB=false, so deploy is stopped."
-  fi
-
   if container_exists "${DB_CONTAINER_NAME}"; then
+    if [[ "${AUTO_RESTORE_DB}" != "true" ]]; then
+      error "required DB container '${DB_CONTAINER_NAME}' exists but is not running.
+       AUTO_RESTORE_DB=false, so deploy is stopped."
+    fi
+
     echo "DB container '${DB_CONTAINER_NAME}' exists but is not running. Starting existing container..."
     if ! docker start "${DB_CONTAINER_NAME}"; then
       warn "failed to start existing DB container '${DB_CONTAINER_NAME}'."
@@ -134,12 +132,17 @@ ensure_db_running_for_app_scope() {
       docker rm "${DB_CONTAINER_NAME}" || error "failed to remove broken DB container '${DB_CONTAINER_NAME}'."
       compose_cmd up -d yogieat-db
     fi
-  else
-    echo "DB container '${DB_CONTAINER_NAME}' does not exist. Attempting auto-restore with compose..."
-    compose_cmd up -d yogieat-db
+    wait_for_db_ready "${DB_CONTAINER_NAME}" "${DB_READY_TIMEOUT_SECONDS}"
+    echo "DB start succeeded: ${DB_CONTAINER_NAME}"
+    return 0
   fi
 
-  # Always align DB container with current compose project/network settings.
+  if [[ "${AUTO_RESTORE_DB}" != "true" ]]; then
+    error "required DB container '${DB_CONTAINER_NAME}' does not exist.
+       AUTO_RESTORE_DB=false, so deploy is stopped."
+  fi
+
+  echo "DB container '${DB_CONTAINER_NAME}' does not exist. Attempting auto-restore with compose..."
   compose_cmd up -d yogieat-db
   wait_for_db_ready "${DB_CONTAINER_NAME}" "${DB_READY_TIMEOUT_SECONDS}"
   echo "DB auto-restore succeeded: ${DB_CONTAINER_NAME}"
@@ -158,18 +161,29 @@ print_deploy_summary() {
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     echo "Auto restore DB: ${AUTO_RESTORE_DB:-true}"
   fi
+  echo "Pull images on deploy: ${PULL_IMAGES_ON_DEPLOY:-true}"
 }
 
 main() {
   validate_required_env
   resolve_env_file
   configure_scope_and_files
+  PULL_IMAGES_ON_DEPLOY="${PULL_IMAGES_ON_DEPLOY:-true}"
+  export PULL_IMAGES_ON_DEPLOY
 
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     ensure_db_running_for_app_scope
   fi
 
   print_deploy_summary
+
+  if [[ "${PULL_IMAGES_ON_DEPLOY}" == "true" ]]; then
+    if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
+      compose_cmd pull yogieat-api yogieat-admin yogieat-batch-sync
+    else
+      compose_cmd pull
+    fi
+  fi
 
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     compose_cmd up -d --no-deps yogieat-api yogieat-admin yogieat-batch-sync

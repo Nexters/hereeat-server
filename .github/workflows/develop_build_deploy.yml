@@ -132,6 +132,7 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_PRIVATE_KEY }}
           script: |
+            set -euo pipefail
             echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ env.DOCKERHUB_USERNAME }}" --password-stdin
             echo "Deploying API image: ${{ steps.image-tags.outputs.api_image }}"
             echo "Deploying Admin image: ${{ steps.image-tags.outputs.admin_image }}"
@@ -146,6 +147,15 @@ jobs:
             DEPLOY_SCOPE="app" \
             DEPLOY_ENV="dev" \
             ../scripts/deploy/compose-up.sh
+
+            ACTUAL_API_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_API_IMAGE_NAME }}')"
+            ACTUAL_ADMIN_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}')"
+            ACTUAL_BATCH_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}')"
+
+            [ "${ACTUAL_API_IMAGE}" = "${{ steps.image-tags.outputs.api_image }}" ] || { echo "API image mismatch: expected=${{ steps.image-tags.outputs.api_image }}, actual=${ACTUAL_API_IMAGE}"; exit 1; }
+            [ "${ACTUAL_ADMIN_IMAGE}" = "${{ steps.image-tags.outputs.admin_image }}" ] || { echo "ADMIN image mismatch: expected=${{ steps.image-tags.outputs.admin_image }}, actual=${ACTUAL_ADMIN_IMAGE}"; exit 1; }
+            [ "${ACTUAL_BATCH_IMAGE}" = "${{ steps.image-tags.outputs.batch_image }}" ] || { echo "BATCH image mismatch: expected=${{ steps.image-tags.outputs.batch_image }}, actual=${ACTUAL_BATCH_IMAGE}"; exit 1; }
+
             docker image prune -a -f
 
       - name: Discord notification

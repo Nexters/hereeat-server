@@ -90,9 +90,11 @@ ENV_FILE_PATH=~/.env \
 ```
 
 `DEPLOY_SCOPE=app`일 때는 내부적으로 아래와 같이 동작한다.
+- 기본값으로 배포 대상 이미지를 `docker compose pull`로 먼저 최신화한다 (`PULL_IMAGES_ON_DEPLOY=true`).
 - `docker compose ... up -d --no-deps yogieat-api yogieat-admin yogieat-batch-sync`
 - 즉, DB 컨테이너는 배포에서 제외된다.
-- 단, `yogieat-db`가 없으면 배포 스크립트가 `docker compose ... up -d yogieat-db`를 먼저 실행해 자동 복구한다.
+- `yogieat-db`가 이미 running이면 스크립트는 DB를 건드리지 않고 그대로 진행한다.
+- 단, `yogieat-db`가 없으면 배포 스크립트가 `docker compose ... up -d yogieat-db`를 실행해 자동 복구한다.
 - `DEPLOY_ENV=dev`면 `docker-compose.dev.yaml`, `DEPLOY_ENV=prod`면 `docker-compose.prod.yaml`를 추가 적용한다.
 
 ### 5.2 환경별 리소스 제한
