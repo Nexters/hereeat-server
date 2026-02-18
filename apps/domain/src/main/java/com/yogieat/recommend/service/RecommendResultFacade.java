@@ -60,7 +60,6 @@ public class RecommendResultFacade {
 
         // 4. PENDING 상태인 경우
         if (recommendResults.getFirst().status() == RecommendStatus.PENDING) {
-            log.info("Recommendation is still PENDING for gathering: {}", gathering.id());
             return RecommendResultData.Get.ofPending();
         }
 
@@ -72,6 +71,9 @@ public class RecommendResultFacade {
 
         // 7. 카테고리별 선호도/불호 집계
         CategoryAggregation aggregation = participantAnalyzer.aggregateCategoryPreferences(participants);
+
+        // 7-1. DistanceRange별 집계
+        Map<String, Integer> distances = participantAnalyzer.aggregateDistanceRanges(participants);
 
         // 8. Restaurant 정보와 Category 정보 조회 및 캐싱
         List<Long> restaurantIds = recommendResults.stream()
@@ -98,6 +100,7 @@ public class RecommendResultFacade {
                 rankings,
                 aggregation.preferences(),
                 aggregation.dislikes(),
+                distances,
                 averageAgreementRate
         );
     }

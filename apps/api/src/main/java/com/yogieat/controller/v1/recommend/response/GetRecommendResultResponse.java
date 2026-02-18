@@ -19,6 +19,8 @@ public record GetRecommendResultResponse(
         Map<String, Integer> preferences,
         @Schema(description = "카테고리별 불호 집계", example = "{\"CHINESE\": 1}")
         Map<String, Integer> dislikes,
+        @Schema(description = "거리 범위별 집계", example = "{\"RANGE_500M\": 2, \"RANGE_1KM\": 1, \"ANY\": 1}")
+        Map<String, Integer> distances,
         @Schema(description = "의견 일치율 (%)", example = "85.5")
         Double agreementRate
 ) {
@@ -28,7 +30,7 @@ public record GetRecommendResultResponse(
                 .toList();
 
         // 1등과 나머지 후보 분리
-        RankingRecommendResultResponse topRecommendation = rankings.isEmpty() ? null : rankings.get(0);
+        RankingRecommendResultResponse topRecommendation = rankings.isEmpty() ? null : rankings.getFirst();
         List<RankingRecommendResultResponse> otherCandidates = rankings.size() > 1
                 ? rankings.subList(1, rankings.size())
                 : List.of();
@@ -39,6 +41,7 @@ public record GetRecommendResultResponse(
                 otherCandidates,
                 result.preferences(),
                 result.dislikes(),
+                result.distances(),
                 result.averageAgreementRate()
         );
     }

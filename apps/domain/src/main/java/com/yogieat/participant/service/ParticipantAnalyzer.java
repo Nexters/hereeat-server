@@ -59,30 +59,44 @@ public class ParticipantAnalyzer {
             // 선호도 집계
             List<String> prefList = StringUtils.splitByComma(participant.preferences());
             for (String pref : prefList) {
-                if (!pref.equals("상관없음")) {
-                    // displayName 또는 enum name을 LargeCategory로 변환
-                    LargeCategory category =
-                        LargeCategory.fromString(pref);
-                    if (category != null) {
-                        preferences.merge(category.name(), 1, Integer::sum);
-                    }
+                // displayName 또는 enum name을 LargeCategory로 변환
+                LargeCategory category = LargeCategory.fromString(pref);
+                if (category != null) {
+                    preferences.merge(category.name(), 1, Integer::sum);
                 }
             }
 
             // 불호 집계
             List<String> dislikeList = StringUtils.splitByComma(participant.dislikes());
             for (String dislike : dislikeList) {
-                if (!dislike.equals("상관없음")) {
-                    // displayName 또는 enum name을 LargeCategory로 변환
-                    LargeCategory category =
-                        LargeCategory.fromString(dislike);
-                    if (category != null) {
-                        dislikes.merge(category.name(), 1, Integer::sum);
-                    }
+                // displayName 또는 enum name을 LargeCategory로 변환
+                LargeCategory category = LargeCategory.fromString(dislike);
+                if (category != null) {
+                    dislikes.merge(category.name(), 1, Integer::sum);
                 }
             }
         }
 
         return CategoryAggregation.of(preferences, dislikes);
+    }
+
+    /**
+     * 참여자들의 DistanceRange를 집계
+     *
+     * @param participants 참여자 목록
+     * @return DistanceRange별 참여자 수 집계 결과
+     */
+    public Map<String, Integer> aggregateDistanceRanges(List<Participant> participants) {
+        if (participants == null || participants.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, Integer> distances = new HashMap<>();
+        for (Participant participant : participants) {
+            String rangeName = participant.distanceRange().name();
+            distances.merge(rangeName, 1, Integer::sum);
+        }
+
+        return distances;
     }
 }
