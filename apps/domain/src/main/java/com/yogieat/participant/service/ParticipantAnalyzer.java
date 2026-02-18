@@ -91,12 +91,7 @@ public class ParticipantAnalyzer {
             return Map.of();
         }
 
-        Map<String, Integer> distances = new HashMap<>();
-        for (Participant participant : participants) {
-            String rangeName = participant.distanceRange().name();
-            distances.merge(rangeName, 1, Integer::sum);
-        }
-
-        return distances;
+        return participants.stream()
+                .collect(Collectors.groupingBy(p -> p.distanceRange().name(), Collectors.summingInt(p -> 1)));
     }
 }
