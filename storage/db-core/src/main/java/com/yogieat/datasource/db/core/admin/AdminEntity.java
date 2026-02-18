@@ -7,6 +7,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -16,7 +17,11 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "t_admin")
+@Table(
+        name = "t_admin",
+        indexes = {
+            @Index(name = "idx_admin_login_id_deleted_at", columnList = "login_id, deleted_at")
+        })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AdminEntity extends BaseEntity {
 

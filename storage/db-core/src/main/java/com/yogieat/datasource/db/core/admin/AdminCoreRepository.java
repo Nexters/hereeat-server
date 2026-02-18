@@ -1,5 +1,8 @@
 package com.yogieat.datasource.db.core.admin;
 
+import static com.yogieat.datasource.db.core.admin.QAdminEntity.adminEntity;
+
+import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.yogieat.admin.domain.Admin;
 import com.yogieat.admin.service.AdminRepository;
 import java.time.LocalDateTime;
@@ -13,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminCoreRepository implements AdminRepository {
 
     private final AdminJpaRepository adminJpaRepository;
+    private final JPAQueryFactory jpaQueryFactory;
 
     @Override
     public Optional<Admin> findByLoginId(String loginId) {
@@ -34,8 +38,12 @@ public class AdminCoreRepository implements AdminRepository {
     @Override
     @Transactional
     public void updateLastLoginAt(Long adminId) {
-        adminJpaRepository
-                .findByIdAndDeletedAtIsNull(adminId)
-                .ifPresent(entity -> entity.updateLastLoginAt(LocalDateTime.now()));
+        jpaQueryFactory.update(adminEntity)
+                .set(adminEntity.lastLoginAt, LocalDateTime.now())
+                .where(
+                        adminEntity.id.eq(adminId),
+                        adminEntity.deletedAt.isNull()
+                )
+                .execute();
     }
 }
