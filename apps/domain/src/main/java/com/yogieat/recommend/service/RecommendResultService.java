@@ -19,6 +19,11 @@ public class RecommendResultService {
         return recommendResultRepository.findByGatheringId(gatheringId);
     }
 
+    @Transactional(readOnly = true)
+    public boolean existsByGatheringId(Long gatheringId) {
+        return recommendResultRepository.existsByGatheringId(gatheringId);
+    }
+
     @Transactional
     public void createPendingStatus(Long gatheringId) {
         // 중복 방어
