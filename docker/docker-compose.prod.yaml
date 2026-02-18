@@ -1,20 +1,21 @@
+# Prod 2vCore, 4GB RAM, 50GB Storage
 services:
   yogieat-api:
-    cpus: "1.80"
-    mem_limit: "960m"
-    mem_reservation: "384m"
+    cpus: "1.05"
+    mem_limit: "1536m"
+    mem_reservation: "768m"
 
   yogieat-admin:
-    cpus: "0.40"
-    mem_limit: "320m"
-    mem_reservation: "128m"
+    cpus: "0.25"
+    mem_limit: "512m"
+    mem_reservation: "192m"
 
   yogieat-batch-sync:
-    cpus: "0.30"
-    mem_limit: "192m"
-    mem_reservation: "96m"
+    cpus: "0.15"
+    mem_limit: "384m"
+    mem_reservation: "128m"
 
   yogieat-db:
-    cpus: "0.80"
-    mem_limit: "448m"
-    mem_reservation: "128m"
+    cpus: "0.45"
+    mem_limit: "1024m"
+    mem_reservation: "512m"

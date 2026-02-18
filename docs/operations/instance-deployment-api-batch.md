@@ -98,16 +98,16 @@ ENV_FILE_PATH=~/.env \
 ### 5.2 환경별 리소스 제한
 - DEV (`docker/docker-compose.dev.yaml`)
   - 서버 스펙 목표: `1 vCPU / 1GB`
-  - `yogieat-api`: `cpus=0.45`, `mem_limit=384m`, `mem_reservation=128m`
-  - `yogieat-admin`: `cpus=0.15`, `mem_limit=192m`, `mem_reservation=64m`
-  - `yogieat-batch-sync`: `cpus=0.10`, `mem_limit=128m`, `mem_reservation=64m`
-  - `yogieat-db`: `cpus=0.25`, `mem_limit=256m`, `mem_reservation=64m`
+  - `yogieat-api`: `cpus=0.55`, `mem_limit=320m`, `mem_reservation=160m`
+  - `yogieat-admin`: `cpus=0.15`, `mem_limit=160m`, `mem_reservation=80m`
+  - `yogieat-batch-sync`: `cpus=0.10`, `mem_limit=128m`, `mem_reservation=48m`
+  - `yogieat-db`: `cpus=0.20`, `mem_limit=192m`, `mem_reservation=96m`
 - PROD (`docker/docker-compose.prod.yaml`)
-  - 서버 스펙 목표: `4 vCPU / 2GB`
-  - `yogieat-api`: `cpus=1.80`, `mem_limit=960m`, `mem_reservation=384m`
-  - `yogieat-admin`: `cpus=0.40`, `mem_limit=320m`, `mem_reservation=128m`
-  - `yogieat-batch-sync`: `cpus=0.30`, `mem_limit=192m`, `mem_reservation=96m`
-  - `yogieat-db`: `cpus=0.80`, `mem_limit=448m`, `mem_reservation=128m`
+  - 서버 스펙 목표: `2 vCPU / 4GB`
+  - `yogieat-api`: `cpus=1.05`, `mem_limit=1536m`, `mem_reservation=768m`
+  - `yogieat-admin`: `cpus=0.25`, `mem_limit=512m`, `mem_reservation=192m`
+  - `yogieat-batch-sync`: `cpus=0.15`, `mem_limit=384m`, `mem_reservation=128m`
+  - `yogieat-db`: `cpus=0.45`, `mem_limit=1024m`, `mem_reservation=512m`
 
 `DEPLOY_SCOPE=app` 배포는 API/Admin/BATCH 중심으로 동작하며, DB는 필요 시 자동 복구(기동/재생성)된다.
 DB 설정을 강제로 재적용하려면 유지보수 창에 `DEPLOY_SCOPE=full` 배포를 사용한다.
