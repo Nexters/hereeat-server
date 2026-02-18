@@ -1,4 +1,4 @@
-package com.yogieat.service;
+package com.yogieat.service.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -12,6 +12,7 @@ import com.yogieat.admin.service.AdminService;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.config.jwt.JwtTokenProvider;
+import com.yogieat.service.auth.result.LoginResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,7 +42,7 @@ class AuthFacadeTest {
         String rawPassword = "admin123!";
         Admin admin = new Admin(
                 1L,
-                "admin@yogieat.com",
+                "admin",
                 "encoded-password",
                 "Admin",
                 AdminRole.ADMIN,
@@ -51,14 +52,14 @@ class AuthFacadeTest {
                 null
         );
 
-        when(adminService.getByEmail(admin.email())).thenReturn(admin);
+        when(adminService.getByLoginId(admin.loginId())).thenReturn(admin);
         when(passwordEncoder.matches(rawPassword, admin.password())).thenReturn(true);
         when(jwtTokenProvider.createAccessToken(admin)).thenReturn("access-token");
         when(jwtTokenProvider.createRefreshToken(admin)).thenReturn("refresh-token");
         when(jwtTokenProvider.getAccessTokenValidity()).thenReturn(3_600_000L);
         when(jwtTokenProvider.getRefreshTokenValidity()).thenReturn(604_800_000L);
 
-        AuthFacade.LoginResult result = authFacade.login(admin.email(), rawPassword);
+        LoginResult result = authFacade.login(admin.loginId(), rawPassword);
 
         assertThat(result.accessToken()).isEqualTo("access-token");
         assertThat(result.refreshToken()).isEqualTo("refresh-token");
@@ -74,7 +75,7 @@ class AuthFacadeTest {
         String rawPassword = "wrong-password";
         Admin admin = new Admin(
                 1L,
-                "admin@yogieat.com",
+                "admin",
                 "encoded-password",
                 "Admin",
                 AdminRole.ADMIN,
@@ -84,12 +85,12 @@ class AuthFacadeTest {
                 null
         );
 
-        when(adminService.getByEmail(admin.email())).thenReturn(admin);
+        when(adminService.getByLoginId(admin.loginId())).thenReturn(admin);
         when(passwordEncoder.matches(rawPassword, admin.password())).thenReturn(false);
 
         CustomException exception = assertThrows(
                 CustomException.class,
-                () -> authFacade.login(admin.email(), rawPassword)
+                () -> authFacade.login(admin.loginId(), rawPassword)
         );
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ADMIN_INVALID_PASSWORD);
@@ -99,15 +100,15 @@ class AuthFacadeTest {
     @Test
     @DisplayName("존재하지 않는 계정 로그인 시 도메인 예외를 그대로 전파한다")
     void adminNotFound() {
-        String email = "missing@yogieat.com";
+        String loginId = "missing-admin";
         String password = "admin123!";
         CustomException notFound = new CustomException(ErrorCode.ADMIN_NOT_FOUND);
 
-        when(adminService.getByEmail(email)).thenThrow(notFound);
+        when(adminService.getByLoginId(loginId)).thenThrow(notFound);
 
         CustomException exception = assertThrows(
                 CustomException.class,
-                () -> authFacade.login(email, password)
+                () -> authFacade.login(loginId, password)
         );
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ADMIN_NOT_FOUND);

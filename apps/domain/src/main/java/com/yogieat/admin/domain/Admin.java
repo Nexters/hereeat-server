@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 public record Admin(
         Long id,
-        String email,
+        String loginId,
         String password, // BCrypt 해시된 비밀번호
         String name,
         AdminRole role,

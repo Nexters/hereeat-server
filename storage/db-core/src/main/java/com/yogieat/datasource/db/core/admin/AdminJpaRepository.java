@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AdminJpaRepository extends JpaRepository<AdminEntity, Long> {
 
-    Optional<AdminEntity> findByEmailAndDeletedAtIsNull(String email);
+    Optional<AdminEntity> findByLoginIdAndDeletedAtIsNull(String loginId);
 
     Optional<AdminEntity> findByIdAndDeletedAtIsNull(Long id);
 }

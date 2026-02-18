@@ -22,7 +22,7 @@ class JwtTokenProviderTest {
 
     private final Admin admin = new Admin(
             1L,
-            "admin@yogieat.com",
+            "admin",
             "encoded-password",
             "Admin",
             AdminRole.ADMIN,
@@ -40,7 +40,7 @@ class JwtTokenProviderTest {
         JwtTokenProvider.TokenPayload payload = tokenProvider.parseAccessToken(token);
 
         assertThat(payload.adminId()).isEqualTo(admin.id());
-        assertThat(payload.email()).isEqualTo(admin.email());
+        assertThat(payload.loginId()).isEqualTo(admin.loginId());
         assertThat(payload.role()).isEqualTo(admin.role());
         assertThat(payload.tokenType()).isEqualTo("access");
     }

@@ -1,10 +1,12 @@
-package com.yogieat.service;
+package com.yogieat.service.auth;
 
 import com.yogieat.admin.domain.Admin;
 import com.yogieat.admin.service.AdminService;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.config.jwt.JwtTokenProvider;
+import com.yogieat.service.auth.result.LoginResult;
+import com.yogieat.service.auth.result.LogoutResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -19,8 +21,8 @@ public class AuthFacade {
     private final JwtTokenProvider jwtTokenProvider;
 
     @Transactional
-    public LoginResult login(String email, String password) {
-        Admin admin = adminService.getByEmail(email);
+    public LoginResult login(String loginId, String password) {
+        Admin admin = adminService.getByLoginId(loginId);
 
         if (!passwordEncoder.matches(password, admin.password())) {
             throw new CustomException(ErrorCode.ADMIN_INVALID_PASSWORD);
@@ -42,17 +44,5 @@ public class AuthFacade {
 
     public LogoutResult logout() {
         return new LogoutResult(true, "로그아웃 되었습니다");
-    }
-
-    public record LoginResult(
-            String accessToken,
-            String refreshToken,
-            String tokenType,
-            long accessTokenExpiresIn,
-            long refreshTokenExpiresIn
-    ) {
-    }
-
-    public record LogoutResult(boolean success, String message) {
     }
 }

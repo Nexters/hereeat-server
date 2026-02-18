@@ -53,7 +53,7 @@ class AdminSecurityIntegrationTest {
     @Test
     @DisplayName("유효한 ADMIN 토큰으로 /test 호출 시 200을 반환한다")
     void accessWithAdminTokenShouldReturn200() throws Exception {
-        Admin admin = saveAdmin("admin@yogieat.com", AdminRole.ADMIN);
+        Admin admin = saveAdmin();
         String accessToken = jwtTokenProvider.createAccessToken(admin);
 
         mockMvc.perform(
@@ -65,26 +65,36 @@ class AdminSecurityIntegrationTest {
     }
 
     @Test
-    @DisplayName("ADMIN 토큰으로 SUPER_ADMIN 전용 엔드포인트 호출 시 403을 반환한다")
-    void accessSuperAdminEndpointWithAdminTokenShouldReturn403() throws Exception {
-        Admin admin = saveAdmin("admin-only@yogieat.com", AdminRole.ADMIN);
-        String accessToken = jwtTokenProvider.createAccessToken(admin);
+    @DisplayName("토큰은 유효하지만 관리자가 존재하지 않으면 401을 반환한다")
+    void accessWithMissingAdminShouldReturn401() throws Exception {
+        Admin missingAdmin = new Admin(
+                999_999L,
+                "missing-admin",
+                "encoded-password",
+                "Missing",
+                AdminRole.ADMIN,
+                null,
+                null,
+                null,
+                null
+        );
+        String accessToken = jwtTokenProvider.createAccessToken(missingAdmin);
 
         mockMvc.perform(
-                        get("/api/v1/admin/admins/test")
+                        get("/api/v1/admin/test")
                                 .header("Authorization", "Bearer " + accessToken)
                 )
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.data.errorCode").value(ErrorCode.ADMIN_FORBIDDEN.getCode()));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.data.errorCode").value(ErrorCode.ADMIN_NOT_FOUND.getCode()));
     }
 
-    private Admin saveAdmin(String email, AdminRole role) {
+    private Admin saveAdmin() {
         Admin source = new Admin(
                 null,
-                email,
+                "admin",
                 passwordEncoder.encode("admin123!"),
                 "Admin",
-                role,
+                AdminRole.ADMIN,
                 null,
                 null,
                 null,

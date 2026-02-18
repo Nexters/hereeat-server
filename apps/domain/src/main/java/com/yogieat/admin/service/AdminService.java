@@ -14,9 +14,9 @@ public class AdminService {
     private final AdminRepository adminRepository;
 
     @Transactional(readOnly = true)
-    public Admin getByEmail(String email) {
+    public Admin getByLoginId(String loginId) {
         return adminRepository
-                .findByEmail(email)
+                .findByLoginId(loginId)
                 .filter(Admin::isActive)
                 .orElseThrow(() -> new CustomException(ErrorCode.ADMIN_NOT_FOUND));
     }

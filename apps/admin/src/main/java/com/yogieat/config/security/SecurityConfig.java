@@ -45,7 +45,6 @@ public class SecurityConfig {
                         auth -> auth
                                 .requestMatchers("/ping").permitAll()
                                 .requestMatchers("/api/v1/admin/auth/**").permitAll()
-                                .requestMatchers("/api/v1/admin/admins/**").hasRole(AdminRole.SUPER_ADMIN.name())
                                 .requestMatchers("/api/v1/admin/**")
                                 .hasAnyRole(AdminRole.SUPER_ADMIN.name(), AdminRole.ADMIN.name())
                                 .anyRequest().authenticated()
@@ -56,7 +55,7 @@ public class SecurityConfig {
                                 .authenticationEntryPoint(
                                         (request, response, authException) -> {
                                             ErrorCode errorCode =
-                                                    extractAuthErrorCode(request, ErrorCode.ADMIN_UNAUTHORIZED);
+                                                    extractAuthErrorCode(request);
                                             writeErrorResponse(response, errorCode);
                                         }
                                 )
@@ -76,12 +75,12 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    private ErrorCode extractAuthErrorCode(HttpServletRequest request, ErrorCode fallback) {
+    private ErrorCode extractAuthErrorCode(HttpServletRequest request) {
         Object value = request.getAttribute(JwtAuthenticationFilter.AUTH_ERROR_CODE_ATTRIBUTE);
         if (value instanceof ErrorCode errorCode) {
             return errorCode;
         }
-        return fallback;
+        return ErrorCode.ADMIN_UNAUTHORIZED;
     }
 
     private void writeErrorResponse(HttpServletResponse response, ErrorCode errorCode) throws IOException {

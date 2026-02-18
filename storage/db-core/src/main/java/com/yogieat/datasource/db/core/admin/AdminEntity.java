@@ -20,8 +20,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AdminEntity extends BaseEntity {
 
-    @Column(name = "email", nullable = false, unique = true)
-    private String email;
+    @Column(name = "login_id", nullable = false, unique = true)
+    private String loginId;
 
     @Column(name = "password", nullable = false)
     private String password;
@@ -38,8 +38,8 @@ public class AdminEntity extends BaseEntity {
 
     @Builder(access = AccessLevel.PRIVATE)
     public AdminEntity(
-            String email, String password, String name, AdminRole role, LocalDateTime lastLoginAt) {
-        this.email = email;
+            String loginId, String password, String name, AdminRole role, LocalDateTime lastLoginAt) {
+        this.loginId = loginId;
         this.password = password;
         this.name = name;
         this.role = role;
@@ -48,7 +48,7 @@ public class AdminEntity extends BaseEntity {
 
     public static AdminEntity from(Admin admin) {
         return AdminEntity.builder()
-                .email(admin.email())
+                .loginId(admin.loginId())
                 .password(admin.password())
                 .name(admin.name())
                 .role(admin.role())
@@ -59,7 +59,7 @@ public class AdminEntity extends BaseEntity {
     public static Admin toDomain(AdminEntity entity) {
         return new Admin(
                 entity.getId(),
-                entity.getEmail(),
+                entity.getLoginId(),
                 entity.getPassword(),
                 entity.getName(),
                 entity.getRole(),

@@ -15,8 +15,8 @@ public class AdminCoreRepository implements AdminRepository {
     private final AdminJpaRepository adminJpaRepository;
 
     @Override
-    public Optional<Admin> findByEmail(String email) {
-        return adminJpaRepository.findByEmailAndDeletedAtIsNull(email).map(AdminEntity::toDomain);
+    public Optional<Admin> findByLoginId(String loginId) {
+        return adminJpaRepository.findByLoginIdAndDeletedAtIsNull(loginId).map(AdminEntity::toDomain);
     }
 
     @Override

@@ -5,7 +5,7 @@ import java.util.Optional;
 
 public interface AdminRepository {
 
-    Optional<Admin> findByEmail(String email);
+    Optional<Admin> findByLoginId(String loginId);
 
     Optional<Admin> findById(Long id);
 

@@ -4,6 +4,9 @@ spring:
       enabled: true
   application:
     name: yogieat-admin
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   config:
     import:
       - logging.yaml

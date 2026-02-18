@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class JwtTokenProvider {
 
-    private static final String CLAIM_EMAIL = "email";
+    private static final String CLAIM_LOGIN_ID = "loginId";
     private static final String CLAIM_ROLE = "role";
     private static final String CLAIM_TYPE = "type";
     private static final String TOKEN_TYPE_ACCESS = "access";
@@ -53,7 +53,7 @@ public class JwtTokenProvider {
 
     private String createToken(Admin admin, String tokenType, long validity) {
         if (admin.id() == null) {
-            throw new IllegalArgumentException("Admin id is required to issue JWT");
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
 
         Date issuedAt = new Date();
@@ -61,7 +61,7 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .subject(String.valueOf(admin.id()))
-                .claim(CLAIM_EMAIL, admin.email())
+                .claim(CLAIM_LOGIN_ID, admin.loginId())
                 .claim(CLAIM_ROLE, admin.role().name())
                 .claim(CLAIM_TYPE, tokenType)
                 .issuedAt(issuedAt)
@@ -75,11 +75,11 @@ public class JwtTokenProvider {
 
         try {
             Long adminId = Long.valueOf(claims.getSubject());
-            String email = claims.get(CLAIM_EMAIL, String.class);
+            String loginId = claims.get(CLAIM_LOGIN_ID, String.class);
             String role = claims.get(CLAIM_ROLE, String.class);
             String tokenType = claims.get(CLAIM_TYPE, String.class);
 
-            if (email == null || role == null || tokenType == null) {
+            if (loginId == null || role == null || tokenType == null) {
                 throw new CustomException(ErrorCode.ADMIN_TOKEN_INVALID);
             }
             if (!expectedTokenType.equals(tokenType)) {
@@ -87,7 +87,7 @@ public class JwtTokenProvider {
             }
 
             AdminRole adminRole = AdminRole.valueOf(role);
-            return new TokenPayload(adminId, email, adminRole, tokenType);
+            return new TokenPayload(adminId, loginId, adminRole, tokenType);
         } catch (IllegalArgumentException e) {
             throw new CustomException(ErrorCode.ADMIN_TOKEN_INVALID);
         }
@@ -111,6 +111,6 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(jwtProperties.secret().getBytes(StandardCharsets.UTF_8));
     }
 
-    public record TokenPayload(Long adminId, String email, AdminRole role, String tokenType) {
+    public record TokenPayload(Long adminId, String loginId, AdminRole role, String tokenType) {
     }
 }

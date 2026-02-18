@@ -1,6 +1,6 @@
 package com.yogieat.controller.v1.auth.response;
 
-import com.yogieat.service.AuthFacade;
+import com.yogieat.service.auth.result.LoginResult;
 
 public record LoginResponse(
         String accessToken,
@@ -9,7 +9,7 @@ public record LoginResponse(
         long accessTokenExpiresIn,
         long refreshTokenExpiresIn
 ) {
-    public static LoginResponse from(AuthFacade.LoginResult result) {
+    public static LoginResponse from(LoginResult result) {
         return new LoginResponse(
                 result.accessToken(),
                 result.refreshToken(),

@@ -3,7 +3,7 @@ package com.yogieat.controller.v1.auth;
 import com.yogieat.controller.v1.auth.request.LoginRequest;
 import com.yogieat.controller.v1.auth.response.LoginResponse;
 import com.yogieat.controller.v1.auth.response.LogoutResponse;
-import com.yogieat.service.AuthFacade;
+import com.yogieat.service.auth.AuthFacade;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +20,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public LoginResponse login(@RequestBody @Valid LoginRequest request) {
-        return LoginResponse.from(authFacade.login(request.email(), request.password()));
+        return LoginResponse.from(authFacade.login(request.loginId(), request.password()));
     }
 
     @PostMapping("/logout")
