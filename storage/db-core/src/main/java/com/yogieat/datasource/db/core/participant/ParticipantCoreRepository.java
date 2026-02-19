@@ -2,6 +2,7 @@ package com.yogieat.datasource.db.core.participant;
 
 import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.service.ParticipantRepository;
+import java.util.Collections;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -26,6 +27,18 @@ public class ParticipantCoreRepository implements ParticipantRepository {
     @Override
     public List<Participant> findByGatheringId(Long gatheringId) {
         List<ParticipantEntity> entities = participantJpaRepository.findByGatheringId(gatheringId);
+        return entities.stream()
+                .map(ParticipantEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Participant> findByGatheringIds(List<Long> gatheringIds) {
+        if (gatheringIds == null || gatheringIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<ParticipantEntity> entities = participantJpaRepository.findByGatheringIdIn(gatheringIds);
         return entities.stream()
                 .map(ParticipantEntity::toDomain)
                 .toList();

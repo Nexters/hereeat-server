@@ -1,6 +1,7 @@
 package com.yogieat.gathering.service;
 
 import com.yogieat.gathering.domain.Gathering;
+import com.yogieat.gathering.result.GatheringAdminItemResult;
 import java.util.List;
 import java.util.Optional;
 
@@ -10,12 +11,18 @@ public interface GatheringRepository {
     Gathering save(Gathering gathering);
 
     List<Gathering> findAdminGatherings(
-            GatheringAdminListCriteria criteria,
+            GatheringAdminCriteria.List criteria,
             int page,
             int size
     );
 
-    List<Gathering> findAdminGatherings(GatheringAdminListCriteria criteria);
+    List<GatheringAdminItemResult> findAdminGatheringsWithParticipantCount(
+            GatheringAdminCriteria.List criteria,
+            int page,
+            int size
+    );
 
-    long countAdminGatherings(GatheringAdminListCriteria criteria);
+    List<Gathering> findAdminGatherings(GatheringAdminCriteria.List criteria);
+
+    long countAdminGatherings(GatheringAdminCriteria.List criteria);
 }

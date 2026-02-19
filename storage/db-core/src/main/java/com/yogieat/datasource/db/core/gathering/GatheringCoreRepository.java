@@ -1,12 +1,15 @@
 package com.yogieat.datasource.db.core.gathering;
 
 import static com.yogieat.datasource.db.core.gathering.QGatheringEntity.gatheringEntity;
+import static com.yogieat.datasource.db.core.participant.QParticipantEntity.participantEntity;
 
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.yogieat.gathering.domain.Gathering;
-import com.yogieat.gathering.service.GatheringAdminListCriteria;
+import com.yogieat.gathering.result.GatheringAdminItemResult;
+import com.yogieat.gathering.service.GatheringAdminCriteria;
 import com.yogieat.gathering.service.GatheringRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +45,7 @@ public class GatheringCoreRepository implements GatheringRepository {
 
     @Override
     public List<Gathering> findAdminGatherings(
-            GatheringAdminListCriteria criteria,
+            GatheringAdminCriteria.List criteria,
             int page,
             int size
     ) {
@@ -57,7 +60,37 @@ public class GatheringCoreRepository implements GatheringRepository {
     }
 
     @Override
-    public List<Gathering> findAdminGatherings(GatheringAdminListCriteria criteria) {
+    public List<GatheringAdminItemResult> findAdminGatheringsWithParticipantCount(
+            GatheringAdminCriteria.List criteria,
+            int page,
+            int size
+    ) {
+        NumberExpression<Long> participantCount = participantEntity.id.count();
+
+        return jpaQueryFactory
+                .select(gatheringEntity, participantCount)
+                .from(gatheringEntity)
+                .leftJoin(participantEntity)
+                .on(participantEntity.gatheringId.eq(gatheringEntity.id))
+                .where(buildAdminGatheringConditions(criteria))
+                .groupBy(gatheringEntity.id)
+                .orderBy(gatheringEntity.createdAt.desc(), gatheringEntity.id.desc())
+                .offset((long) page * size)
+                .limit(size)
+                .fetch()
+                .stream()
+                .map(tuple -> {
+                    Long count = tuple.get(participantCount);
+                    return new GatheringAdminItemResult(
+                            GatheringEntity.toDomain(tuple.get(gatheringEntity)),
+                            count == null ? 0L : count
+                    );
+                })
+                .toList();
+    }
+
+    @Override
+    public List<Gathering> findAdminGatherings(GatheringAdminCriteria.List criteria) {
         return createAdminGatheringQuery(criteria)
                 .orderBy(gatheringEntity.createdAt.desc(), gatheringEntity.id.desc())
                 .fetch()
@@ -67,7 +100,7 @@ public class GatheringCoreRepository implements GatheringRepository {
     }
 
     @Override
-    public long countAdminGatherings(GatheringAdminListCriteria criteria) {
+    public long countAdminGatherings(GatheringAdminCriteria.List criteria) {
         Long total = createAdminGatheringQuery(criteria)
                 .select(gatheringEntity.count())
                 .fetchOne();
@@ -76,14 +109,14 @@ public class GatheringCoreRepository implements GatheringRepository {
     }
 
     private JPAQuery<GatheringEntity> createAdminGatheringQuery(
-            GatheringAdminListCriteria criteria
+            GatheringAdminCriteria.List criteria
     ) {
         return jpaQueryFactory.selectFrom(gatheringEntity)
                 .where(buildAdminGatheringConditions(criteria));
     }
 
     private BooleanExpression[] buildAdminGatheringConditions(
-            GatheringAdminListCriteria criteria
+            GatheringAdminCriteria.List criteria
     ) {
         List<BooleanExpression> conditions = new ArrayList<>();
 

@@ -5,8 +5,9 @@ import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.value.TimeSlot;
+import com.yogieat.gathering.result.GatheringAdminItemResult;
 import com.yogieat.gathering.result.GatheringAdminResult;
-import com.yogieat.gathering.service.GatheringAdminListCriteria;
+import com.yogieat.gathering.service.GatheringAdminCriteria;
 import com.yogieat.gathering.service.GatheringService;
 import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.service.ParticipantService;
@@ -14,6 +15,8 @@ import com.yogieat.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,20 +37,20 @@ public class GatheringAdminFacade {
             String timeSlot,
             Boolean includeDeleted
     ) {
-        GatheringAdminListCriteria criteria = GatheringAdminListCriteria.of(
+        GatheringAdminCriteria.List criteria = GatheringAdminCriteria.List.of(
                 normalizeKeyword(keyword),
                 Region.fromString(region),
                 parseTimeSlot(timeSlot),
                 includeDeleted != null && includeDeleted
         );
 
-        List<Gathering> gatherings = gatheringService.findAdminGatherings(criteria, page, size);
+        List<GatheringAdminItemResult> gatheringItems = gatheringService.findAdminGatheringsWithParticipantCount(criteria, page, size);
         long totalElements = gatheringService.countAdminGatherings(criteria);
 
-        List<GatheringAdminResult.ListItem> content = gatherings.stream()
-                .map(gathering -> GatheringAdminResult.ListItem.from(
-                        gathering,
-                        participantService.countByGatheringId(gathering.id())
+        List<GatheringAdminResult.ListItem> content = gatheringItems.stream()
+                .map(item -> GatheringAdminResult.ListItem.from(
+                        item.gathering(),
+                        item.participantCount()
                 ))
                 .toList();
 
@@ -68,7 +71,7 @@ public class GatheringAdminFacade {
 
     public GatheringAdminResult.Dashboard getGatheringDashboard() {
         LocalDateTime generatedAt = LocalDateTime.now();
-        GatheringAdminListCriteria criteria = GatheringAdminListCriteria.of(
+        GatheringAdminCriteria.List criteria = GatheringAdminCriteria.List.of(
                 null,
                 null,
                 null,
@@ -76,12 +79,18 @@ public class GatheringAdminFacade {
         );
 
         List<Gathering> gatherings = gatheringService.findAdminGatherings(criteria);
+        List<Long> gatheringIds = gatherings.stream()
+                .map(Gathering::id)
+                .toList();
+
+        Map<Long, List<Participant>> participantsByGatheringId = participantService.getByGatheringIds(gatheringIds).stream()
+                .collect(Collectors.groupingBy(Participant::gatheringId));
 
         List<GatheringAdminResult.GatheringItem> gatheringItems = new ArrayList<>();
         List<GatheringAdminResult.ParticipantItem> participantItems = new ArrayList<>();
 
         for (Gathering gathering : gatherings) {
-            List<Participant> participants = participantService.getByGatheringId(gathering.id());
+            List<Participant> participants = participantsByGatheringId.getOrDefault(gathering.id(), List.of());
             long participantCount = participants.size();
 
             gatheringItems.add(GatheringAdminResult.GatheringItem.from(gathering, participantCount));
@@ -124,8 +133,8 @@ public class GatheringAdminFacade {
                 participant.distanceRange() == null ? null : participant.distanceRange().name(),
                 StringUtils.splitByComma(participant.preferences()),
                 participant.dislikes(),
-                null,
-                null,
+                participant.createdAt(),
+                participant.updatedAt(),
                 participant.gatheringId()
         );
     }

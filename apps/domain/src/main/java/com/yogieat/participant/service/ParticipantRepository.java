@@ -7,5 +7,6 @@ public interface ParticipantRepository {
     Participant save(Participant participant);
     long countByGatheringId(Long gatheringId);
     List<Participant> findByGatheringId(Long gatheringId);
+    List<Participant> findByGatheringIds(List<Long> gatheringIds);
     boolean existsByGatheringIdAndNickname(Long gatheringId, String nickname);
 }

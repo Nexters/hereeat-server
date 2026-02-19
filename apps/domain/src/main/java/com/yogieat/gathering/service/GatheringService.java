@@ -5,6 +5,7 @@ import com.yogieat.common.error.ErrorCode;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.command.GatheringCommand;
 import com.yogieat.gathering.domain.result.GatheringResult;
+import com.yogieat.gathering.result.GatheringAdminItemResult;
 import com.yogieat.participant.service.ParticipantService;
 import java.util.List;
 import java.util.UUID;
@@ -85,7 +86,7 @@ public class GatheringService {
 
     @Transactional(readOnly = true)
     public List<Gathering> findAdminGatherings(
-            GatheringAdminListCriteria criteria,
+            GatheringAdminCriteria.List criteria,
             int page,
             int size
     ) {
@@ -93,12 +94,21 @@ public class GatheringService {
     }
 
     @Transactional(readOnly = true)
-    public long countAdminGatherings(GatheringAdminListCriteria criteria) {
+    public List<GatheringAdminItemResult> findAdminGatheringsWithParticipantCount(
+            GatheringAdminCriteria.List criteria,
+            int page,
+            int size
+    ) {
+        return gatheringRepository.findAdminGatheringsWithParticipantCount(criteria, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public long countAdminGatherings(GatheringAdminCriteria.List criteria) {
         return gatheringRepository.countAdminGatherings(criteria);
     }
 
     @Transactional(readOnly = true)
-    public List<Gathering> findAdminGatherings(GatheringAdminListCriteria criteria) {
+    public List<Gathering> findAdminGatherings(GatheringAdminCriteria.List criteria) {
         return gatheringRepository.findAdminGatherings(criteria);
     }
 
