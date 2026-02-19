@@ -2,6 +2,9 @@ package com.yogieat.restaurant.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +16,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -44,11 +48,13 @@ class RestaurantServiceTest {
         Restaurant updated = RestaurantFixture.sampleUpdatedRestaurantForAdmin(source);
         RestaurantCommand.Patch command = RestaurantFixture.samplePatchForAdmin();
 
-        when(restaurantRepository.applyAdminPatch(id, command)).thenReturn(updated);
+        when(restaurantRepository.applyAdminPatch(anyLong(), any(RestaurantCommand.Patch.class))).thenReturn(updated);
 
         Restaurant result = restaurantService.updateBy(id, command);
+        ArgumentCaptor<RestaurantCommand.Patch> commandCaptor = ArgumentCaptor.forClass(RestaurantCommand.Patch.class);
 
         assertThat(result).isEqualTo(updated);
-        verify(restaurantRepository).applyAdminPatch(id, command);
+        verify(restaurantRepository).applyAdminPatch(eq(id), commandCaptor.capture());
+        assertThat(commandCaptor.getValue()).isEqualTo(command);
     }
 }
