@@ -13,7 +13,9 @@ public record Gathering(
         TimeSlot timeSlot,
         Region region,
         Integer peopleCount,
-        LocalDateTime deletedAt
+        LocalDateTime deletedAt,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
 ) {
     public boolean isDeleted() {
         return deletedAt != null;

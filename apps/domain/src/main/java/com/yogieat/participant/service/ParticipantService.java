@@ -58,7 +58,7 @@ public class ParticipantService {
      * @return 참여자 목록
      */
     @Transactional(readOnly = true)
-    public List<Participant> findByGatheringId(Long gatheringId) {
+    public List<Participant> getByGatheringId(Long gatheringId) {
         return participantRepository.findByGatheringId(gatheringId);
     }
 }
