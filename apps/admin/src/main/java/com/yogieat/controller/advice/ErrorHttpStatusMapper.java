@@ -12,6 +12,7 @@ public class ErrorHttpStatusMapper {
             case METHOD_ARGUMENT_TYPE_MISMATCH -> HttpStatus.BAD_REQUEST;
             case INVALID_LOCATION_NAME -> HttpStatus.BAD_REQUEST;
             case METHOD_NOT_ALLOWED -> HttpStatus.METHOD_NOT_ALLOWED;
+            case GATHERING_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case ADMIN_NOT_FOUND,
                  ADMIN_INVALID_PASSWORD,
                  ADMIN_UNAUTHORIZED,

@@ -64,7 +64,7 @@ public class RecommendResultFacade {
         }
 
         // 5. 참여자 목록 조회
-        List<Participant> participants = participantService.findByGatheringId(gathering.id());
+        List<Participant> participants = participantService.getByGatheringId(gathering.id());
 
         // 6. 다수결 DistanceRange 결정
         DistanceRange majorityDistanceRange = participantAnalyzer.determineMajorityDistanceRange(participants);

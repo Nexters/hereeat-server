@@ -77,7 +77,9 @@ public class GatheringEntity extends BaseEntity {
                 entity.getTimeSlot(),
                 entity.getRegion(),
                 entity.getPeopleCount(),
-                entity.getDeletedAt()
+                entity.getDeletedAt(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
         );
     }
 }

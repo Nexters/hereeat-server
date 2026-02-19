@@ -30,5 +30,6 @@ class ErrorHttpStatusMapperTest {
         assertThat(mapper.toHttpStatus(ErrorCode.ADMIN_FORBIDDEN)).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(mapper.toHttpStatus(ErrorCode.INVALID_LOCATION_NAME)).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(mapper.toHttpStatus(ErrorCode.RESTAURANT_NOT_FOUND)).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(mapper.toHttpStatus(ErrorCode.GATHERING_NOT_FOUND)).isEqualTo(HttpStatus.NOT_FOUND);
     }
 }
