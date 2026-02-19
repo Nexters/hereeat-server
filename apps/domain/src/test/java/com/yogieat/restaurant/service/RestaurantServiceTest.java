@@ -10,7 +10,6 @@ import com.yogieat.common.error.ErrorCode;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.fixture.RestaurantFixture;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,19 +44,11 @@ class RestaurantServiceTest {
         Restaurant updated = RestaurantFixture.sampleUpdatedRestaurantForAdmin(source);
         RestaurantCommand.Patch command = RestaurantFixture.samplePatchForAdmin();
 
-        AtomicReference<Restaurant> restaurantRef = new AtomicReference<>(source);
-        when(restaurantRepository.findById(id)).thenAnswer(__ -> Optional.ofNullable(restaurantRef.get()));
-        org.mockito.Mockito.doAnswer(__ -> {
-                    restaurantRef.set(updated);
-                    return null;
-                })
-                .when(restaurantRepository)
-                .applyAdminPatch(id, command);
+        when(restaurantRepository.applyAdminPatch(id, command)).thenReturn(updated);
 
         Restaurant result = restaurantService.updateBy(id, command);
 
         assertThat(result).isEqualTo(updated);
-        verify(restaurantRepository).findById(id);
         verify(restaurantRepository).applyAdminPatch(id, command);
     }
 }
