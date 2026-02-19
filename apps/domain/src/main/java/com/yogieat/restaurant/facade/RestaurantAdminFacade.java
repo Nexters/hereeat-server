@@ -5,7 +5,9 @@ import com.yogieat.common.Region;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
 import com.yogieat.restaurant.result.RestaurantAdminListResult;
+import com.yogieat.restaurant.result.RestaurantAdminResult;
 import com.yogieat.restaurant.service.RestaurantAdminListCriteria;
+import com.yogieat.restaurant.service.RestaurantCommand;
 import com.yogieat.restaurant.service.RestaurantService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +51,20 @@ public class RestaurantAdminFacade {
                 .toList();
 
         return RestaurantAdminListResult.of(content, page, size, totalElements);
+    }
+
+    public RestaurantAdminResult.Detail getRestaurantBy(Long restaurantId) {
+        Restaurant restaurant = restaurantService.getBy(restaurantId);
+        return RestaurantAdminResult.Detail.from(restaurant);
+    }
+
+    @Transactional
+    public RestaurantAdminResult.Detail updateRestaurant(
+            Long restaurantId,
+            RestaurantCommand.Patch command
+    ) {
+        Restaurant restaurant = restaurantService.updateBy(restaurantId, command);
+        return RestaurantAdminResult.Detail.from(restaurant);
     }
 
     private LargeCategory parseLargeCategory(String largeCategory) {

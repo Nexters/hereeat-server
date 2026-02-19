@@ -7,9 +7,12 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.yogieat.common.Region;
+import com.yogieat.common.error.CustomException;
+import com.yogieat.common.error.ErrorCode;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantAdminListCriteria;
+import com.yogieat.restaurant.service.RestaurantCommand;
 import com.yogieat.restaurant.service.RestaurantRepository;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
@@ -74,6 +77,15 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         return restaurantJpaRepository.findByIdInAndDeletedAtIsNull(ids).stream()
                 .map(RestaurantEntity::toDomain)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public Restaurant applyAdminPatch(Long restaurantId, RestaurantCommand.Patch command) {
+        RestaurantEntity entity = restaurantJpaRepository.findByIdAndDeletedAtIsNull(restaurantId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
+        entity.applyAdminPatch(command);
+        return RestaurantEntity.toDomain(entity);
     }
 
     @Override

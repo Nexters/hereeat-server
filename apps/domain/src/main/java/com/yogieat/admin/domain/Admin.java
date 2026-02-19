@@ -21,4 +21,22 @@ public record Admin(
     public boolean isActive() {
         return !isDeleted();
     }
+
+    public static Admin of(Long id, String loginId, String password, String name, AdminRole role) {
+        return new Admin(
+                id,
+                loginId,
+                password,
+                name,
+                role,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    public static Admin of(String loginId, String password, String name, AdminRole role) {
+        return of(null, loginId, password, name, role);
+    }
 }
