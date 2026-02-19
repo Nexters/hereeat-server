@@ -4,15 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
-@SpringBootApplication(
-        scanBasePackages = {
-                "com.yogieat.config",
-                "com.yogieat.controller",
-                "com.yogieat.service",
-                "com.yogieat.admin",
-                "com.yogieat.datasource.db.core"
-        }
-)
+@SpringBootApplication
 @ConfigurationPropertiesScan
 public class AdminApplication {
 

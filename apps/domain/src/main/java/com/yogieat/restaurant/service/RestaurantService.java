@@ -23,4 +23,14 @@ public class RestaurantService {
     public List<Restaurant> findByIds(List<Long> ids) {
         return restaurantRepository.findByIds(ids);
     }
+
+    @Transactional(readOnly = true)
+    public List<Restaurant> findAdminRestaurants(RestaurantAdminListCriteria criteria, int page, int size) {
+        return restaurantRepository.findPageRestaurants(criteria, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public long countAdminRestaurantList(RestaurantAdminListCriteria criteria) {
+        return restaurantRepository.countAdminRestaurantList(criteria);
+    }
 }
