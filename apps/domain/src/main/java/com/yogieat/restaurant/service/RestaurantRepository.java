@@ -21,6 +21,7 @@ public interface RestaurantRepository {
     Optional<Restaurant> findByExternalId(String externalId);
     List<Long> findActiveRestaurantIdsAfter(Long lastId, int limit);
     long countActiveRestaurants();
+    void applyAdminPatch(Long restaurantId, RestaurantCommand.Patch command);
     List<Restaurant> findPageRestaurants(
             RestaurantAdminListCriteria criteria,
             int page,

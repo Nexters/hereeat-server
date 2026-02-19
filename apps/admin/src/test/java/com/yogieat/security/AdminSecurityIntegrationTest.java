@@ -10,6 +10,7 @@ import com.yogieat.common.error.ErrorCode;
 import com.yogieat.config.jwt.JwtTokenProvider;
 import com.yogieat.datasource.db.core.admin.AdminEntity;
 import com.yogieat.datasource.db.core.admin.AdminJpaRepository;
+import com.yogieat.fixture.AdminTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,17 +68,7 @@ class AdminSecurityIntegrationTest {
     @Test
     @DisplayName("토큰은 유효하지만 관리자가 존재하지 않으면 401을 반환한다")
     void accessWithMissingAdminShouldReturn401() throws Exception {
-        Admin missingAdmin = new Admin(
-                999_999L,
-                "missing-admin",
-                "encoded-password",
-                "Missing",
-                AdminRole.ADMIN,
-                null,
-                null,
-                null,
-                null
-        );
+        Admin missingAdmin = AdminTestFixture.admin(999_999L, "missing-admin", "encoded-password", "Missing", AdminRole.ADMIN);
         String accessToken = jwtTokenProvider.createAccessToken(missingAdmin);
 
         mockMvc.perform(
@@ -89,16 +80,12 @@ class AdminSecurityIntegrationTest {
     }
 
     private Admin saveAdmin() {
-        Admin source = new Admin(
+        Admin source = AdminTestFixture.admin(
                 null,
                 "admin",
                 passwordEncoder.encode("admin123!"),
                 "Admin",
-                AdminRole.ADMIN,
-                null,
-                null,
-                null,
-                null
+                AdminRole.ADMIN
         );
 
         AdminEntity savedEntity = adminJpaRepository.save(AdminEntity.from(source));

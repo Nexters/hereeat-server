@@ -14,7 +14,7 @@ public class RestaurantService {
     private final RestaurantRepository restaurantRepository;
 
     @Transactional(readOnly = true)
-    public Restaurant findById(Long id) {
+    public Restaurant getBy(Long id) {
         return restaurantRepository.findById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
     }
@@ -27,6 +27,12 @@ public class RestaurantService {
     @Transactional(readOnly = true)
     public List<Restaurant> findAdminRestaurants(RestaurantAdminListCriteria criteria, int page, int size) {
         return restaurantRepository.findPageRestaurants(criteria, page, size);
+    }
+
+    @Transactional
+    public Restaurant updateBy(Long id, RestaurantCommand.Patch command) {
+        restaurantRepository.applyAdminPatch(id, command);
+        return getBy(id);
     }
 
     @Transactional(readOnly = true)

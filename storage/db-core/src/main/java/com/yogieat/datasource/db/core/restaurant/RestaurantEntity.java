@@ -8,6 +8,7 @@ import com.yogieat.datasource.db.core.common.BaseEntity;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
+import com.yogieat.restaurant.service.RestaurantCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -281,6 +282,79 @@ public class RestaurantEntity extends BaseEntity {
         }
         if (patch.timeSlot() != null) {
             this.timeSlot = patch.timeSlot();
+        }
+    }
+
+    public void applyAdminPatch(RestaurantCommand.Patch command) {
+        if (command.externalId() != null && !command.externalId().isBlank()) {
+            this.externalId = command.externalId();
+        }
+        if (command.name() != null && !command.name().isBlank()) {
+            this.name = command.name();
+        }
+        if (command.address() != null && !command.address().isBlank()) {
+            this.address = command.address();
+        }
+        if (command.categoryId() != null) {
+            this.categoryId = command.categoryId();
+        }
+        if (command.region() != null) {
+            this.region = command.region();
+        }
+        if (command.location() != null) {
+            this.location = toJtsPoint(command.location());
+        }
+        if (command.rating() != null) {
+            this.rating = command.rating();
+        }
+        if (command.imageUrl() != null && !command.imageUrl().isBlank()) {
+            this.imageUrl = command.imageUrl();
+        }
+        if (command.mapUrl() != null && !command.mapUrl().isBlank()) {
+            this.mapUrl = command.mapUrl();
+        }
+        if (command.representativeReview() != null && !command.representativeReview().isBlank()) {
+            this.representativeReview = command.representativeReview();
+        }
+        if (command.description() != null && !command.description().isBlank()) {
+            this.description = command.description();
+        }
+        if (command.reviewCount() != null) {
+            this.reviewCount = command.reviewCount();
+        }
+        if (command.blogReviewCount() != null) {
+            this.blogReviewCount = command.blogReviewCount();
+        }
+        if (command.representMenu() != null && !command.representMenu().isBlank()) {
+            this.representMenu = command.representMenu();
+        }
+        if (command.representMenuPrice() != null) {
+            this.representMenuPrice = command.representMenuPrice();
+        }
+        if (command.priceLevel() != null && !command.priceLevel().isBlank()) {
+            this.priceLevel = command.priceLevel();
+        }
+        if (command.aiMateSummaryTitle() != null && !command.aiMateSummaryTitle().isBlank()) {
+            this.aiMateSummaryTitle = command.aiMateSummaryTitle();
+        }
+        if (command.aiMateSummaryContents() != null && !command.aiMateSummaryContents().isEmpty()) {
+            this.aiMateSummaryContents = toJsonString(command.aiMateSummaryContents());
+        }
+        if (command.timeSlot() != null) {
+            this.timeSlot = command.timeSlot();
+        }
+    }
+
+    private static String toJsonString(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return OBJECT_MAPPER.writeValueAsString(values);
+        } catch (Exception e) {
+            log.warn("Failed to convert aiMateSummaryContents: {}", values);
+            return null;
         }
     }
 }

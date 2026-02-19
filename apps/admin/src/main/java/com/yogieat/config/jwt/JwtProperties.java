@@ -10,6 +10,10 @@ public record JwtProperties(
         long accessTokenValidity,
         long refreshTokenValidity
 ) {
+    public static JwtProperties of(String secret, long accessTokenValidity, long refreshTokenValidity) {
+        return new JwtProperties(secret, accessTokenValidity, refreshTokenValidity);
+    }
+
     public JwtProperties {
         if (secret == null || secret.length() < 32) {
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);

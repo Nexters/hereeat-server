@@ -7,11 +7,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.yogieat.admin.domain.Admin;
-import com.yogieat.admin.domain.value.AdminRole;
 import com.yogieat.admin.service.AdminService;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.config.jwt.JwtTokenProvider;
+import com.yogieat.fixture.AdminTestFixture;
 import com.yogieat.service.auth.result.LoginResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,17 +40,7 @@ class AuthFacadeTest {
     @DisplayName("로그인 성공 시 토큰을 반환하고 마지막 로그인 시간을 갱신한다")
     void loginSuccess() {
         String rawPassword = "admin123!";
-        Admin admin = new Admin(
-                1L,
-                "admin",
-                "encoded-password",
-                "Admin",
-                AdminRole.ADMIN,
-                null,
-                null,
-                null,
-                null
-        );
+        Admin admin = AdminTestFixture.admin();
 
         when(adminService.getByLoginId(admin.loginId())).thenReturn(admin);
         when(passwordEncoder.matches(rawPassword, admin.password())).thenReturn(true);
@@ -73,17 +63,7 @@ class AuthFacadeTest {
     @DisplayName("비밀번호 불일치 시 예외가 발생하고 로그인 시간은 갱신하지 않는다")
     void invalidPassword() {
         String rawPassword = "wrong-password";
-        Admin admin = new Admin(
-                1L,
-                "admin",
-                "encoded-password",
-                "Admin",
-                AdminRole.ADMIN,
-                null,
-                null,
-                null,
-                null
-        );
+        Admin admin = AdminTestFixture.admin();
 
         when(adminService.getByLoginId(admin.loginId())).thenReturn(admin);
         when(passwordEncoder.matches(rawPassword, admin.password())).thenReturn(false);
