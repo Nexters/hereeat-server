@@ -1,12 +1,12 @@
 # Dev 1vCore, 1GB RAM, 50GB Storage
 services:
   yogieat-api:
-    cpus: "0.55"
+    cpus: "0.50"
     mem_limit: "320m"
     mem_reservation: "160m"
 
   yogieat-admin:
-    cpus: "0.15"
+    cpus: "0.25"
     mem_limit: "160m"
     mem_reservation: "80m"
 
@@ -16,6 +16,6 @@ services:
     mem_reservation: "48m"
 
   yogieat-db:
-    cpus: "0.20"
+    cpus: "0.15"
     mem_limit: "192m"
     mem_reservation: "96m"
