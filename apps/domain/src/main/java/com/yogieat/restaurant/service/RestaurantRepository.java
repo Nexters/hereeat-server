@@ -21,6 +21,14 @@ public interface RestaurantRepository {
     Optional<Restaurant> findByExternalId(String externalId);
     List<Long> findActiveRestaurantIdsAfter(Long lastId, int limit);
     long countActiveRestaurants();
+    List<Restaurant> findPageRestaurants(
+            RestaurantAdminListCriteria criteria,
+            int page,
+            int size
+    );
+    long countAdminRestaurantList(
+            RestaurantAdminListCriteria criteria
+    );
     List<RestaurantSyncTarget> findSyncTargetsByIds(List<Long> ids);
     void batchApplySyncPatch(List<RestaurantSyncPatchCommand> commands);
     void batchSoftDeleteByIds(List<Long> restaurantIds);
