@@ -31,8 +31,7 @@ public class RestaurantService {
 
     @Transactional
     public Restaurant updateBy(Long id, RestaurantCommand.Patch command) {
-        restaurantRepository.applyAdminPatch(id, command);
-        return getBy(id);
+        return restaurantRepository.applyAdminPatch(id, command);
     }
 
     @Transactional(readOnly = true)

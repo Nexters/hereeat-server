@@ -1,5 +1,6 @@
 package com.yogieat.datasource.db.core.restaurant;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yogieat.common.GeoJson;
@@ -286,6 +287,9 @@ public class RestaurantEntity extends BaseEntity {
     }
 
     public void applyAdminPatch(RestaurantCommand.Patch command) {
+        if (command == null) {
+            return;
+        }
         if (command.externalId() != null && !command.externalId().isBlank()) {
             this.externalId = command.externalId();
         }
@@ -352,8 +356,8 @@ public class RestaurantEntity extends BaseEntity {
 
         try {
             return OBJECT_MAPPER.writeValueAsString(values);
-        } catch (Exception e) {
-            log.warn("Failed to convert aiMateSummaryContents: {}", values);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to convert aiMateSummaryContents: {}", values, e);
             return null;
         }
     }

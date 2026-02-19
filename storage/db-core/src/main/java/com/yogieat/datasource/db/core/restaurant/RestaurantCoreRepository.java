@@ -81,14 +81,11 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     @Transactional
-    public void applyAdminPatch(Long restaurantId, RestaurantCommand.Patch command) {
-        if (command == null) {
-            return;
-        }
-
+    public Restaurant applyAdminPatch(Long restaurantId, RestaurantCommand.Patch command) {
         RestaurantEntity entity = restaurantJpaRepository.findByIdAndDeletedAtIsNull(restaurantId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
         entity.applyAdminPatch(command);
+        return RestaurantEntity.toDomain(entity);
     }
 
     @Override

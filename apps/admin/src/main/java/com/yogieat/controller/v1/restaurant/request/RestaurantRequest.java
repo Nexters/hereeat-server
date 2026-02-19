@@ -182,10 +182,15 @@ public final class RestaurantRequest {
         }
 
         private static List<String> trimAiMateSummaryContents(List<String> aiMateSummaryContents) {
-            if (aiMateSummaryContents == null || aiMateSummaryContents.isEmpty()) {
+            if (aiMateSummaryContents == null) {
                 return null;
             }
-            return aiMateSummaryContents;
+            List<String> cleanedList = aiMateSummaryContents.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::strip)
+                    .filter(s -> !s.isBlank())
+                    .toList();
+            return cleanedList.isEmpty() ? null : cleanedList;
         }
 
         public record RestaurantLocationRequest(List<Double> coordinates) {
