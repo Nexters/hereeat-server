@@ -1,8 +1,8 @@
 package com.yogieat.controller.v1.restaurant;
 
 import com.yogieat.controller.v1.restaurant.response.RestaurantListResponse;
-import com.yogieat.service.restaurant.RestaurantAdminService;
-import com.yogieat.service.restaurant.result.RestaurantAdminListResult;
+import com.yogieat.restaurant.facade.RestaurantAdminFacade;
+import com.yogieat.restaurant.result.RestaurantAdminListResult;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class RestaurantAdminController {
 
-    private final RestaurantAdminService restaurantAdminService;
+    private final RestaurantAdminFacade restaurantAdminFacade;
 
     @GetMapping
     public RestaurantListResponse getPageRestaurants(
@@ -29,7 +29,7 @@ public class RestaurantAdminController {
             @RequestParam(required = false) String largeCategory,
             @RequestParam(required = false) Long categoryId
     ) {
-        RestaurantAdminListResult result = restaurantAdminService.getPageRestaurants(
+        RestaurantAdminListResult result = restaurantAdminFacade.getPageRestaurants(
                 page,
                 size,
                 keyword,

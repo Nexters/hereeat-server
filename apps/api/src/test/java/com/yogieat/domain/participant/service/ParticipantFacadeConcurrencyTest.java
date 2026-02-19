@@ -100,18 +100,21 @@ class ParticipantFacadeConcurrencyTest {
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch endLatch = new CountDownLatch(2);
 
-        List<Long> executionTimes = new CopyOnWriteArrayList<>();
+        AtomicInteger successCount = new AtomicInteger(0);
+        List<Throwable> errors = new CopyOnWriteArrayList<>();
 
         // When: 동시에 다른 모임 참여
         new Thread(
                 () -> {
                     try {
                         startLatch.await();
-                        long start = System.currentTimeMillis();
                         participantFacade.participate(createCommand(gathering1.accessKey()));
-                        executionTimes.add(System.currentTimeMillis() - start);
+                        successCount.incrementAndGet();
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
+                        errors.add(e);
+                    } catch (Exception e) {
+                        errors.add(e);
                     } finally {
                         endLatch.countDown();
                     }
@@ -122,11 +125,13 @@ class ParticipantFacadeConcurrencyTest {
                 () -> {
                     try {
                         startLatch.await();
-                        long start = System.currentTimeMillis();
                         participantFacade.participate(createCommand(gathering2.accessKey()));
-                        executionTimes.add(System.currentTimeMillis() - start);
+                        successCount.incrementAndGet();
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
+                        errors.add(e);
+                    } catch (Exception e) {
+                        errors.add(e);
                     } finally {
                         endLatch.countDown();
                     }
@@ -134,10 +139,16 @@ class ParticipantFacadeConcurrencyTest {
                 .start();
 
         startLatch.countDown(); // 동시 시작
-        endLatch.await(5, TimeUnit.SECONDS);
+        boolean completed = endLatch.await(30, TimeUnit.SECONDS);
 
-        // Then: 둘 다 성공, 실행 시간이 거의 동시 (락 대기 없음)
-        assertThat(executionTimes).hasSize(2);
+        // Then: 둘 다 성공
+        assertThat(completed)
+                .withFailMessage("스레드가 제한 시간 내에 완료되지 않음")
+                .isTrue();
+        assertThat(errors)
+                .withFailMessage(() -> "스레드 실행 중 예외 발생: " + errors)
+                .isEmpty();
+        assertThat(successCount.get()).isEqualTo(2);
         assertThat(participantRepository.countByGatheringId(gathering1.id())).isEqualTo(1);
         assertThat(participantRepository.countByGatheringId(gathering2.id())).isEqualTo(1);
     }

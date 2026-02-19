@@ -2,7 +2,7 @@ package com.yogieat.controller.v1.restaurant.response;
 
 import com.yogieat.common.Region;
 import com.yogieat.restaurant.domain.Restaurant;
-import com.yogieat.service.restaurant.result.RestaurantAdminListItemResult;
+import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
 import java.time.LocalDateTime;
 
 public record RestaurantListItemResponse(

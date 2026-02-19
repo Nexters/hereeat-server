@@ -1,6 +1,5 @@
-package com.yogieat.service.restaurant.result;
+package com.yogieat.restaurant.result;
 
-import com.yogieat.service.common.PaginationResult;
 import java.util.List;
 
 public record RestaurantAdminListResult(

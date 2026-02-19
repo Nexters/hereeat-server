@@ -1,20 +1,21 @@
-package com.yogieat.service.restaurant;
+package com.yogieat.restaurant.facade;
 
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.common.Region;
 import com.yogieat.restaurant.domain.Restaurant;
+import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
+import com.yogieat.restaurant.result.RestaurantAdminListResult;
 import com.yogieat.restaurant.service.RestaurantAdminListCriteria;
 import com.yogieat.restaurant.service.RestaurantService;
-import com.yogieat.service.restaurant.result.RestaurantAdminListItemResult;
-import com.yogieat.service.restaurant.result.RestaurantAdminListResult;
-import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class RestaurantAdminService {
+@Transactional(readOnly = true)
+public class RestaurantAdminFacade {
 
     private final RestaurantService restaurantService;
 
@@ -26,7 +27,7 @@ public class RestaurantAdminService {
             String largeCategory,
             Long categoryId
     ) {
-        Region regionValue = parseRegion(region);
+        Region regionValue = Region.fromString(region);
         LargeCategory largeCategoryValue = parseLargeCategory(largeCategory);
         String normalizedKeyword = normalizeKeyword(keyword);
         RestaurantAdminListCriteria criteria = RestaurantAdminListCriteria.of(
@@ -48,23 +49,6 @@ public class RestaurantAdminService {
                 .toList();
 
         return RestaurantAdminListResult.of(content, page, size, totalElements);
-    }
-
-    private Region parseRegion(String region) {
-        if (region == null || region.isBlank()) {
-            return null;
-        }
-
-        String normalizedRegion = region.strip();
-        try {
-            return Region.valueOf(normalizedRegion);
-        } catch (IllegalArgumentException ignored) {
-            return Arrays.stream(Region.values())
-                    .filter(value -> value.name().equalsIgnoreCase(normalizedRegion)
-                            || value.getName().equals(normalizedRegion))
-                    .findFirst()
-                    .orElse(null);
-        }
     }
 
     private LargeCategory parseLargeCategory(String largeCategory) {

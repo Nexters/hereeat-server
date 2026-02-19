@@ -1,6 +1,6 @@
 package com.yogieat.controller.v1.restaurant.response;
 
-import com.yogieat.service.restaurant.result.RestaurantAdminListResult;
+import com.yogieat.restaurant.result.RestaurantAdminListResult;
 import java.util.List;
 
 public record RestaurantListResponse(

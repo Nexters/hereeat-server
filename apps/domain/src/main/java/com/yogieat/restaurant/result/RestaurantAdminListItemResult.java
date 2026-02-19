@@ -1,4 +1,4 @@
-package com.yogieat.service.restaurant.result;
+package com.yogieat.restaurant.result;
 
 import com.yogieat.common.Region;
 import com.yogieat.restaurant.domain.Restaurant;

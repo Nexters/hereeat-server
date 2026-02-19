@@ -1,4 +1,4 @@
-package com.yogieat.service.common;
+package com.yogieat.restaurant.result;
 
 public record PaginationResult(
         int page,
