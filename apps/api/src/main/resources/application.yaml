@@ -31,3 +31,10 @@ sync:
     poll-delay-ms: 5000
     weekly-cron: "0 0 21 ? * SUN"
     weekly-zone: "Asia/Seoul"
+
+kakao:
+  client:
+    enabled: ${KAKAO_CLIENT_ENABLED:true}
+  api:
+    client:
+      enabled: ${kakao.client.enabled}

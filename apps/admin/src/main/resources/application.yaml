@@ -22,10 +22,22 @@ jwt:
   access-token-validity: 3600000
   refresh-token-validity: 604800000
 
+restaurant:
+  collection:
+    processor:
+      enabled: false
+  sync:
+    service:
+      enabled: false
+
 kakao:
+  client:
+    enabled: ${KAKAO_CLIENT_ENABLED:false}
   api:
     api-key: ${KAKAO_API_KEY:admin-dummy-key}
     base-url: ${KAKAO_API_BASE_URL:https://dapi.kakao.com}
+    client:
+      enabled: ${kakao.client.enabled}
 
 ai:
   gemini:
