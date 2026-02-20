@@ -3,7 +3,7 @@ spring:
     open-in-view: false
     properties:
       hibernate:
-        show_sql: true
+        show_sql: false
         format_sql: true
         default_batch_fetch_size: 100
     database-platform: org.hibernate.dialect.PostgreSQLDialect
@@ -29,7 +29,9 @@ datasource:
       username: sa
       password: ""
       pool-name: core-db-pool
-      maximum-pool-size: 5
+      minimum-idle: ${DATASOURCE_DB_CORE_MINIMUM_IDLE:1}
+      maximum-pool-size: ${DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE:5}
+      connection-timeout: ${DATASOURCE_DB_CORE_CONNECTION_TIMEOUT:3000}
       data-source-properties:
         rewriteBatchedStatements: true
 ---
@@ -52,8 +54,9 @@ datasource:
       username: ${DATASOURCE_DB_CORE_USERNAME}
       password: ${DATASOURCE_DB_CORE_PASSWORD}
       pool-name: core-db-pool
-      maximum-pool-size: 10
-      connection-timeout: 1500
+      minimum-idle: ${DATASOURCE_DB_CORE_MINIMUM_IDLE:1}
+      maximum-pool-size: ${DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE:10}
+      connection-timeout: ${DATASOURCE_DB_CORE_CONNECTION_TIMEOUT:1500}
       keepalive-time: 30000
       validation-timeout: 1000
       max-lifetime: 600000
@@ -79,8 +82,9 @@ datasource:
       username: ${DATASOURCE_DB_CORE_USERNAME}
       password: ${DATASOURCE_DB_CORE_PASSWORD}
       pool-name: core-db-pool
-      maximum-pool-size: 5
-      connection-timeout: 1500
+      minimum-idle: ${DATASOURCE_DB_CORE_MINIMUM_IDLE:1}
+      maximum-pool-size: ${DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE:3}
+      connection-timeout: ${DATASOURCE_DB_CORE_CONNECTION_TIMEOUT:3000}
       keepalive-time: 30000
       validation-timeout: 1000
       max-lifetime: 600000
@@ -105,8 +109,9 @@ datasource:
       username: ${DATASOURCE_DB_CORE_USERNAME}
       password: ${DATASOURCE_DB_CORE_PASSWORD}
       pool-name: core-db-pool
-      maximum-pool-size: 10
-      connection-timeout: 1500
+      minimum-idle: ${DATASOURCE_DB_CORE_MINIMUM_IDLE:1}
+      maximum-pool-size: ${DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE:15}
+      connection-timeout: ${DATASOURCE_DB_CORE_CONNECTION_TIMEOUT:3000}
       keepalive-time: 30000
       validation-timeout: 1000
       max-lifetime: 600000

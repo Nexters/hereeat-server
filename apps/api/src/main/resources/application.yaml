@@ -21,8 +21,8 @@ server:
   tomcat:
     max-connections: 20000
     threads:
-      max: 600
-      min-spare: 100
+      max: ${API_TOMCAT_MAX_THREADS:180}
+      min-spare: ${API_TOMCAT_MIN_THREADS:20}
 
 sync:
   job:

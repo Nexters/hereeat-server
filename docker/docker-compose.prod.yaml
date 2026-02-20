@@ -4,18 +4,32 @@ services:
     cpus: "1.05"
     mem_limit: "1536m"
     mem_reservation: "768m"
+    environment:
+      - API_TOMCAT_MAX_THREADS=320
+      - API_TOMCAT_MIN_THREADS=40
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70.0 -XX:MinRAMPercentage=35.0 -XX:MaxGCPauseMillis=400
 
   yogieat-admin:
     cpus: "0.25"
     mem_limit: "512m"
     mem_reservation: "192m"
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60.0 -XX:MinRAMPercentage=30.0 -XX:MaxGCPauseMillis=600
 
   yogieat-batch-sync:
     cpus: "0.15"
     mem_limit: "384m"
     mem_reservation: "128m"
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60.0 -XX:MinRAMPercentage=30.0 -XX:MaxGCPauseMillis=800
 
   yogieat-db:
     cpus: "0.45"
     mem_limit: "1024m"
     mem_reservation: "512m"
+    environment:
+      - PG_LOG_STATEMENT=none
+      - PG_SHARED_BUFFERS=256MB
+      - PG_WORK_MEM=8MB
+      - PG_MAINTENANCE_WORK_MEM=64MB
+      - PG_MAX_CONNECTIONS=120
