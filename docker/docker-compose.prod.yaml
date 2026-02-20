@@ -10,9 +10,9 @@ services:
       - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70.0 -XX:MinRAMPercentage=35.0 -XX:MaxGCPauseMillis=400
 
   yogieat-admin:
-    cpus: "0.25"
-    mem_limit: "512m"
-    mem_reservation: "192m"
+    cpus: "0.40"
+    mem_limit: "768m"
+    mem_reservation: "320m"
     environment:
       - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60.0 -XX:MinRAMPercentage=30.0 -XX:MaxGCPauseMillis=600
 

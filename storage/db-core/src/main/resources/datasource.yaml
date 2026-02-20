@@ -82,8 +82,8 @@ datasource:
       username: ${DATASOURCE_DB_CORE_USERNAME}
       password: ${DATASOURCE_DB_CORE_PASSWORD}
       pool-name: core-db-pool
-      minimum-idle: ${DATASOURCE_DB_CORE_MINIMUM_IDLE:1}
-      maximum-pool-size: ${DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE:3}
+      minimum-idle: ${DATASOURCE_DB_CORE_MINIMUM_IDLE:2}
+      maximum-pool-size: ${DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE:10}
       connection-timeout: ${DATASOURCE_DB_CORE_CONNECTION_TIMEOUT:3000}
       keepalive-time: 30000
       validation-timeout: 1000
