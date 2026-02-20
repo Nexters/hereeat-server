@@ -1,5 +1,6 @@
 package com.yogieat.controller.v1.restaurant.fixture;
 
+import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.common.Region;
 import com.yogieat.controller.v1.restaurant.request.RestaurantRequest;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
@@ -15,6 +16,8 @@ public final class RestaurantAdminFixture {
                 1L,
                 "external-id",
                 10L,
+                LargeCategory.KOREAN,
+                "국밥",
                 "restaurant",
                 "address",
                 4.5,
@@ -42,6 +45,8 @@ public final class RestaurantAdminFixture {
                 1L,
                 "external-id",
                 10L,
+                LargeCategory.KOREAN,
+                "국밥",
                 "updated",
                 "address",
                 4.8,

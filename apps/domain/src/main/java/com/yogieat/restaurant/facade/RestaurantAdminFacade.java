@@ -2,7 +2,6 @@ package com.yogieat.restaurant.facade;
 
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.common.Region;
-import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
 import com.yogieat.restaurant.result.RestaurantAdminListResult;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
@@ -39,23 +38,18 @@ public class RestaurantAdminFacade {
                 categoryId
         );
 
-        List<Restaurant> restaurants = restaurantService.findAdminRestaurants(
+        List<RestaurantAdminListItemResult> content = restaurantService.findAdminRestaurants(
                 criteria,
                 page,
                 size
         );
         long totalElements = restaurantService.countAdminRestaurantList(criteria);
 
-        List<RestaurantAdminListItemResult> content = restaurants.stream()
-                .map(RestaurantAdminListItemResult::from)
-                .toList();
-
         return RestaurantAdminListResult.of(content, page, size, totalElements);
     }
 
     public RestaurantAdminResult.Detail getRestaurantBy(Long restaurantId) {
-        Restaurant restaurant = restaurantService.getBy(restaurantId);
-        return RestaurantAdminResult.Detail.from(restaurant);
+        return restaurantService.getAdminRestaurantDetailBy(restaurantId);
     }
 
     @Transactional
@@ -63,8 +57,8 @@ public class RestaurantAdminFacade {
             Long restaurantId,
             RestaurantCommand.Patch command
     ) {
-        Restaurant restaurant = restaurantService.updateBy(restaurantId, command);
-        return RestaurantAdminResult.Detail.from(restaurant);
+        restaurantService.updateBy(restaurantId, command);
+        return restaurantService.getAdminRestaurantDetailBy(restaurantId);
     }
 
     private LargeCategory parseLargeCategory(String largeCategory) {

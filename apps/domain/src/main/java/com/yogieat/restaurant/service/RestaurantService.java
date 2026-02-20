@@ -3,6 +3,8 @@ package com.yogieat.restaurant.service;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.restaurant.domain.Restaurant;
+import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
+import com.yogieat.restaurant.result.RestaurantAdminResult;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,8 +27,14 @@ public class RestaurantService {
     }
 
     @Transactional(readOnly = true)
-    public List<Restaurant> findAdminRestaurants(RestaurantAdminListCriteria criteria, int page, int size) {
+    public List<RestaurantAdminListItemResult> findAdminRestaurants(RestaurantAdminListCriteria criteria, int page, int size) {
         return restaurantRepository.findPageRestaurants(criteria, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public RestaurantAdminResult.Detail getAdminRestaurantDetailBy(Long id) {
+        return restaurantRepository.findAdminRestaurantDetailById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
     }
 
     @Transactional

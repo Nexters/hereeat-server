@@ -3,6 +3,7 @@ package com.yogieat.datasource.db.core.restaurant;
 import static com.yogieat.datasource.db.core.category.QCategoryEntity.*;
 import static com.yogieat.datasource.db.core.restaurant.QRestaurantEntity.*;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -11,6 +12,8 @@ import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
+import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
+import com.yogieat.restaurant.result.RestaurantAdminResult;
 import com.yogieat.restaurant.service.RestaurantAdminListCriteria;
 import com.yogieat.restaurant.service.RestaurantCommand;
 import com.yogieat.restaurant.service.RestaurantRepository;
@@ -120,18 +123,18 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     }
 
     @Override
-    public List<Restaurant> findPageRestaurants(
+    public List<RestaurantAdminListItemResult> findPageRestaurants(
             RestaurantAdminListCriteria criteria,
             int page,
             int size
     ) {
-        return createAdminRestaurantQuery(criteria)
+        return createAdminRestaurantTupleQuery(criteria)
                 .orderBy(restaurantEntity.updatedAt.desc(), restaurantEntity.id.desc())
                 .offset((long) page * size)
                 .limit(size)
                 .fetch()
                 .stream()
-                .map(RestaurantEntity::toDomain)
+                .map(this::toAdminListItem)
                 .toList();
     }
 
@@ -149,6 +152,54 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         return total == null ? 0L : total;
     }
 
+    @Override
+    public Optional<RestaurantAdminResult.Detail> findAdminRestaurantDetailById(Long restaurantId) {
+        Tuple tuple = createAdminRestaurantTupleQuery(RestaurantAdminListCriteria.of(null, null, null, null))
+                .where(
+                        restaurantEntity.id.eq(restaurantId)
+                )
+                .fetchOne();
+
+        if (tuple == null) {
+            return Optional.empty();
+        }
+
+        RestaurantEntity entity = tuple.get(restaurantEntity);
+        if (entity == null) {
+            return Optional.empty();
+        }
+
+        Restaurant restaurant = RestaurantEntity.toDomain(entity);
+        return Optional.of(
+                RestaurantAdminResult.Detail.of(
+                        restaurant.id(),
+                        restaurant.externalId(),
+                        restaurant.categoryId(),
+                        tuple.get(categoryEntity.largeCategory),
+                        tuple.get(categoryEntity.mediumCategory),
+                        restaurant.name(),
+                        restaurant.address(),
+                        restaurant.rating(),
+                        restaurant.imageUrl(),
+                        restaurant.mapUrl(),
+                        restaurant.representativeReview(),
+                        restaurant.description(),
+                        restaurant.region(),
+                        restaurant.location(),
+                        restaurant.reviewCount(),
+                        restaurant.blogReviewCount(),
+                        restaurant.representMenu(),
+                        restaurant.representMenuPrice(),
+                        restaurant.priceLevel(),
+                        restaurant.aiMateSummaryTitle(),
+                        restaurant.aiMateSummaryContents(),
+                        restaurant.timeSlot(),
+                        restaurant.createdAt(),
+                        restaurant.updatedAt()
+                )
+        );
+    }
+
     private JPAQuery<RestaurantEntity> createAdminRestaurantQuery(
             RestaurantAdminListCriteria criteria
     ) {
@@ -156,6 +207,32 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .leftJoin(categoryEntity)
                 .on(restaurantEntity.categoryId.eq(categoryEntity.id))
                 .where(buildAdminRestaurantConditions(criteria));
+    }
+
+    private JPAQuery<Tuple> createAdminRestaurantTupleQuery(
+            RestaurantAdminListCriteria criteria
+    ) {
+        return jpaQueryFactory
+                .select(restaurantEntity, categoryEntity.largeCategory, categoryEntity.mediumCategory)
+                .from(restaurantEntity)
+                .leftJoin(categoryEntity)
+                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
+                .where(buildAdminRestaurantConditions(criteria));
+    }
+
+    private RestaurantAdminListItemResult toAdminListItem(Tuple tuple) {
+        RestaurantEntity entity = tuple.get(restaurantEntity);
+        return new RestaurantAdminListItemResult(
+                entity.getId(),
+                entity.getName(),
+                entity.getCategoryId(),
+                tuple.get(categoryEntity.largeCategory),
+                tuple.get(categoryEntity.mediumCategory),
+                entity.getRating(),
+                entity.getImageUrl(),
+                entity.getRegion(),
+                entity.getUpdatedAt()
+        );
     }
 
     private BooleanExpression[] buildAdminRestaurantConditions(

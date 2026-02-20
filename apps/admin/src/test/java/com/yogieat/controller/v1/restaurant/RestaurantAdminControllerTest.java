@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yogieat.admin.service.AdminService;
+import com.yogieat.category.domain.value.LargeCategory;
+import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.config.jwt.JwtTokenProvider;
@@ -19,8 +21,12 @@ import com.yogieat.controller.advice.GlobalExceptionHandler;
 import com.yogieat.controller.v1.restaurant.fixture.RestaurantAdminFixture;
 import com.yogieat.controller.v1.restaurant.request.RestaurantRequest;
 import com.yogieat.restaurant.facade.RestaurantAdminFacade;
+import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
+import com.yogieat.restaurant.result.RestaurantAdminListResult;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
 import com.yogieat.restaurant.service.RestaurantCommand;
+import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -91,7 +97,34 @@ class RestaurantAdminControllerTest {
         mockMvc.perform(get(BASE_URL + "/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(1L))
-                .andExpect(jsonPath("$.data.name").value("restaurant"));
+                .andExpect(jsonPath("$.data.name").value("restaurant"))
+                .andExpect(jsonPath("$.data.largeCategory").value("KOREAN"))
+                .andExpect(jsonPath("$.data.mediumCategory").value("국밥"));
+    }
+
+    @Test
+    @DisplayName("페이지 조회 응답에 카테고리 대/중분류가 포함된다")
+    void getPageRestaurants_ShouldContainCategoryFields() throws Exception {
+        RestaurantAdminListItemResult item = new RestaurantAdminListItemResult(
+                1L,
+                "restaurant",
+                10L,
+                LargeCategory.KOREAN,
+                "국밥",
+                4.5,
+                "image",
+                Region.GANGNAM,
+                LocalDateTime.now()
+        );
+        RestaurantAdminListResult result = RestaurantAdminListResult.of(List.of(item), 0, 10, 1);
+
+        when(restaurantAdminFacade.getPageRestaurants(0, 10, null, null, null, null)).thenReturn(result);
+
+        mockMvc.perform(get(BASE_URL))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(1L))
+                .andExpect(jsonPath("$.data.content[0].largeCategory").value("KOREAN"))
+                .andExpect(jsonPath("$.data.content[0].mediumCategory").value("국밥"));
     }
 
     @Test

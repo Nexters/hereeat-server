@@ -1,5 +1,6 @@
 package com.yogieat.restaurant.result;
 
+import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.gathering.domain.value.TimeSlot;
@@ -16,6 +17,8 @@ public final class RestaurantAdminResult {
             Long id,
             String externalId,
             Long categoryId,
+            LargeCategory largeCategory,
+            String mediumCategory,
             String name,
             String address,
             Double rating,
@@ -40,6 +43,8 @@ public final class RestaurantAdminResult {
                 Long id,
                 String externalId,
                 Long categoryId,
+                LargeCategory largeCategory,
+                String mediumCategory,
                 String name,
                 String address,
                 Double rating,
@@ -64,6 +69,8 @@ public final class RestaurantAdminResult {
                     id,
                     externalId,
                     categoryId,
+                    largeCategory,
+                    mediumCategory,
                     name,
                     address,
                     rating,
@@ -91,6 +98,8 @@ public final class RestaurantAdminResult {
                     restaurant.id(),
                     restaurant.externalId(),
                     restaurant.categoryId(),
+                    null,
+                    null,
                     restaurant.name(),
                     restaurant.address(),
                     restaurant.rating(),

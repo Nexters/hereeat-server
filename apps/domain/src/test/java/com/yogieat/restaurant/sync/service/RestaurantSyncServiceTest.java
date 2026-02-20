@@ -21,6 +21,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,6 +43,9 @@ class RestaurantSyncServiceTest {
 
     @InjectMocks
     private RestaurantSyncService restaurantSyncService;
+
+    @Captor
+    private ArgumentCaptor<List<RestaurantSyncPatchCommand>> patchCommandsCaptor;
 
     @Test
     void syncChunk_success_callsBatchApplyOnce() {
@@ -68,9 +72,8 @@ class RestaurantSyncServiceTest {
         RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(List.of(1L), Runnable::run);
 
         assertThat(result.successCount()).isEqualTo(1);
-        ArgumentCaptor<List<RestaurantSyncPatchCommand>> captor = ArgumentCaptor.forClass(List.class);
-        verify(restaurantRepository).batchApplySyncPatch(captor.capture());
-        RestaurantSyncPatchCommand command = captor.getValue().getFirst();
+        verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
+        RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
         assertThat(command.mapUrl()).isEqualTo("https://place.map.kakao.com/123");
         assertThat(command.longitude()).isEqualTo(127.03);
         assertThat(command.latitude()).isEqualTo(37.51);
