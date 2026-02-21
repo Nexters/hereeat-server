@@ -29,7 +29,9 @@ public class ParticipantService {
                 distanceRange,
                 preferences,
                 dislikes,
-                Role.MEMBER // 참여자는 기본적으로 MEMBER 역할
+                Role.MEMBER, // 참여자는 기본적으로 MEMBER 역할
+                null,
+                null
         );
         return participantRepository.save(participant);
     }
@@ -58,7 +60,12 @@ public class ParticipantService {
      * @return 참여자 목록
      */
     @Transactional(readOnly = true)
-    public List<Participant> findByGatheringId(Long gatheringId) {
+    public List<Participant> getByGatheringId(Long gatheringId) {
         return participantRepository.findByGatheringId(gatheringId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Participant> getByGatheringIds(List<Long> gatheringIds) {
+        return participantRepository.findByGatheringIds(gatheringIds);
     }
 }

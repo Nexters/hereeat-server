@@ -11,6 +11,8 @@ spring:
     import:
       - logging.yaml
       - datasource.yaml
+      - client.yaml
+      - ai.yaml
 
 server:
   port: 8081
@@ -19,3 +21,25 @@ jwt:
   secret: ${JWT_SECRET:your-256-bit-secret-key-here-must-be-at-least-32-characters}
   access-token-validity: 3600000
   refresh-token-validity: 604800000
+
+restaurant:
+  collection:
+    processor:
+      enabled: false
+  sync:
+    service:
+      enabled: false
+
+kakao:
+  client:
+    enabled: ${KAKAO_CLIENT_ENABLED:false}
+  api:
+    api-key: ${KAKAO_API_KEY:admin-dummy-key}
+    base-url: ${KAKAO_API_BASE_URL:https://dapi.kakao.com}
+    client:
+      enabled: ${kakao.client.enabled}
+
+ai:
+  gemini:
+    api-key: ${AI_GEMINI_API_KEY:${GEMINI_API_KEY:admin-dummy-key}}
+    model: ${AI_GEMINI_MODEL:${GEMINI_MODEL:gemini-2.0-flash}}

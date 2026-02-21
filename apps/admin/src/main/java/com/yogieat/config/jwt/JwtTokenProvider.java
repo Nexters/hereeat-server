@@ -27,6 +27,10 @@ public class JwtTokenProvider {
 
     private final JwtProperties jwtProperties;
 
+    public static JwtTokenProvider of(String secret, long accessTokenValidity, long refreshTokenValidity) {
+        return new JwtTokenProvider(JwtProperties.of(secret, accessTokenValidity, refreshTokenValidity));
+    }
+
     public String createAccessToken(Admin admin) {
         return createToken(admin, TOKEN_TYPE_ACCESS, jwtProperties.accessTokenValidity());
     }

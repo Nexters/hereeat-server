@@ -23,4 +23,23 @@ public enum Region {
         this.name = name;
         this.coordinatesStandard = coordinatesStandard;
     }
+
+    public static Region fromString(String region) {
+        if (region == null || region.isBlank()) {
+            return null;
+        }
+
+        String normalizedRegion = region.strip();
+        try {
+            return valueOf(normalizedRegion);
+        } catch (IllegalArgumentException ignored) {
+            for (Region value : values()) {
+                if (value.name().equalsIgnoreCase(normalizedRegion)
+                        || value.getName().equals(normalizedRegion)) {
+                    return value;
+                }
+            }
+            return null;
+        }
+    }
 }

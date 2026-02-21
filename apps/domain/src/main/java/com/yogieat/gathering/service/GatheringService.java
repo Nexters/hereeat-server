@@ -5,7 +5,9 @@ import com.yogieat.common.error.ErrorCode;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.command.GatheringCommand;
 import com.yogieat.gathering.domain.result.GatheringResult;
+import com.yogieat.gathering.result.GatheringAdminItemResult;
 import com.yogieat.participant.service.ParticipantService;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -47,6 +49,8 @@ public class GatheringService {
                 command.timeSlot(),
                 command.region(),
                 command.peopleCount(),
+                null,
+                null,
                 null
         );
 
@@ -70,6 +74,42 @@ public class GatheringService {
                 currentCount,
                 gathering.peopleCount()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public Gathering getGatheringBy(Long id) {
+        Gathering gathering = gatheringRepository.findById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.GATHERING_NOT_FOUND));
+        gatheringValidator.validateGatheringNotDeleted(gathering);
+        return gathering;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Gathering> findAdminGatherings(
+            GatheringAdminCriteria.List criteria,
+            int page,
+            int size
+    ) {
+        return gatheringRepository.findAdminGatherings(criteria, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GatheringAdminItemResult> findAdminGatheringsWithParticipantCount(
+            GatheringAdminCriteria.List criteria,
+            int page,
+            int size
+    ) {
+        return gatheringRepository.findAdminGatheringsWithParticipantCount(criteria, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public long countAdminGatherings(GatheringAdminCriteria.List criteria) {
+        return gatheringRepository.countAdminGatherings(criteria);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Gathering> findAdminGatherings(GatheringAdminCriteria.List criteria) {
+        return gatheringRepository.findAdminGatherings(criteria);
     }
 
     private String createAccessKey() {

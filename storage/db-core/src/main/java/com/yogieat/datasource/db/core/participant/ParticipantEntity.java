@@ -82,7 +82,9 @@ public class ParticipantEntity extends BaseEntity {
                 entity.getDistanceRange(),
                 entity.getPreferences(),
                 entity.getDislikes(),
-                entity.getRole()
+                entity.getRole(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
         );
     }
 }

@@ -1,17 +1,27 @@
 package com.yogieat.datasource.db.core.restaurant;
 
+import static com.yogieat.datasource.db.core.category.QCategoryEntity.*;
 import static com.yogieat.datasource.db.core.restaurant.QRestaurantEntity.*;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.yogieat.common.Region;
+import com.yogieat.common.error.CustomException;
+import com.yogieat.common.error.ErrorCode;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
+import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
+import com.yogieat.restaurant.result.RestaurantAdminResult;
+import com.yogieat.restaurant.service.RestaurantAdminListCriteria;
+import com.yogieat.restaurant.service.RestaurantCommand;
 import com.yogieat.restaurant.service.RestaurantRepository;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.sql.Types;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -73,6 +83,15 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     }
 
     @Override
+    @Transactional
+    public Restaurant applyAdminPatch(Long restaurantId, RestaurantCommand.Patch command) {
+        RestaurantEntity entity = restaurantJpaRepository.findByIdAndDeletedAtIsNull(restaurantId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
+        entity.applyAdminPatch(command);
+        return RestaurantEntity.toDomain(entity);
+    }
+
+    @Override
     public long countByRegion(Region region) {
         return restaurantJpaRepository.countByRegionAndDeletedAtIsNull(region);
     }
@@ -101,6 +120,166 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     @Override
     public long countActiveRestaurants() {
         return restaurantJpaRepository.countByDeletedAtIsNull();
+    }
+
+    @Override
+    public List<RestaurantAdminListItemResult> findPageRestaurants(
+            RestaurantAdminListCriteria criteria,
+            int page,
+            int size
+    ) {
+        return createAdminRestaurantTupleQuery(criteria)
+                .orderBy(restaurantEntity.updatedAt.desc(), restaurantEntity.id.desc())
+                .offset((long) page * size)
+                .limit(size)
+                .fetch()
+                .stream()
+                .map(this::toAdminListItem)
+                .toList();
+    }
+
+    @Override
+    public long countAdminRestaurantList(
+            RestaurantAdminListCriteria criteria
+    ) {
+        Long total = jpaQueryFactory.select(restaurantEntity.count())
+                .from(restaurantEntity)
+                .leftJoin(categoryEntity)
+                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
+                .where(buildAdminRestaurantConditions(criteria))
+                .fetchOne();
+
+        return total == null ? 0L : total;
+    }
+
+    @Override
+    public Optional<RestaurantAdminResult.Detail> findAdminRestaurantDetailById(Long restaurantId) {
+        Tuple tuple = createAdminRestaurantTupleQuery(RestaurantAdminListCriteria.of(null, null, null, null))
+                .where(
+                        restaurantEntity.id.eq(restaurantId)
+                )
+                .fetchOne();
+
+        if (tuple == null) {
+            return Optional.empty();
+        }
+
+        RestaurantEntity entity = tuple.get(restaurantEntity);
+        if (entity == null) {
+            return Optional.empty();
+        }
+
+        Restaurant restaurant = RestaurantEntity.toDomain(entity);
+        return Optional.of(
+                RestaurantAdminResult.Detail.of(
+                        restaurant.id(),
+                        restaurant.externalId(),
+                        restaurant.categoryId(),
+                        tuple.get(categoryEntity.largeCategory),
+                        tuple.get(categoryEntity.mediumCategory),
+                        restaurant.name(),
+                        restaurant.address(),
+                        restaurant.rating(),
+                        restaurant.imageUrl(),
+                        restaurant.mapUrl(),
+                        restaurant.representativeReview(),
+                        restaurant.description(),
+                        restaurant.region(),
+                        restaurant.location(),
+                        restaurant.reviewCount(),
+                        restaurant.blogReviewCount(),
+                        restaurant.representMenu(),
+                        restaurant.representMenuPrice(),
+                        restaurant.priceLevel(),
+                        restaurant.aiMateSummaryTitle(),
+                        restaurant.aiMateSummaryContents(),
+                        restaurant.timeSlot(),
+                        restaurant.createdAt(),
+                        restaurant.updatedAt()
+                )
+        );
+    }
+
+    private JPAQuery<RestaurantEntity> createAdminRestaurantQuery(
+            RestaurantAdminListCriteria criteria
+    ) {
+        return jpaQueryFactory.selectFrom(restaurantEntity)
+                .leftJoin(categoryEntity)
+                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
+                .where(buildAdminRestaurantConditions(criteria));
+    }
+
+    private JPAQuery<Tuple> createAdminRestaurantTupleQuery(
+            RestaurantAdminListCriteria criteria
+    ) {
+        return jpaQueryFactory
+                .select(restaurantEntity, categoryEntity.largeCategory, categoryEntity.mediumCategory)
+                .from(restaurantEntity)
+                .leftJoin(categoryEntity)
+                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
+                .where(buildAdminRestaurantConditions(criteria));
+    }
+
+    private RestaurantAdminListItemResult toAdminListItem(Tuple tuple) {
+        RestaurantEntity entity = tuple.get(restaurantEntity);
+        return new RestaurantAdminListItemResult(
+                entity.getId(),
+                entity.getName(),
+                entity.getCategoryId(),
+                tuple.get(categoryEntity.largeCategory),
+                tuple.get(categoryEntity.mediumCategory),
+                entity.getRating(),
+                entity.getImageUrl(),
+                entity.getRegion(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    private BooleanExpression[] buildAdminRestaurantConditions(
+            RestaurantAdminListCriteria criteria
+    ) {
+        List<BooleanExpression> conditions = new ArrayList<>();
+        conditions.add(restaurantEntity.deletedAt.isNull());
+
+        if (criteria.region() != null) {
+            conditions.add(restaurantEntity.region.eq(criteria.region()));
+        }
+
+        if (criteria.categoryId() != null) {
+            conditions.add(restaurantEntity.categoryId.eq(criteria.categoryId()));
+        }
+
+        if (criteria.largeCategory() != null) {
+            conditions.add(categoryEntity.largeCategory.eq(criteria.largeCategory()));
+        }
+
+        BooleanExpression keywordCondition = createKeywordCondition(criteria.keyword());
+        if (keywordCondition != null) {
+            conditions.add(keywordCondition);
+        }
+
+        return conditions.toArray(BooleanExpression[]::new);
+    }
+
+    private BooleanExpression createKeywordCondition(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return null;
+        }
+
+        String trimmedKeyword = keyword.strip();
+        BooleanExpression keywordCondition = restaurantEntity.name.containsIgnoreCase(trimmedKeyword)
+                .or(restaurantEntity.address.containsIgnoreCase(trimmedKeyword))
+                .or(restaurantEntity.externalId.containsIgnoreCase(trimmedKeyword));
+
+        if (trimmedKeyword.chars().allMatch(Character::isDigit)) {
+            try {
+                keywordCondition = keywordCondition.or(restaurantEntity.id.eq(Long.valueOf(trimmedKeyword)));
+            } catch (NumberFormatException ignored) {
+                // 숫자 키워드지만 Long 범위를 초과한 경우 id 검색은 생략하고 텍스트 검색만 수행
+            }
+        }
+
+        return keywordCondition;
     }
 
     @Override

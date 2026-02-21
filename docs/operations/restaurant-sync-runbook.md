@@ -68,7 +68,27 @@ where deleted_at is null
     or time_slot is null
     or map_url is null
     or "location" is null
-    or image_url is null
-    or representative_review is null
+  or image_url is null
+  or representative_review is null
   );
+
+## 5) 관리자 검색 인덱스 반영 (PostgreSQL)
+
+관리자 맛집 목록 검색(키워드 containsIgnoreCase)에 대한 성능 개선을 위해 트라이그램 인덱스를 적용한다.
+
+```bash
+psql "$DATASOURCE_DB_CORE_JDBC_URL" -v ON_ERROR_STOP=1 -f scripts/sync/sql/restaurant-admin-search-index-up.sql
+```
+
+배포 후 통계 갱신:
+
+```sql
+ANALYZE t_restaurant;
+```
+
+롤백이 필요한 경우:
+
+```bash
+psql "$DATASOURCE_DB_CORE_JDBC_URL" -v ON_ERROR_STOP=1 -f scripts/sync/sql/restaurant-admin-search-index-down.sql
+```
 ```

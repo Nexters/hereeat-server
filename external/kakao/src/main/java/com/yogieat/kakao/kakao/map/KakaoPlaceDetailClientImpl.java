@@ -7,12 +7,14 @@ import com.yogieat.external.kakao.result.KakaoPlaceDetailFetchResult;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
+@ConditionalOnProperty(name = "kakao.api.client.enabled", havingValue = "true", matchIfMissing = false)
 @Slf4j
 public class KakaoPlaceDetailClientImpl implements KakaoPlaceDetailClient {
 

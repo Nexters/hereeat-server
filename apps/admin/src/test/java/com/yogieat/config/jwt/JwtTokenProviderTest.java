@@ -4,33 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.yogieat.admin.domain.Admin;
-import com.yogieat.admin.domain.value.AdminRole;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
+import com.yogieat.fixture.AdminTestFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class JwtTokenProviderTest {
 
-    private final JwtTokenProvider tokenProvider = new JwtTokenProvider(
-            new JwtProperties(
-                    "this-is-a-sufficiently-long-test-secret-key-12345",
-                    1_000,
-                    2_000
-            )
-    );
+    private final JwtTokenProvider tokenProvider = AdminTestFixture.defaultJwtTokenProvider();
 
-    private final Admin admin = new Admin(
-            1L,
-            "admin",
-            "encoded-password",
-            "Admin",
-            AdminRole.ADMIN,
-            null,
-            null,
-            null,
-            null
-    );
+    private final Admin admin = AdminTestFixture.admin();
 
     @Test
     @DisplayName("Access 토큰 생성 후 파싱에 성공한다")
@@ -61,13 +45,7 @@ class JwtTokenProviderTest {
     @Test
     @DisplayName("만료된 Access 토큰은 만료 예외가 발생한다")
     void expiredTokenShouldFail() throws InterruptedException {
-        JwtTokenProvider shortLivedTokenProvider = new JwtTokenProvider(
-                new JwtProperties(
-                        "this-is-a-sufficiently-long-test-secret-key-12345",
-                        10,
-                        2_000
-                )
-        );
+        JwtTokenProvider shortLivedTokenProvider = AdminTestFixture.shortAccessJwtTokenProvider();
 
         String token = shortLivedTokenProvider.createAccessToken(admin);
         Thread.sleep(30);

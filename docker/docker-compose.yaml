@@ -60,7 +60,18 @@ services:
       TZ: Asia/Seoul
     env_file:
       - ${ENV_FILE_PATH:-~/.env}
-    command: [ "postgres", "-c", "log_statement=all" ]
+    command:
+      - "postgres"
+      - "-c"
+      - "log_statement=${PG_LOG_STATEMENT:-none}"
+      - "-c"
+      - "shared_buffers=${PG_SHARED_BUFFERS:-64MB}"
+      - "-c"
+      - "work_mem=${PG_WORK_MEM:-4MB}"
+      - "-c"
+      - "maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-32MB}"
+      - "-c"
+      - "max_connections=${PG_MAX_CONNECTIONS:-60}"
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres_data:/var/lib/postgresql/data
