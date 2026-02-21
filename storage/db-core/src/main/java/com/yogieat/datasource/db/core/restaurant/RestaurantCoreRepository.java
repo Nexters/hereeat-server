@@ -93,7 +93,6 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     }
 
     @Override
-    @Transactional
     public void deleteBy(Long restaurantId) {
         RestaurantEntity entity = restaurantJpaRepository.findByIdAndDeletedAtIsNull(restaurantId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
