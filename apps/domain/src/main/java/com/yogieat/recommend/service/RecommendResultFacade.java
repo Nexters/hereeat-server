@@ -49,18 +49,19 @@ public class RecommendResultFacade {
     public RecommendResultData.Get getRecommendResults(String accessKey) {
         // 1. accessKey로 Gathering 조회
         Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
+        RecommendResultData.GatheringInfo gatheringInfo = RecommendResultData.GatheringInfo.of(gathering);
 
         // 2. gatheringId로 RecommendResult 목록 조회 (rank 순서대로)
         List<RecommendResult> recommendResults = recommendResultService.findByGatheringId(gathering.id());
 
         // 3. 결과가 없는 경우
         if (recommendResults.isEmpty()) {
-            return RecommendResultData.Get.ofEmpty();
+            return RecommendResultData.Get.ofEmpty(gatheringInfo);
         }
 
         // 4. PENDING 상태인 경우
         if (recommendResults.getFirst().status() == RecommendStatus.PENDING) {
-            return RecommendResultData.Get.ofPending();
+            return RecommendResultData.Get.ofPending(gatheringInfo);
         }
 
         // 5. 참여자 목록 조회
@@ -101,7 +102,8 @@ public class RecommendResultFacade {
                 aggregation.preferences(),
                 aggregation.dislikes(),
                 distances,
-                averageAgreementRate
+                averageAgreementRate,
+                gatheringInfo
         );
     }
 

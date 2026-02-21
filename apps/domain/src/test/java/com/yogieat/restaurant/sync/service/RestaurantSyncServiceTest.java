@@ -122,7 +122,7 @@ class RestaurantSyncServiceTest {
                 new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
-                .thenReturn(KakaoPlaceDetailFetchResult.success(detailData("맛집")));
+                .thenReturn(KakaoPlaceDetailFetchResult.success(detailData()));
 
         RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(List.of(1L), Runnable::run);
 
@@ -166,10 +166,10 @@ class RestaurantSyncServiceTest {
         verifyNoInteractions(kakaoPlaceClient, kakaoPlaceDetailClient, kakaoPlaceMapper);
     }
 
-    private KakaoPlaceDetailData detailData(String placeName) {
+    private KakaoPlaceDetailData detailData() {
         return new KakaoPlaceDetailData(
                 "123",
-                placeName,
+                "맛집",
                 null,
                 null,
                 null,
