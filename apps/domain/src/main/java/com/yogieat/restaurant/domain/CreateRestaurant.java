@@ -95,12 +95,15 @@ public record CreateRestaurant(
             KakaoPlaceDetailData detail,
             Long categoryId,
             String externalId,
-            Region region
+            Region region,
+            String description
     ) {
         GeoJson.Point location = toPoint(detail);
         String mapUrl = externalId == null || externalId.isBlank()
                 ? null
                 : "https://place.map.kakao.com/" + externalId;
+
+        String normalizedDescription = (description == null || description.isBlank()) ? null : description.strip();
 
         return new CreateRestaurant(
                 externalId,
@@ -111,7 +114,7 @@ public record CreateRestaurant(
                 detail == null ? null : detail.mainPhotoUrl(),
                 mapUrl,
                 detail == null ? null : detail.representativeReview(),
-                null,
+                normalizedDescription,
                 region,
                 location,
                 detail == null ? null : detail.reviewCount(),

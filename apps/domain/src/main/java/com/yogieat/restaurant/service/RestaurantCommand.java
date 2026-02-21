@@ -13,7 +13,8 @@ public final class RestaurantCommand {
     public record Create(
             String externalId,
             Long categoryId,
-            Region region
+            Region region,
+            String description
     ) {
     }
 

@@ -19,10 +19,11 @@ public final class RestaurantRequest {
     public record Create(
             @NotBlank String externalId,
             @NotNull @Min(1) Long categoryId,
-            @NotBlank String region
+            @NotBlank String region,
+            String description
     ) {
-        public static Create from(String externalId, Long categoryId, String region) {
-            return new Create(externalId, categoryId, region);
+        public static Create from(String externalId, Long categoryId, String region, String description) {
+            return new Create(externalId, categoryId, region, description);
         }
 
         public static RestaurantCommand.Create toCommand(Create request) {
@@ -33,7 +34,8 @@ public final class RestaurantRequest {
             return new RestaurantCommand.Create(
                     trimOrNull(request.externalId()),
                     request.categoryId(),
-                    parseRegion(request.region())
+                    parseRegion(request.region()),
+                    trimOrNull(request.description())
             );
         }
     }

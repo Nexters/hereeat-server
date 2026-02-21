@@ -83,7 +83,8 @@ public class RestaurantService {
                             detailResult.detail(),
                             command.categoryId(),
                             externalId,
-                            command.region()
+                            command.region(),
+                            command.description()
                     )
             );
             return RestaurantAdminResult.Create.created(createdRestaurant.id());
