@@ -91,7 +91,7 @@ class RestaurantSyncServiceTest {
         assertThat(result.processedCount()).isEqualTo(1);
         assertThat(result.successCount()).isEqualTo(1);
         assertThat(result.failedCount()).isEqualTo(0);
-        verify(restaurantRepository).batchSoftDeleteByIds(List.of(1L));
+        verify(restaurantRepository).batchDeleteByIds(List.of(1L));
         verify(restaurantRepository, never()).batchApplySyncPatch(anyList());
         verifyNoInteractions(kakaoPlaceClient, kakaoPlaceMapper);
     }

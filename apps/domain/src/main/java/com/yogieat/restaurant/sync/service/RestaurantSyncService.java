@@ -126,12 +126,12 @@ public class RestaurantSyncService {
 
         if (!softDeleteIds.isEmpty()) {
             try {
-                restaurantRepository.batchSoftDeleteByIds(softDeleteIds);
+                restaurantRepository.batchDeleteByIds(softDeleteIds);
                 successCount += softDeleteIds.size();
             } catch (Exception e) {
-                log.error("Batch soft delete failed for {} restaurants", softDeleteIds.size(), e);
+                log.error("Batch delete failed for {} restaurants", softDeleteIds.size(), e);
                 if (errorMessages.size() < 10) {
-                    errorMessages.add("batch soft delete failed: " + e.getMessage());
+                    errorMessages.add("batch delete failed: " + e.getMessage());
                 }
             }
         }

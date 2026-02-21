@@ -367,23 +367,12 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     @Transactional
-    public void batchSoftDeleteByIds(List<Long> restaurantIds) {
+    public void batchDeleteByIds(List<Long> restaurantIds) {
         if (restaurantIds == null || restaurantIds.isEmpty()) {
             return;
         }
 
-        String sql = """
-                update t_restaurant
-                set deleted_at = coalesce(deleted_at, now()),
-                    updated_at = now()
-                where id in (:restaurantIds)
-                  and deleted_at is null
-                """;
-
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("restaurantIds", restaurantIds);
-
-        namedParameterJdbcTemplate.update(sql, params);
+        restaurantJpaRepository.deleteAllByIdInBatch(restaurantIds);
     }
 
     @Override

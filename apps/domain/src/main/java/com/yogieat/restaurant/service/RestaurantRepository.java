@@ -35,7 +35,7 @@ public interface RestaurantRepository {
     Optional<RestaurantAdminResult.Detail> findAdminRestaurantDetailById(Long restaurantId);
     List<RestaurantSyncTarget> findSyncTargetsByIds(List<Long> ids);
     void batchApplySyncPatch(List<RestaurantSyncPatchCommand> commands);
-    void batchSoftDeleteByIds(List<Long> restaurantIds);
+    void batchDeleteByIds(List<Long> restaurantIds);
     void applySyncPatch(Long restaurantId, RestaurantSyncPatch patch);
 
 }
