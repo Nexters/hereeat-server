@@ -23,9 +23,23 @@ public class KakaoPlaceClientImpl implements KakaoPlaceClient {
     private static final int KAKAO_MAX_RESULT_LIMIT = 15;
 
     private final RestClient kakaoRestClient;
+    private final KakaoAdminKakaoApiExecutor kakaoAdminKakaoApiExecutor;
 
     @Override
     public List<KaKaoPlaceDocumentResult> searchPlaces(String placeName, String region, int size) {
+        return kakaoAdminKakaoApiExecutor.executeSearchPlaces(
+                placeName,
+                region,
+                size,
+                () -> searchPlacesWithoutPolicy(placeName, region, size)
+        );
+    }
+
+    private List<KaKaoPlaceDocumentResult> searchPlacesWithoutPolicy(
+            String placeName,
+            String region,
+            int size
+    ) {
         String normalizedName = placeName == null ? "" : placeName.trim();
         String normalizedRegion = region == null ? "" : region.trim();
         int normalizedSize = Math.max(1, Math.min(size, KAKAO_MAX_RESULT_LIMIT));
