@@ -22,10 +22,15 @@ public final class RegionAdminResponse {
 
     public record RegionItemResponse(
             String name,
+            String displayName,
             GeoJson.Point coordinatesStandard
     ) {
         public static RegionItemResponse from(Region region) {
-            return new RegionItemResponse(region.getName(), region.getCoordinatesStandard());
+            return new RegionItemResponse(
+                    region.name(),
+                    region.getName(),
+                    region.getCoordinatesStandard()
+            );
         }
     }
 }
