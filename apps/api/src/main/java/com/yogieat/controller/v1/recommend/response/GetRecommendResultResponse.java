@@ -29,10 +29,7 @@ public record GetRecommendResultResponse(
         @Schema(description = "의견 일치율 (%)", example = "85.5")
         Double agreementRate
 ) {
-    public static record GatheringInfo(
-            Long id,
-            String accessKey,
-            String title,
+    public record GatheringInfo(
             LocalDate scheduledDate,
             TimeSlot timeSlot,
             Region region,
@@ -40,9 +37,6 @@ public record GetRecommendResultResponse(
     ) {
         public static GatheringInfo from(RecommendResultData.GatheringInfo info) {
             return new GatheringInfo(
-                    info.id(),
-                    info.accessKey(),
-                    info.title(),
                     info.scheduledDate(),
                     info.timeSlot(),
                     info.region(),
