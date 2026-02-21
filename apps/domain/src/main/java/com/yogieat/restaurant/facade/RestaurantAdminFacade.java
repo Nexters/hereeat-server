@@ -75,6 +75,11 @@ public class RestaurantAdminFacade {
         return restaurantService.getAdminRestaurantDetailBy(restaurantId);
     }
 
+    @Transactional
+    public void deleteRestaurantBy(Long restaurantId) {
+        restaurantService.deleteBy(restaurantId);
+    }
+
     private LargeCategory parseLargeCategory(String largeCategory) {
         if (largeCategory == null || largeCategory.isBlank()) {
             return null;

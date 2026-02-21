@@ -58,6 +58,11 @@ public class RestaurantService {
                 .orElseGet(() -> createRestaurantByExternalId(command, externalId));
     }
 
+    @Transactional
+    public void deleteBy(Long id) {
+        restaurantRepository.deleteBy(id);
+    }
+
     @Transactional(readOnly = true)
     public long countAdminRestaurantList(RestaurantAdminListCriteria criteria) {
         return restaurantRepository.countAdminRestaurantList(criteria);
