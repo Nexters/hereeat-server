@@ -13,9 +13,11 @@ public class CorsConfig implements WebMvcConfigurer {
                         "http://localhost:3000",
                         "https://dev.yogieat.com",
                         "https://yogieat.com",
-                        "https://www.yogieat.com"
+                        "https://www.yogieat.com",
+                        "https://dev-admin.yogieat.com",
+                        "https://admin.yogieat.com"
                 )
-                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE")
+                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
     }
