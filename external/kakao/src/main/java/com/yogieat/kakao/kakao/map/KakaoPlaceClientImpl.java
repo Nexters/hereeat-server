@@ -3,9 +3,11 @@ package com.yogieat.kakao.kakao.map;
 import com.yogieat.external.kakao.KakaoPlaceClient;
 import com.yogieat.external.kakao.result.KaKaoPlaceDocumentResult;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,32 +20,78 @@ import org.springframework.web.client.RestClient;
 @Slf4j
 public class KakaoPlaceClientImpl implements KakaoPlaceClient {
 
+    private static final int KAKAO_MAX_RESULT_LIMIT = 15;
+
     private final RestClient kakaoRestClient;
+    private final KakaoAdminKakaoApiExecutor kakaoAdminKakaoApiExecutor;
 
     @Override
-    public Optional<KaKaoPlaceDocumentResult> searchPlace(String placeName, String region) {
+    public List<KaKaoPlaceDocumentResult> searchPlaces(String placeName, String region, int size) {
+        return kakaoAdminKakaoApiExecutor.executeSearchPlaces(
+                placeName,
+                region,
+                size,
+                () -> searchPlacesWithoutPolicy(placeName, region, size)
+        );
+    }
+
+    private List<KaKaoPlaceDocumentResult> searchPlacesWithoutPolicy(
+            String placeName,
+            String region,
+            int size
+    ) {
         String normalizedName = placeName == null ? "" : placeName.trim();
         String normalizedRegion = region == null ? "" : region.trim();
+        int normalizedSize = Math.max(1, Math.min(size, KAKAO_MAX_RESULT_LIMIT));
+        RuntimeException lastError = null;
 
         if (normalizedName.isBlank()) {
-            return Optional.empty();
+            return List.of();
         }
 
         List<String> candidates = buildCandidateQueries(normalizedName, normalizedRegion);
+        List<KaKaoPlaceDocumentResult> results = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
+
         for (String query : candidates) {
             try {
-                Optional<KaKaoPlaceDocumentResult> result = searchSingleQuery(query);
-                if (result.isPresent()) {
-                    return result;
+                List<KaKaoPlaceDocumentResult> queryResults = searchSingleQuery(query, normalizedSize);
+                for (KaKaoPlaceDocumentResult candidate : queryResults) {
+                    if (candidate == null || candidate.id() == null || candidate.id().isBlank()) {
+                        continue;
+                    }
+                    if (seenIds.add(candidate.id())) {
+                        results.add(candidate);
+                        if (results.size() >= normalizedSize) {
+                            return results;
+                        }
+                    }
                 }
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 log.warn("Kakao API search failed. query={}", query, e);
+                lastError = e;
             }
         }
 
-        log.warn("No place found for name={} region={} with {} candidates",
-                normalizedName, normalizedRegion, candidates.size());
-        return Optional.empty();
+        if (results.isEmpty() && lastError != null) {
+            throw lastError;
+        }
+
+        if (results.isEmpty()) {
+            log.warn("No place found for name={} region={} with {} candidates",
+                    normalizedName, normalizedRegion, candidates.size());
+        }
+
+        return results;
+    }
+
+    @Override
+    public Optional<KaKaoPlaceDocumentResult> searchPlace(String placeName, String region) {
+        List<KaKaoPlaceDocumentResult> results = searchPlaces(placeName, region, 1);
+        if (results.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(results.getFirst());
     }
 
     private List<String> buildCandidateQueries(String placeName, String region) {
@@ -71,23 +119,26 @@ public class KakaoPlaceClientImpl implements KakaoPlaceClient {
         return name + " " + region;
     }
 
-    private Optional<KaKaoPlaceDocumentResult> searchSingleQuery(String query) {
-        log.debug("Searching Kakao Place API with query={}", query);
+    private List<KaKaoPlaceDocumentResult> searchSingleQuery(String query, int size) {
+        int fetchSize = Math.max(1, Math.min(size, KAKAO_MAX_RESULT_LIMIT));
+        log.debug("Searching Kakao Place API with query={}, size={}", query, fetchSize);
         KakaoSearchResponse response = kakaoRestClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/v2/local/search/keyword.json")
                         .queryParam("query", query)
-                        .queryParam("size", 1)
+                        .queryParam("size", fetchSize)
                         .build())
                 .retrieve()
                 .body(KakaoSearchResponse.class);
 
         if (response == null || response.documents().isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
 
-        KaKaoPlaceDocument document = response.documents().getFirst();
-        log.debug("Found place via query={}, place={}", query, document.placeName());
-        return Optional.of(document.toResult());
+        List<KaKaoPlaceDocumentResult> documents = response.documents().stream()
+                .map(KaKaoPlaceDocument::toResult)
+                .toList();
+        log.debug("Found {} places via query={}", documents.size(), query);
+        return documents;
     }
 }

@@ -3,6 +3,7 @@ package com.yogieat.restaurant.result;
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
+import com.yogieat.external.kakao.result.KaKaoPlaceDocumentResult;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.Restaurant;
 import java.time.LocalDateTime;
@@ -11,6 +12,56 @@ import java.util.List;
 public final class RestaurantAdminResult {
 
     private RestaurantAdminResult() {
+    }
+
+    public record SearchItem(
+            String externalId,
+            String placeName,
+            String addressName,
+            String roadAddressName,
+            String category,
+            String x,
+            String y
+    ) {
+        public static SearchItem from(KaKaoPlaceDocumentResult result) {
+            return new SearchItem(
+                    result.id(),
+                    result.placeName(),
+                    result.addressName(),
+                    result.roadAddressName(),
+                    result.categoryName(),
+                    result.x(),
+                    result.y()
+            );
+        }
+    }
+
+    public record Search(
+            String keyword,
+            List<SearchItem> items
+    ) {
+        public static Search of(String keyword, List<KaKaoPlaceDocumentResult> items) {
+            List<SearchItem> mappedItems = items == null
+                    ? List.of()
+                    : items.stream()
+                        .filter(java.util.Objects::nonNull)
+                        .map(SearchItem::from)
+                        .toList();
+            return new Search(keyword, mappedItems);
+        }
+    }
+
+    public record Create(
+            Long restaurantId,
+            boolean duplicated
+    ) {
+        public static Create created(Long restaurantId) {
+            return new Create(restaurantId, false);
+        }
+
+        public static Create duplicated(Long restaurantId) {
+            return new Create(restaurantId, true);
+        }
     }
 
     public record Detail(

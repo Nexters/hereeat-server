@@ -1,6 +1,9 @@
 package com.yogieat.participant.service;
 
 import com.yogieat.category.domain.value.LargeCategory;
+import com.yogieat.common.GeoJson;
+import com.yogieat.common.GeoUtils;
+import com.yogieat.common.Region;
 import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.domain.value.DistanceRange;
 import com.yogieat.recommend.domain.value.CategoryAggregation;
@@ -39,6 +42,31 @@ public class ParticipantAnalyzer {
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
                 .orElse(DistanceRange.ANY);
+    }
+
+    /**
+     * 맛집 위치와 region 기준 좌표의 거리를 기준으로 거리 범위를 결정
+     *
+     * @param restaurantPoint 맛집 좌표
+     * @param region         다수결 판단 기준 지역
+     * @return 거리 500m 이내면 RANGE_500M, 1km 이내면 RANGE_1KM, 그 외는 ANY
+     */
+    public DistanceRange determineMajorityDistanceRange(GeoJson.Point restaurantPoint, Region region) {
+        if (region == null
+                || !GeoUtils.isValidPoint(restaurantPoint)
+                || !GeoUtils.isValidPoint(region.getCoordinatesStandard())
+        ) {
+            return DistanceRange.ANY;
+        }
+
+        double distance = GeoUtils.calculateDistanceKm(region.getCoordinatesStandard(), restaurantPoint);
+        if (distance <= 0.5) {
+            return DistanceRange.RANGE_500M;
+        }
+        if (distance <= 1.0) {
+            return DistanceRange.RANGE_1KM;
+        }
+        return DistanceRange.ANY;
     }
 
     /**

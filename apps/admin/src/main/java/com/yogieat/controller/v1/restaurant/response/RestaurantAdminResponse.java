@@ -13,6 +13,54 @@ public final class RestaurantAdminResponse {
     private RestaurantAdminResponse() {
     }
 
+    public record Search(
+            String keyword,
+            List<SearchItem> items
+    ) {
+        public static Search from(RestaurantAdminResult.Search result) {
+            if (result == null) {
+                return null;
+            }
+            return new Search(
+                    result.keyword(),
+                    result.items().stream()
+                            .map(SearchItem::from)
+                            .toList()
+            );
+        }
+    }
+
+    public record SearchItem(
+            String externalId,
+            String placeName,
+            String addressName,
+            String roadAddressName,
+            String category,
+            String x,
+            String y
+    ) {
+        public static SearchItem from(RestaurantAdminResult.SearchItem item) {
+            return new SearchItem(
+                    item.externalId(),
+                    item.placeName(),
+                    item.addressName(),
+                    item.roadAddressName(),
+                    item.category(),
+                    item.x(),
+                    item.y()
+            );
+        }
+    }
+
+    public record Create(
+            Long restaurantId,
+            boolean duplicated
+    ) {
+        public static Create from(RestaurantAdminResult.Create result) {
+            return new Create(result.restaurantId(), result.duplicated());
+        }
+    }
+
     public record Detail(
             Long id,
             String externalId,

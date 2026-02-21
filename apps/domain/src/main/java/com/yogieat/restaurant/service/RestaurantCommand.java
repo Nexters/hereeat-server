@@ -10,6 +10,14 @@ public final class RestaurantCommand {
     private RestaurantCommand() {
     }
 
+    public record Create(
+            String externalId,
+            Long categoryId,
+            Region region,
+            String description
+    ) {
+    }
+
     public record Patch(
             String externalId,
             String name,

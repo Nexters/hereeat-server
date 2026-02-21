@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -26,7 +27,9 @@ import com.yogieat.restaurant.result.RestaurantAdminListResult;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
 import com.yogieat.restaurant.service.RestaurantCommand;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -190,11 +193,108 @@ class RestaurantAdminControllerTest {
         RestaurantRequest.Patch request = RestaurantAdminFixture.patchForInvalidTimeSlot();
 
         mockMvc.perform(
-                        patch(BASE_URL + "/1")
+                patch(BASE_URL + "/1")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
                 )
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.data.errorCode").value(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH.getCode()));
+    }
+
+    @Test
+    @DisplayName("키워드로 카카오 맛집 검색 시 200과 결과를 반환한다")
+    void searchRestaurants_ShouldReturnOk_WhenRequestValid() throws Exception {
+        RestaurantAdminResult.Search result = new RestaurantAdminResult.Search(
+                "파스타",
+                List.of(
+                        new RestaurantAdminResult.SearchItem(
+                                "ext-1",
+                                "restaurant",
+                                "address",
+                                "road-address",
+                                "카페",
+                                "126.0",
+                                "37.0"
+                        )
+                )
+        );
+        when(restaurantAdminFacade.searchRestaurants("파스타")).thenReturn(result);
+
+        mockMvc.perform(
+                        get(BASE_URL + "/search")
+                                .param("keyword", "파스타")
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.keyword").value("파스타"))
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.items[0].externalId").value("ext-1"));
+    }
+
+    @Test
+    @DisplayName("검색 키워드가 공백이면 400을 반환한다")
+    void searchRestaurants_ShouldReturnBadRequest_WhenKeywordBlank() throws Exception {
+        mockMvc.perform(
+                        get(BASE_URL + "/search")
+                                .param("keyword", "  ")
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("맛집 생성 요청 시 201과 생성 응답을 반환한다")
+    void createRestaurant_ShouldReturn201_WhenRequestValid() throws Exception {
+        RestaurantAdminResult.Create result = RestaurantAdminResult.Create.created(101L);
+        when(restaurantAdminFacade.createRestaurant(any(RestaurantCommand.Create.class))).thenReturn(result);
+
+        Map<String, Object> request = new HashMap<>();
+        request.put("externalId", "ext-101");
+        request.put("categoryId", 1L);
+        request.put("region", "GANGNAM");
+
+        mockMvc.perform(
+                        post(BASE_URL)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.restaurantId").value(101L))
+                .andExpect(jsonPath("$.data.duplicated").value(false));
+    }
+
+    @Test
+    @DisplayName("동일한 외부 식당 ID로 중복 생성 시 duplicated=true와 200을 반환한다")
+    void createRestaurant_ShouldReturn200_WhenDuplicated() throws Exception {
+        RestaurantAdminResult.Create result = RestaurantAdminResult.Create.duplicated(101L);
+        when(restaurantAdminFacade.createRestaurant(any(RestaurantCommand.Create.class))).thenReturn(result);
+
+        Map<String, Object> request = new HashMap<>();
+        request.put("externalId", "ext-101");
+        request.put("categoryId", 1L);
+        request.put("region", "GANGNAM");
+
+        mockMvc.perform(
+                        post(BASE_URL)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.restaurantId").value(101L))
+                .andExpect(jsonPath("$.data.duplicated").value(true));
+    }
+
+    @Test
+    @DisplayName("맛집 생성 요청에서 region가 비면 400을 반환한다")
+    void createRestaurant_ShouldReturn400_WhenRegionBlank() throws Exception {
+        Map<String, Object> request = new HashMap<>();
+        request.put("externalId", "ext-101");
+        request.put("categoryId", 1L);
+        request.put("region", "");
+
+        mockMvc.perform(
+                        post(BASE_URL)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isBadRequest());
     }
 }

@@ -31,5 +31,7 @@ class ErrorHttpStatusMapperTest {
         assertThat(mapper.toHttpStatus(ErrorCode.INVALID_LOCATION_NAME)).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(mapper.toHttpStatus(ErrorCode.RESTAURANT_NOT_FOUND)).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(mapper.toHttpStatus(ErrorCode.GATHERING_NOT_FOUND)).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(mapper.toHttpStatus(ErrorCode.KAKAO_API_ERROR)).isEqualTo(HttpStatus.BAD_GATEWAY);
+        assertThat(mapper.toHttpStatus(ErrorCode.KAKAO_RATE_LIMIT_EXCEEDED)).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     }
 }

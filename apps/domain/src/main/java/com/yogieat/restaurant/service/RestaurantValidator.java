@@ -1,13 +1,17 @@
 package com.yogieat.restaurant.service;
 
 import com.yogieat.common.Region;
+import com.yogieat.common.error.CustomException;
+import com.yogieat.common.error.ErrorCode;
+import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,13 +20,18 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class RestaurantValidator {
+
+    private static final Logger log = LoggerFactory.getLogger(RestaurantValidator.class);
 
     private static final String DUPLICATE_EXTERNAL_ID_REASON = "Restaurant already exists with externalId: %s";
     private static final String DUPLICATE_NAME_ADDRESS_REASON = "Restaurant already exists with same name and address";
     private static final String REQUIRED_NAME_REASON = "Restaurant name is required";
     private static final String REQUIRED_ADDRESS_REASON = "Restaurant address is required";
+    private static final String REQUIRED_EXTERNAL_ID_REASON = "Restaurant externalId is required";
+    private static final String REQUIRED_CATEGORY_REASON = "Restaurant category is required";
+    private static final String REQUIRED_REGION_REASON = "Restaurant region is required";
+    private static final int MAX_REGION_NAME_LENGTH = 20;
 
     private final RestaurantRepository restaurantRepository;
 
@@ -95,6 +104,38 @@ public class RestaurantValidator {
      */
     public void addToCache(ValidationContext context, String externalId, String name, String address) {
         context.add(externalId, name, address);
+    }
+
+    public void validateCreateCommand(RestaurantCommand.Create command) {
+        if (command == null) {
+            throw new CustomException(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH);
+        }
+
+        if (command.externalId() == null || command.externalId().isBlank()) {
+            throw new CustomException(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH, REQUIRED_EXTERNAL_ID_REASON);
+        }
+
+        if (command.categoryId() == null) {
+            throw new CustomException(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH, REQUIRED_CATEGORY_REASON);
+        }
+
+        if (command.region() == null || command.region().getName() == null || command.region().getName().isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_LOCATION_NAME, REQUIRED_REGION_REASON);
+        }
+
+        if (command.region().getName().length() > MAX_REGION_NAME_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_LOCATION_NAME, REQUIRED_REGION_REASON);
+        }
+    }
+
+    public void validateCreateDetail(KakaoPlaceDetailData detail) {
+        if (detail == null || detail.placeName() == null || detail.placeName().isBlank()) {
+            throw new CustomException(ErrorCode.KAKAO_API_ERROR, "카카오 상세 정보에서 식당명을 확인할 수 없습니다");
+        }
+
+        if (detail.address() == null || detail.address().isBlank()) {
+            throw new CustomException(ErrorCode.KAKAO_API_ERROR, "카카오 상세 정보에서 주소를 확인할 수 없습니다");
+        }
     }
 
     /**

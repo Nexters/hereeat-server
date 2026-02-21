@@ -105,7 +105,7 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 "GANGNAM",
-                RestaurantRequest.Patch.RestaurantLocationRequest.of(List.of(127.0)),
+                RestaurantRequest.RestaurantLocationRequest.of(List.of(127.0)),
                 null,
                 null,
                 null,

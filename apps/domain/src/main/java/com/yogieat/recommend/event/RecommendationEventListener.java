@@ -2,15 +2,18 @@ package com.yogieat.recommend.event;
 
 import com.yogieat.recommend.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RecommendationEventListener {
+
+    private static final Logger log = LoggerFactory.getLogger(RecommendationEventListener.class);
+
     private final RecommendationService recommendationService;
 
     @Async
