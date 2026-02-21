@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import com.yogieat.common.Region;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
+import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ class RestaurantValidatorTest {
         when(restaurantRepository.existsByExternalId("k-1")).thenReturn(true);
 
         RestaurantValidator.ValidationContext context =
-                new RestaurantValidator.ValidationContext(new java.util.HashSet<>(List.of("k-1")), new java.util.HashSet<>());
+                new RestaurantValidator.ValidationContext(new HashSet<>(List.of("k-1")), new HashSet<>());
 
         RestaurantValidator.ValidationResult cacheResult =
                 restaurantValidator.duplicateValidateWithCache(context, suggestion, "k-1");
@@ -49,7 +50,7 @@ class RestaurantValidatorTest {
         when(restaurantRepository.existsByNameAndAddress("식당B", "주소B")).thenReturn(true);
 
         RestaurantValidator.ValidationContext context =
-                new RestaurantValidator.ValidationContext(new java.util.HashSet<>(), new java.util.HashSet<>(List.of("식당B|주소B")));
+                new RestaurantValidator.ValidationContext(new HashSet<>(), new HashSet<>(List.of("식당B|주소B")));
 
         RestaurantValidator.ValidationResult cacheResult =
                 restaurantValidator.duplicateValidateWithCache(context, suggestion, null);

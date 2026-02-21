@@ -6,6 +6,9 @@ create index if not exists idx_sync_job_scope_status_created_at
 create index if not exists idx_sync_job_target_status_created_at
     on t_restaurant_sync_job (target_restaurant_id, status, created_at);
 
+create index if not exists idx_sync_job_status_started_at
+    on t_restaurant_sync_job (status, started_at);
+
 -- 2) Duplicate prevention constraints for active jobs
 -- ALL scope: only one RUNNING/PENDING job
 create unique index if not exists uq_sync_job_all_active

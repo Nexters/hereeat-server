@@ -1,12 +1,14 @@
 package com.yogieat.restaurant.sync.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.external.kakao.KakaoPlaceClient;
 import com.yogieat.external.kakao.KakaoPlaceDetailClient;
@@ -17,6 +19,8 @@ import com.yogieat.restaurant.service.RestaurantRepository;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncChunkResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,10 +53,11 @@ class RestaurantSyncServiceTest {
 
     @Test
     void syncChunk_success_callsBatchApplyOnce() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123");
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+                new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
-                .thenReturn(KakaoPlaceDetailFetchResult.success(detailData("맛집")));
+                .thenReturn(KakaoPlaceDetailFetchResult.success(detailDataWithCoordinate("맛집", 37.498, 127.0285)));
 
         RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(List.of(1L), Runnable::run);
 
@@ -64,7 +69,8 @@ class RestaurantSyncServiceTest {
 
     @Test
     void syncChunk_whenOnlyDetailAvailable_fillsMapUrlAndLocation() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123");
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+                new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
                 .thenReturn(KakaoPlaceDetailFetchResult.success(detailDataWithCoordinate("맛집", 37.498, 127.0285)));
@@ -80,8 +86,59 @@ class RestaurantSyncServiceTest {
     }
 
     @Test
-    void syncChunk_whenKakaoPlaceNotFound_softDeletesRestaurant() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "not-found-id");
+    void syncChunk_whenRegionNull_deletesRestaurant() {
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", null, "123");
+        when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
+
+        RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(List.of(1L), Runnable::run);
+
+        assertThat(result.processedCount()).isEqualTo(1);
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(result.failedCount()).isEqualTo(0);
+        verify(restaurantRepository).batchDeleteByIds(List.of(1L));
+        verify(restaurantRepository, never()).batchApplySyncPatch(anyList());
+        verifyNoInteractions(kakaoPlaceClient, kakaoPlaceDetailClient, kakaoPlaceMapper);
+    }
+
+    @Test
+    void syncChunk_whenTargetPointInvalid_deletesRestaurant() {
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+                new GeoJson.Point(new ArrayList<>(Arrays.asList(127.0280, null))));
+        when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
+
+        RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(List.of(1L), Runnable::run);
+
+        assertThat(result.processedCount()).isEqualTo(1);
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(result.failedCount()).isEqualTo(0);
+        verify(restaurantRepository).batchDeleteByIds(List.of(1L));
+        verify(restaurantRepository, never()).batchApplySyncPatch(anyList());
+        verifyNoInteractions(kakaoPlaceClient, kakaoPlaceDetailClient, kakaoPlaceMapper);
+    }
+
+    @Test
+    void syncChunk_whenResolvedPointInvalid_deletesRestaurant() {
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+                new GeoJson.Point(List.of(127.0280, 37.4980)));
+        when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
+        when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
+                .thenReturn(KakaoPlaceDetailFetchResult.success(detailData("맛집")));
+
+        RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(List.of(1L), Runnable::run);
+
+        assertThat(result.processedCount()).isEqualTo(1);
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(result.failedCount()).isEqualTo(0);
+        verify(restaurantRepository).batchDeleteByIds(List.of(1L));
+        verify(restaurantRepository, never()).batchApplySyncPatch(anyList());
+        verify(kakaoPlaceClient, never()).searchPlace("맛집", Region.GANGNAM.getName());
+        verify(kakaoPlaceMapper, never()).toDomainData(any());
+    }
+
+    @Test
+    void syncChunk_whenKakaoPlaceNotFound_deletesRestaurant() {
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "not-found-id",
+                new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("not-found-id"))
                 .thenReturn(KakaoPlaceDetailFetchResult.notFound());

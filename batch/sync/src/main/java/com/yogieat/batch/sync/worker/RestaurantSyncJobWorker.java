@@ -22,6 +22,11 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class RestaurantSyncJobWorker {
     private static final String STALE_RUNNING_ERROR_SUMMARY = "stale RUNNING job recovered by worker";
+    private static final int PROGRESS_UPDATE_INTERVAL_CHUNKS = 5;
+    private static final long PROGRESS_UPDATE_INTERVAL_MS = 5_000L;
+    private static final int PROGRESS_UPDATE_BATCH_FAIL_THRESHOLD = 2;
+    private static final long CHUNK_SLOW_THRESHOLD_MS = 8_000L;
+    private static final int MIN_CHUNK_SIZE = 20;
 
     private final RestaurantSyncJobRepository syncJobRepository;
     private final RestaurantRepository restaurantRepository;
@@ -38,13 +43,20 @@ public class RestaurantSyncJobWorker {
         }
 
         RestaurantSyncJob currentJob = null;
+        long pollStartAt = System.nanoTime();
         try {
+            long staleStartAt = System.nanoTime();
             cleanupStaleRunningJobs();
+            log.debug("cleanup stale jobs finished in {}ms", (System.nanoTime() - staleStartAt) / 1_000_000L);
 
+            long claimStartAt = System.nanoTime();
             currentJob = syncJobRepository.claimNextPendingJob().orElse(null);
             if (currentJob == null) {
+                log.debug("sync job poll finished: no pending job, elapsed {}ms",
+                        (System.nanoTime() - pollStartAt) / 1_000_000L);
                 return;
             }
+            log.debug("claimed sync job {} in {}ms", currentJob.id(), (System.nanoTime() - claimStartAt) / 1_000_000L);
 
             if (currentJob.scope() == RestaurantSyncScope.SINGLE) {
                 executeSingle(currentJob);
@@ -58,6 +70,9 @@ public class RestaurantSyncJobWorker {
                 syncJobRepository.markFailed(currentJob.id(), e.getMessage());
             }
         } finally {
+            log.debug("sync job poll completed in {}ms (jobId={})",
+                    (System.nanoTime() - pollStartAt) / 1_000_000L,
+                    currentJob == null ? "none" : currentJob.id());
             running.set(false);
         }
     }
@@ -104,22 +119,42 @@ public class RestaurantSyncJobWorker {
 
     private void executeAll(RestaurantSyncJob job) {
         long totalCount = restaurantRepository.countActiveRestaurants();
+        int baseChunkSize = syncJobProperties.resolvedChunkSize();
+        int currentChunkSize = Math.max(1, baseChunkSize);
+        int minChunkSize = Math.max(MIN_CHUNK_SIZE, Math.max(1, baseChunkSize / 2));
+        int maxChunkSize = Math.max(baseChunkSize, baseChunkSize * 2);
+        int slowChunkStreak = 0;
+        int successChunkStreak = 0;
         syncJobRepository.initializeTotalCount(job.id(), totalCount);
 
         long lastId = job.lastProcessedRestaurantId() == null ? 0L : job.lastProcessedRestaurantId();
         long totalFailed = 0L;
+        long totalSuccess = 0L;
         List<String> errorMessages = new ArrayList<>();
+        long lastProgressUpdateAt = System.currentTimeMillis();
+        int chunkIndex = 0;
+        long totalProcessed = 0L;
+        long lastUpdatedProcessed = 0L;
+        long lastUpdatedSuccess = 0L;
+        long lastUpdatedFailed = 0L;
 
         while (true) {
-            List<Long> ids = restaurantRepository.findActiveRestaurantIdsAfter(lastId == 0L ? null : lastId, syncJobProperties.resolvedChunkSize());
+            long chunkStartAt = System.nanoTime();
+            List<Long> ids = restaurantRepository.findActiveRestaurantIdsAfter(lastId == 0L ? null : lastId, currentChunkSize);
             if (ids.isEmpty()) {
                 break;
             }
 
             RestaurantSyncChunkResult chunkResult = restaurantSyncService.syncChunk(ids, syncJobExecutor);
+            long chunkDurationMs = (System.nanoTime() - chunkStartAt) / 1_000_000L;
             long successCount = chunkResult.successCount();
             long failedCount = chunkResult.failedCount();
+            totalSuccess += successCount;
             totalFailed += failedCount;
+            totalProcessed += ids.size();
+            chunkIndex++;
+            boolean slowChunk = chunkDurationMs > CHUNK_SLOW_THRESHOLD_MS;
+            boolean hasFailure = failedCount > 0;
 
             if (failedCount > 0 && errorMessages.size() < 10) {
                 chunkResult.errorMessages().stream()
@@ -128,13 +163,82 @@ public class RestaurantSyncJobWorker {
             }
 
             lastId = ids.getLast();
+            long now = System.currentTimeMillis();
+            boolean shouldUpdate = chunkIndex % PROGRESS_UPDATE_INTERVAL_CHUNKS == 0
+                    || failedCount > 0
+                    || now - lastProgressUpdateAt >= PROGRESS_UPDATE_INTERVAL_MS;
 
+            if (shouldUpdate) {
+                syncJobRepository.updateProgress(
+                        job.id(),
+                        lastId,
+                        totalProcessed - lastUpdatedProcessed,
+                        totalSuccess - lastUpdatedSuccess,
+                        totalFailed - lastUpdatedFailed
+                );
+                lastProgressUpdateAt = now;
+                lastUpdatedProcessed = totalProcessed;
+                lastUpdatedSuccess = totalSuccess;
+                lastUpdatedFailed = totalFailed;
+            }
+
+            if (hasFailure || slowChunk) {
+                slowChunkStreak++;
+                successChunkStreak = 0;
+            } else {
+                successChunkStreak++;
+                slowChunkStreak = 0;
+            }
+
+            if (slowChunkStreak >= PROGRESS_UPDATE_BATCH_FAIL_THRESHOLD && currentChunkSize > minChunkSize) {
+                int nextChunkSize = Math.max(minChunkSize, currentChunkSize / 2);
+                if (nextChunkSize != currentChunkSize) {
+                    log.warn(
+                            "reducing chunk size due to unstable chunk latency/failure. jobId={} before={} after={}",
+                            job.id(),
+                            currentChunkSize,
+                            nextChunkSize
+                    );
+                    currentChunkSize = nextChunkSize;
+                }
+                slowChunkStreak = 0;
+            } else if (successChunkStreak >= PROGRESS_UPDATE_BATCH_FAIL_THRESHOLD
+                    && currentChunkSize < maxChunkSize) {
+                int nextChunkSize = Math.min(maxChunkSize, (int) Math.ceil(currentChunkSize * 1.2));
+                if (nextChunkSize != currentChunkSize) {
+                    log.info(
+                            "increasing chunk size as chunk processed stably. jobId={} before={} after={}",
+                            job.id(),
+                            currentChunkSize,
+                            nextChunkSize
+                    );
+                    currentChunkSize = nextChunkSize;
+                }
+                successChunkStreak = 0;
+            }
+
+            log.debug(
+                    "sync all chunk complete. jobId={} chunkIndex={} chunkDurationMs={} chunkSize={} processed={} success={} failed={} "
+                            + "nextChunkSize={}",
+                    job.id(),
+                    chunkIndex,
+                    chunkDurationMs,
+                    ids.size(),
+                    successCount,
+                    failedCount,
+                    currentChunkSize
+            );
+        }
+
+        if (totalProcessed > lastUpdatedProcessed
+                || totalSuccess > lastUpdatedSuccess
+                || totalFailed > lastUpdatedFailed) {
             syncJobRepository.updateProgress(
                     job.id(),
                     lastId,
-                    ids.size(),
-                    successCount,
-                    failedCount
+                    totalProcessed - lastUpdatedProcessed,
+                    totalSuccess - lastUpdatedSuccess,
+                    totalFailed - lastUpdatedFailed
             );
         }
 

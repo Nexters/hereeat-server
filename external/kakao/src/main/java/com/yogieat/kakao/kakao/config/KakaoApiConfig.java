@@ -1,5 +1,6 @@
 package com.yogieat.kakao.kakao.config;
 
+import java.lang.reflect.Method;
 import java.net.http.HttpClient;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -31,13 +32,59 @@ public class KakaoApiConfig {
      */
     @Bean
     public RestClient kakaoPlaceDetailRestClient() {
+        JdkClientHttpRequestFactory requestFactory = requestFactory();
         return RestClient.builder()
-            .requestFactory(new JdkClientHttpRequestFactory(httpClient()))
+            .requestFactory(requestFactory)
                 .baseUrl(PANEL3_BASE_URL)
                 .defaultHeader("Pf", "web")
                 .defaultHeader(HttpHeaders.REFERER, REFERER)
                 .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
                 .build();
+    }
+
+    private JdkClientHttpRequestFactory requestFactory() {
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient());
+        applyRequestTimeout(requestFactory, Duration.ofSeconds(2), Duration.ofSeconds(8));
+        return requestFactory;
+    }
+
+    private void applyRequestTimeout(JdkClientHttpRequestFactory requestFactory, Duration connectTimeout,
+            Duration readTimeout) {
+        setTimeoutIfSupported(requestFactory, "setConnectTimeout", connectTimeout);
+        setTimeoutIfSupported(requestFactory, "setReadTimeout", readTimeout);
+    }
+
+    private void setTimeoutIfSupported(JdkClientHttpRequestFactory requestFactory, String methodName, Duration timeout) {
+        try {
+            Method method = requestFactory.getClass().getMethod(methodName, Duration.class);
+            method.invoke(requestFactory, timeout);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // Older Spring versions may not expose Duration-based timeout setters.
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Failed to set Kakao place detail client request timeout", exception);
+        }
+
+        try {
+            Method method = requestFactory.getClass().getMethod(methodName, long.class);
+            method.invoke(requestFactory, timeout.toMillis());
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // Fallback not supported
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Failed to set Kakao place detail client request timeout", exception);
+        }
+
+        try {
+            Method method = requestFactory.getClass().getMethod(methodName, int.class);
+            method.invoke(requestFactory, Math.toIntExact(timeout.toMillis()));
+        } catch (NoSuchMethodException ignored) {
+            // Timeout setter is not available in this runtime. Fallback to defaults.
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Failed to set Kakao place detail client request timeout", exception);
+        } catch (ArithmeticException ignored) {
+            // Fallback not possible when timeout value cannot fit into int.
+        }
     }
 
     private HttpClient httpClient() {

@@ -22,6 +22,7 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.sql.Types;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -372,7 +373,16 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             return;
         }
 
-        restaurantJpaRepository.deleteAllByIdInBatch(restaurantIds);
+        LocalDateTime now = LocalDateTime.now();
+        jpaQueryFactory
+                .update(restaurantEntity)
+                .set(restaurantEntity.deletedAt, now)
+                .set(restaurantEntity.updatedAt, now)
+                .where(
+                        restaurantEntity.id.in(restaurantIds),
+                        restaurantEntity.deletedAt.isNull()
+                )
+                .execute();
     }
 
     @Override

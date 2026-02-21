@@ -24,26 +24,73 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import lombok.RequiredArgsConstructor;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.LongAdder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Conditional(RestaurantSyncServiceCondition.class)
-@RequiredArgsConstructor
 @Slf4j
 public class RestaurantSyncService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final double SYNC_REGION_RADIUS_KM = 1.0;
+    private static final int DB_BATCH_SIZE = 300;
+    private static final String SEARCH_CACHE_PREFIX = "search:";
+    private static final String DETAIL_CACHE_PREFIX = "detail:";
+    private static final int KAKAO_SYNC_CONCURRENT_PERMITS_DEFAULT = 8;
+    private static final int KAKAO_SYNC_MAX_RETRY_ATTEMPTS_DEFAULT = 3;
+    private static final long KAKAO_SYNC_RETRY_BASE_DELAY_MS_DEFAULT = 200L;
+    private static final double KAKAO_SYNC_RETRY_JITTER_RATE_DEFAULT = 0.25d;
+    private static final long KAKAO_SYNC_CACHE_TTL_MS_DEFAULT = 30_000L;
 
+    private final ObjectProvider<RestaurantSyncService> selfProvider;
     private final RestaurantRepository restaurantRepository;
     private final KakaoPlaceClient kakaoPlaceClient;
     private final KakaoPlaceDetailClient kakaoPlaceDetailClient;
     private final KakaoPlaceMapper kakaoPlaceMapper;
+    private final Semaphore kakaoApiSemaphore;
+    private final int kakaoSyncMaxRetryAttempts;
+    private final long kakaoSyncRetryBaseDelayMs;
+    private final double kakaoSyncRetryJitterRate;
+    private final long kakaoSyncCacheTtlMs;
+    private final ConcurrentHashMap<String, CompletableFuture<Optional<KaKaoPlaceDocumentResult>>> searchInFlight = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<KakaoPlaceDetailFetchResult>> detailInFlight = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CachedValue<Optional<KaKaoPlaceDocumentResult>>> searchCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CachedValue<KakaoPlaceDetailFetchResult>> detailCache = new ConcurrentHashMap<>();
+    private final LongAdder kakaoSearchCallCount = new LongAdder();
+    private final LongAdder kakaoDetailCallCount = new LongAdder();
+    private final LongAdder kakaoSearchCallDurationMs = new LongAdder();
+    private final LongAdder kakaoDetailCallDurationMs = new LongAdder();
+    private final LongAdder kakaoRetryCount = new LongAdder();
+
+    public RestaurantSyncService(
+            ObjectProvider<RestaurantSyncService> selfProvider,
+            RestaurantRepository restaurantRepository,
+            KakaoPlaceClient kakaoPlaceClient,
+            KakaoPlaceDetailClient kakaoPlaceDetailClient,
+            KakaoPlaceMapper kakaoPlaceMapper
+    ) {
+        this.selfProvider = selfProvider;
+        this.restaurantRepository = restaurantRepository;
+        this.kakaoPlaceClient = kakaoPlaceClient;
+        this.kakaoPlaceDetailClient = kakaoPlaceDetailClient;
+        this.kakaoPlaceMapper = kakaoPlaceMapper;
+        this.kakaoApiSemaphore = new Semaphore(Math.max(1, KAKAO_SYNC_CONCURRENT_PERMITS_DEFAULT));
+        this.kakaoSyncMaxRetryAttempts = KAKAO_SYNC_MAX_RETRY_ATTEMPTS_DEFAULT;
+        this.kakaoSyncRetryBaseDelayMs = KAKAO_SYNC_RETRY_BASE_DELAY_MS_DEFAULT;
+        this.kakaoSyncRetryJitterRate = KAKAO_SYNC_RETRY_JITTER_RATE_DEFAULT;
+        this.kakaoSyncCacheTtlMs = KAKAO_SYNC_CACHE_TTL_MS_DEFAULT;
+    }
 
     public RestaurantSyncResult syncOne(Long restaurantId) {
         RestaurantSyncChunkResult chunkResult = syncChunk(List.of(restaurantId), Runnable::run);
@@ -62,8 +109,15 @@ public class RestaurantSyncService {
         if (ids.isEmpty()) {
             return RestaurantSyncChunkResult.of(0, 0, 0, List.of());
         }
+        long searchCallCountStart = kakaoSearchCallCount.sum();
+        long detailCallCountStart = kakaoDetailCallCount.sum();
+        long retryCountStart = kakaoRetryCount.sum();
+        long searchCallDurationMsStart = kakaoSearchCallDurationMs.sum();
+        long detailCallDurationMsStart = kakaoDetailCallDurationMs.sum();
+        long chunkStartAt = System.nanoTime();
 
         List<RestaurantSyncTarget> targets = restaurantRepository.findSyncTargetsByIds(ids);
+        long chunkTargetsLookupMs = (System.nanoTime() - chunkStartAt) / 1_000_000L;
         Map<Long, RestaurantSyncTarget> targetMap = new HashMap<>();
         targets.forEach(target -> targetMap.put(target.id(), target));
 
@@ -79,7 +133,7 @@ public class RestaurantSyncService {
                 .filter(SyncExecution::isPatchSuccess)
                 .map(SyncExecution::patchCommand)
                 .toList();
-        List<Long> softDeleteIds = executions.stream()
+        List<Long> deleteIds = executions.stream()
                 .filter(SyncExecution::isDeleteSuccess)
                 .map(SyncExecution::restaurantId)
                 .toList();
@@ -93,8 +147,36 @@ public class RestaurantSyncService {
             }
         }
 
-        int persistedSuccessCount = persistChunkChanges(patchCommands, softDeleteIds, errorMessages);
+        RestaurantSyncService self = this;
+        if (selfProvider != null) {
+            self = Optional.ofNullable(selfProvider.getIfAvailable()).orElse(this);
+        }
+        int persistedSuccessCount = self.persistChunkChanges(patchCommands, deleteIds, errorMessages);
         int failedCount = ids.size() - persistedSuccessCount;
+
+        long chunkDurationMs = (System.nanoTime() - chunkStartAt) / 1_000_000L;
+        long chunkSearchCalls = kakaoSearchCallCount.sum() - searchCallCountStart;
+        long chunkDetailCalls = kakaoDetailCallCount.sum() - detailCallCountStart;
+        long chunkRetryCount = kakaoRetryCount.sum() - retryCountStart;
+        long chunkSearchCallDurationMs = kakaoSearchCallDurationMs.sum() - searchCallDurationMsStart;
+        long chunkDetailCallDurationMs = kakaoDetailCallDurationMs.sum() - detailCallDurationMsStart;
+
+        log.debug(
+                "syncChunk completed. requested={} success={} failed={} patchCount={} deleteCount={} latencyMs={} "
+                        + "targetLookupMs={} searchCalls={} searchCallMs={} detailCalls={} detailCallMs={} retryCount={}",
+                ids.size(),
+                persistedSuccessCount,
+                failedCount,
+                patchCommands.size(),
+                deleteIds.size(),
+                chunkDurationMs,
+                chunkTargetsLookupMs,
+                chunkSearchCalls,
+                chunkSearchCallDurationMs,
+                chunkDetailCalls,
+                chunkDetailCallDurationMs,
+                chunkRetryCount
+        );
 
         return RestaurantSyncChunkResult.of(
                 ids.size(),
@@ -104,34 +186,48 @@ public class RestaurantSyncService {
         );
     }
 
-    @Transactional
-    protected int persistChunkChanges(
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int persistChunkChanges(
             List<RestaurantSyncPatchCommand> patchCommands,
-            List<Long> softDeleteIds,
+            List<Long> deleteIds,
             List<String> errorMessages
     ) {
         int successCount = 0;
 
         if (!patchCommands.isEmpty()) {
-            try {
-                restaurantRepository.batchApplySyncPatch(patchCommands);
-                successCount += patchCommands.size();
-            } catch (Exception e) {
-                log.error("Batch sync patch failed for {} restaurants", patchCommands.size(), e);
-                if (errorMessages.size() < 10) {
-                    errorMessages.add("batch update failed: " + e.getMessage());
+            for (int start = 0; start < patchCommands.size(); start += DB_BATCH_SIZE) {
+                int end = Math.min(start + DB_BATCH_SIZE, patchCommands.size());
+                List<RestaurantSyncPatchCommand> batch = patchCommands.subList(start, end);
+                try {
+                    long startedAt = System.nanoTime();
+                    restaurantRepository.batchApplySyncPatch(batch);
+                    successCount += batch.size();
+                    long dbMs = (System.nanoTime() - startedAt) / 1_000_000L;
+                    log.debug("batchApplySyncPatch completed. size={} tookMs={}", batch.size(), dbMs);
+                } catch (Exception e) {
+                    log.error("Batch sync patch failed for {} restaurants", batch.size(), e);
+                    if (errorMessages.size() < 10) {
+                        errorMessages.add("batch update failed: " + e.getMessage());
+                    }
                 }
             }
         }
 
-        if (!softDeleteIds.isEmpty()) {
-            try {
-                restaurantRepository.batchDeleteByIds(softDeleteIds);
-                successCount += softDeleteIds.size();
-            } catch (Exception e) {
-                log.error("Batch delete failed for {} restaurants", softDeleteIds.size(), e);
-                if (errorMessages.size() < 10) {
-                    errorMessages.add("batch delete failed: " + e.getMessage());
+        if (!deleteIds.isEmpty()) {
+            for (int start = 0; start < deleteIds.size(); start += DB_BATCH_SIZE) {
+                int end = Math.min(start + DB_BATCH_SIZE, deleteIds.size());
+                List<Long> batch = deleteIds.subList(start, end);
+                try {
+                    long startedAt = System.nanoTime();
+                    restaurantRepository.batchDeleteByIds(batch);
+                    successCount += batch.size();
+                    long dbMs = (System.nanoTime() - startedAt) / 1_000_000L;
+                    log.debug("batchDeleteByIds completed. size={} tookMs={}", batch.size(), dbMs);
+                } catch (Exception e) {
+                    log.error("Batch delete failed for {} restaurants", batch.size(), e);
+                    if (errorMessages.size() < 10) {
+                        errorMessages.add("batch delete failed: " + e.getMessage());
+                    }
                 }
             }
         }
@@ -143,7 +239,7 @@ public class RestaurantSyncService {
         if (target == null) {
             return SyncExecution.failed(requestedId, "restaurant not found");
         }
-        if (!isWithinRegionRadius(target, null)) {
+        if (!isWithinRegionRadius(target, target.location())) {
             return SyncExecution.delete(target.id());
         }
 
@@ -158,7 +254,7 @@ public class RestaurantSyncService {
                         "kakao source unavailable"
                                 + " (restaurantId=" + target.id()
                                 + ", name=" + target.name()
-                                + ", region=" + target.region().name()
+                                + ", region=" + (target.region() == null ? "null" : target.region().name())
                                 + ", externalId=" + target.externalId()
                                 + ")"
                 );
@@ -178,7 +274,7 @@ public class RestaurantSyncService {
 
     private SyncSource resolveSource(RestaurantSyncTarget target) {
         if (target.externalId() != null && !target.externalId().isBlank()) {
-            KakaoPlaceDetailFetchResult detailResult = kakaoPlaceDetailClient.fetchPlaceDetailResult(target.externalId());
+            KakaoPlaceDetailFetchResult detailResult = fetchPlaceDetail(target.externalId());
             if (detailResult.status() == KakaoPlaceDetailFetchStatus.NOT_FOUND) {
                 return SyncSource.DELETE_TARGET;
             }
@@ -187,18 +283,198 @@ public class RestaurantSyncService {
             }
         }
 
-        Optional<KaKaoPlaceDocumentResult> placeOpt = kakaoPlaceClient.searchPlace(
-                target.name(), target.region().getName()
-        );
+        Optional<KaKaoPlaceDocumentResult> placeOpt = searchPlace(target.name(), target.region() == null ? null : target.region().getName());
 
         if (placeOpt.isEmpty()) {
             return null;
         }
 
         KaKaoPlaceDocumentResult place = placeOpt.get();
-        Optional<KakaoPlaceDetailData> detailOpt = kakaoPlaceDetailClient.fetchPlaceDetail(place.id());
+        KakaoPlaceDetailFetchResult detailResult = fetchPlaceDetail(place.id());
+        KakaoPlaceDetailData detail = detailResult.status() == KakaoPlaceDetailFetchStatus.SUCCESS
+                ? detailResult.detail()
+                : null;
 
-        return new SyncSource(place.id(), place, detailOpt.orElse(null));
+        return new SyncSource(place.id(), place, detail);
+    }
+
+    private KakaoPlaceDetailFetchResult fetchPlaceDetail(String placeId) {
+        if (placeId == null || placeId.isBlank()) {
+            return KakaoPlaceDetailFetchResult.unavailable();
+        }
+
+        String cacheKey = DETAIL_CACHE_PREFIX + placeId;
+        KakaoPlaceDetailFetchResult cached = getCached(detailCache, cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        CompletableFuture<KakaoPlaceDetailFetchResult> inFlight = detailInFlight.computeIfAbsent(cacheKey, key -> {
+            try {
+                return CompletableFuture.completedFuture(
+                        executeKakaoApiWithRetry(
+                                "fetchPlaceDetailResult",
+                                () -> {
+                                    kakaoDetailCallCount.increment();
+                                    return kakaoPlaceDetailClient.fetchPlaceDetailResult(placeId);
+                                },
+                                kakaoDetailCallDurationMs
+                        )
+                );
+            } catch (RuntimeException e) {
+                CompletableFuture<KakaoPlaceDetailFetchResult> failedFuture = new CompletableFuture<>();
+                failedFuture.completeExceptionally(e);
+                return failedFuture;
+            }
+        });
+
+        try {
+            KakaoPlaceDetailFetchResult result = unwrap(inFlight);
+            detailCache.put(cacheKey, new CachedValue<>(result, System.currentTimeMillis()
+                    + kakaoSyncCacheTtlMs));
+            return result;
+        } finally {
+            detailInFlight.remove(cacheKey, inFlight);
+        }
+    }
+
+    private Optional<KaKaoPlaceDocumentResult> searchPlace(String placeName, String regionName) {
+        String cacheKey = SEARCH_CACHE_PREFIX + normalizedKey(placeName, regionName);
+        Optional<KaKaoPlaceDocumentResult> cached = getCached(searchCache, cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        CompletableFuture<Optional<KaKaoPlaceDocumentResult>> inFlight = searchInFlight.computeIfAbsent(cacheKey, key -> {
+            try {
+                return CompletableFuture.completedFuture(
+                        executeKakaoApiWithRetry(
+                                "searchPlace",
+                                () -> {
+                                    kakaoSearchCallCount.increment();
+                                    return kakaoPlaceClient.searchPlace(placeName, regionName);
+                                },
+                                kakaoSearchCallDurationMs
+                        )
+                );
+            } catch (RuntimeException e) {
+                CompletableFuture<Optional<KaKaoPlaceDocumentResult>> failedFuture = new CompletableFuture<>();
+                failedFuture.completeExceptionally(e);
+                return failedFuture;
+            }
+        });
+
+        try {
+            Optional<KaKaoPlaceDocumentResult> result = unwrap(inFlight);
+            searchCache.put(cacheKey, new CachedValue<>(result, System.currentTimeMillis()
+                    + kakaoSyncCacheTtlMs));
+            return result;
+        } finally {
+            searchInFlight.remove(cacheKey, inFlight);
+        }
+    }
+
+    private static String normalizedKey(String placeName, String regionName) {
+        String safeName = placeName == null ? "" : placeName.trim();
+        String safeRegion = regionName == null ? "" : regionName.trim();
+        return safeName + "|" + safeRegion;
+    }
+
+    private <T> T executeKakaoApiWithRetry(
+            String operationName,
+            java.util.function.Supplier<T> supplier,
+            LongAdder durationMetric
+    ) {
+        long startedAt = System.nanoTime();
+        try {
+            return executeWithRetry(operationName, supplier);
+        } finally {
+            long durationMs = (System.nanoTime() - startedAt) / 1_000_000L;
+            durationMetric.add(durationMs);
+            log.debug("kakao api call completed. operation={} durationMs={}", operationName, durationMs);
+        }
+    }
+
+    private <T> T executeWithRetry(String operationName, java.util.function.Supplier<T> supplier) {
+        RuntimeException lastError = null;
+        int maxAttempts = Math.max(1, kakaoSyncMaxRetryAttempts);
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return executeWithSemaphore(supplier, operationName);
+            } catch (RuntimeException e) {
+                lastError = e;
+                if (attempt >= maxAttempts) {
+                    throw e;
+                }
+
+                kakaoRetryCount.increment();
+                long baseDelayMs = kakaoSyncRetryBaseDelayMs;
+                long exponentialDelay = baseDelayMs * (1L << (attempt - 1));
+                double jitterRatio = Math.max(0.0d, kakaoSyncRetryJitterRate);
+                double jitterDelta = 1.0d + (ThreadLocalRandom.current().nextDouble(-jitterRatio, jitterRatio));
+                long delayMs = (long) Math.max(0, Math.round(exponentialDelay * jitterDelta));
+
+                log.warn(
+                        "[retry:{}] attempt={}/{} failed: {}",
+                        operationName,
+                        attempt,
+                        maxAttempts,
+                        e.getMessage()
+                );
+                sleep(delayMs);
+            }
+        }
+
+        throw lastError;
+    }
+
+    private <T> T executeWithSemaphore(java.util.function.Supplier<T> supplier, String operationName) {
+        try {
+            kakaoApiSemaphore.acquire();
+            return supplier.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("kakao api semaphore interrupted: " + operationName, e);
+        } catch (RuntimeException e) {
+            throw e;
+        } finally {
+            kakaoApiSemaphore.release();
+        }
+    }
+
+    private static void sleep(long millis) {
+        if (millis <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted during kakao api retry delay", e);
+        }
+    }
+
+    private <T> T getCached(ConcurrentHashMap<String, CachedValue<T>> cache, String key) {
+        CachedValue<T> cached = cache.get(key);
+        if (cached == null) {
+            return null;
+        }
+        if (cached.isExpired()) {
+            cache.remove(key, cached);
+            return null;
+        }
+        return cached.value();
+    }
+
+    private <T> T unwrap(CompletableFuture<T> futureResult) {
+        try {
+            return futureResult.join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException("Unexpected async error", e);
+        }
     }
 
     private RestaurantSyncPatch buildPatch(SyncSource source, String currentExternalId) {
@@ -304,20 +580,25 @@ public class RestaurantSyncService {
 
     private boolean isWithinRegionRadius(RestaurantSyncTarget target, GeoJson.Point resolvedPoint) {
         if (target == null || target.region() == null || target.region().getCoordinatesStandard() == null) {
-            return true;
+            return false;
         }
 
-        GeoJson.Point restaurantPoint = target.location() != null ? target.location() : resolvedPoint;
-        return isWithinDistance(target.region().getCoordinatesStandard(), restaurantPoint);
+        return isWithinDistance(target.region().getCoordinatesStandard(), resolvedPoint);
     }
 
     private boolean isWithinDistance(GeoJson.Point centerPoint, GeoJson.Point restaurantPoint) {
         if (!GeoUtils.isValidPoint(centerPoint) || !GeoUtils.isValidPoint(restaurantPoint)) {
-            return true;
+            return false;
         }
 
         double distance = GeoUtils.calculateDistanceKm(centerPoint, restaurantPoint);
         return distance <= SYNC_REGION_RADIUS_KM;
+    }
+
+    private record CachedValue<T>(T value, long expireAt) {
+        boolean isExpired() {
+            return System.currentTimeMillis() > expireAt;
+        }
     }
 
     private record SyncSource(String externalId, KaKaoPlaceDocumentResult place, KakaoPlaceDetailData detail) {
