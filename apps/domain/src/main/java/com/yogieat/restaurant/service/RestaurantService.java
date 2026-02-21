@@ -42,6 +42,11 @@ public class RestaurantService {
         return restaurantRepository.applyAdminPatch(id, command);
     }
 
+    @Transactional
+    public void deleteBy(Long id) {
+        restaurantRepository.deleteBy(id);
+    }
+
     @Transactional(readOnly = true)
     public long countAdminRestaurantList(RestaurantAdminListCriteria criteria) {
         return restaurantRepository.countAdminRestaurantList(criteria);

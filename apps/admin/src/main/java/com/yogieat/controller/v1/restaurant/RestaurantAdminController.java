@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -56,5 +57,12 @@ public class RestaurantAdminController {
             @RequestBody RestaurantRequest.Patch request
     ) {
         return RestaurantAdminResponse.Detail.from(restaurantAdminFacade.updateRestaurant(restaurantId, RestaurantRequest.Patch.toCommand(request)));
+    }
+
+    @DeleteMapping("/{restaurantId}")
+    public void deleteRestaurant(
+            @PathVariable Long restaurantId
+    ) {
+        restaurantAdminFacade.deleteRestaurantBy(restaurantId);
     }
 }
