@@ -37,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RestaurantSyncService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final double SYNC_REGION_RADIUS_KM = 1.0;
 
     private final RestaurantRepository restaurantRepository;
     private final KakaoPlaceClient kakaoPlaceClient;
@@ -141,6 +142,9 @@ public class RestaurantSyncService {
         if (target == null) {
             return SyncExecution.failed(requestedId, "restaurant not found");
         }
+        if (!isWithinRegionRadius(target, null)) {
+            return SyncExecution.delete(target.id());
+        }
 
         try {
             SyncSource source = resolveSource(target);
@@ -160,6 +164,9 @@ public class RestaurantSyncService {
             }
 
             RestaurantSyncPatch patch = buildPatch(source, target.externalId());
+            if (!isWithinRegionRadius(target, patch.location())) {
+                return SyncExecution.delete(target.id());
+            }
             RestaurantSyncPatchCommand command = RestaurantSyncPatchCommand.of(target.id(), patch);
             return SyncExecution.success(target.id(), command);
         } catch (Exception e) {
@@ -292,6 +299,50 @@ public class RestaurantSyncService {
         }
 
         return mapUrl;
+    }
+
+    private boolean isWithinRegionRadius(RestaurantSyncTarget target, GeoJson.Point resolvedPoint) {
+        if (target == null || target.region() == null || target.region().getCoordinatesStandard() == null) {
+            return true;
+        }
+
+        GeoJson.Point restaurantPoint = target.location() != null ? target.location() : resolvedPoint;
+        return isWithinDistance(target.region().getCoordinatesStandard(), restaurantPoint);
+    }
+
+    private boolean isWithinDistance(GeoJson.Point centerPoint, GeoJson.Point restaurantPoint) {
+        if (!isValidPoint(centerPoint) || !isValidPoint(restaurantPoint)) {
+            return true;
+        }
+
+        double distance = calculateDistanceKm(centerPoint, restaurantPoint);
+        return distance <= SYNC_REGION_RADIUS_KM;
+    }
+
+    private boolean isValidPoint(GeoJson.Point point) {
+        return point != null
+                && point.getCoordinates() != null
+                && point.getCoordinates().size() >= 2
+                && point.getCoordinates().get(0) != null
+                && point.getCoordinates().get(1) != null;
+    }
+
+    private double calculateDistanceKm(GeoJson.Point centerPoint, GeoJson.Point restaurantPoint) {
+        double lat1 = centerPoint.getCoordinates().get(1);
+        double lon1 = centerPoint.getCoordinates().get(0);
+        double lat2 = restaurantPoint.getCoordinates().get(1);
+        double lon2 = restaurantPoint.getCoordinates().get(0);
+
+        double r = 6371;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1))
+                * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return r * c;
     }
 
     private record SyncSource(String externalId, KaKaoPlaceDocumentResult place, KakaoPlaceDetailData detail) {

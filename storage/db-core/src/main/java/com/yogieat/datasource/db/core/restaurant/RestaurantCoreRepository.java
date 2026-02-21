@@ -7,6 +7,7 @@ import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
@@ -289,7 +290,10 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         entity.getId(),
                         entity.getName(),
                         entity.getRegion(),
-                        entity.getExternalId()
+                        entity.getExternalId(),
+                        entity.getLocation() == null
+                                ? null
+                                : new GeoJson.Point(List.of(entity.getLocation().getX(), entity.getLocation().getY()))
                 ))
                 .toList();
     }
