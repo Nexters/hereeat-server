@@ -8,9 +8,11 @@ import static org.mockito.Mockito.when;
 
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.category.service.CategoryService;
+import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
 import java.util.HashSet;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -69,6 +71,29 @@ class RestaurantCollectionWriteServiceTest {
         verify(restaurantRepository, never()).save(any());
     }
 
+    @Test
+    @DisplayName("지역 기준점으로부터 1km를 벗어나면 저장하지 않고 false를 반환한다")
+    void persistRestaurant_ShouldReturnFalse_WhenLocationOutsideRegionRadius() {
+        SuggestionRestaurant suggestion = suggestion();
+        RestaurantValidator.ValidationContext context =
+                new RestaurantValidator.ValidationContext(new HashSet<>(), new HashSet<>());
+
+        RestaurantEnrichedData data = enriched("ext-1");
+        data.geoJsonLocation = new GeoJson.Point(List.of(127.0476, 37.4979));
+
+        boolean saved = writeService.persistRestaurant(
+                suggestion,
+                Region.GANGNAM,
+                LargeCategory.KOREAN,
+                suggestion.mediumCategory(),
+                data,
+                context
+        );
+
+        assertThat(saved).isFalse();
+        verify(restaurantRepository, never()).save(any());
+    }
+
     private SuggestionRestaurant suggestion() {
         return new SuggestionRestaurant(
                 "가게",
@@ -85,6 +110,7 @@ class RestaurantCollectionWriteServiceTest {
         RestaurantEnrichedData data = RestaurantEnrichedData.fromSuggestion(suggestion());
         data.externalId = externalId;
         data.placeName = "가게";
+        data.geoJsonLocation = new GeoJson.Point(List.of(127.0276, 37.4979));
         return data;
     }
 }
