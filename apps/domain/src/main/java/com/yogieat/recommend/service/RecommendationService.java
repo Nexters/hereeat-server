@@ -4,6 +4,7 @@ import com.yogieat.category.domain.Category;
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.category.service.CategoryService;
 import com.yogieat.common.GeoJson;
+import com.yogieat.common.GeoUtils;
 import com.yogieat.common.Region;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.value.TimeSlot;
@@ -33,14 +34,16 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class RecommendationService {
+
+    private static final Logger log = LoggerFactory.getLogger(RecommendationService.class);
 
     // ========== 점수 가중치 상수 ==========
     private static final double PREFERENCE_RANK_1_SCORE = 3.0;
@@ -289,21 +292,7 @@ public class RecommendationService {
      * Haversine 공식을 사용한 두 좌표 간 거리 계산 (km)
      */
     private double calculateDistance(GeoJson.Point centerPoint, GeoJson.Point restaurantPoint) {
-        double lat1 = centerPoint.getCoordinates().get(1);
-        double lon1 = centerPoint.getCoordinates().get(0);
-        double lat2 = restaurantPoint.getCoordinates().get(1);
-        double lon2 = restaurantPoint.getCoordinates().get(0);
-
-        double R = 6371; // 지구 반지름 (km)
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
+        return GeoUtils.calculateDistanceKm(centerPoint, restaurantPoint);
     }
 
     private boolean isWithinDistanceRange(double distance, DistanceRange range) {

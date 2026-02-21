@@ -1,6 +1,8 @@
 package com.yogieat.kakao.kakao.map;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.yogieat.common.error.CustomException;
+import com.yogieat.common.error.ErrorCode;
 import com.yogieat.external.kakao.KakaoPlaceDetailClient;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailFetchResult;
@@ -20,17 +22,27 @@ public class KakaoPlaceDetailClientImpl implements KakaoPlaceDetailClient {
 
     private final KakaoPlaceDetailParser parser;
     private final RestClient restClient;
+    private final KakaoAdminKakaoApiExecutor kakaoAdminKakaoApiExecutor;
 
     public KakaoPlaceDetailClientImpl(
             KakaoPlaceDetailParser parser,
-            @Qualifier("kakaoPlaceDetailRestClient") RestClient restClient
+            @Qualifier("kakaoPlaceDetailRestClient") RestClient restClient,
+            KakaoAdminKakaoApiExecutor kakaoAdminKakaoApiExecutor
     ) {
         this.parser = parser;
         this.restClient = restClient;
+        this.kakaoAdminKakaoApiExecutor = kakaoAdminKakaoApiExecutor;
     }
 
     @Override
     public KakaoPlaceDetailFetchResult fetchPlaceDetailResult(String placeId) {
+        return kakaoAdminKakaoApiExecutor.executePlaceDetail(
+                placeId,
+                () -> fetchPlaceDetailResultWithoutPolicy(placeId)
+        );
+    }
+
+    private KakaoPlaceDetailFetchResult fetchPlaceDetailResultWithoutPolicy(String placeId) {
         if (placeId == null || placeId.isBlank()) {
             log.warn("Cannot fetch place detail: placeId is null or blank");
             return KakaoPlaceDetailFetchResult.unavailable();
@@ -51,7 +63,7 @@ public class KakaoPlaceDetailClientImpl implements KakaoPlaceDetailClient {
             }
 
             KakaoPlaceDetailData detailData = parser.parse(panel, placeId);
-            if (detailData.confirmId() == null) {
+            if (detailData == null || detailData.confirmId() == null) {
                 log.warn("Failed to parse valid detail data for placeId: {}", placeId);
                 return KakaoPlaceDetailFetchResult.unavailable();
             }
@@ -69,10 +81,10 @@ public class KakaoPlaceDetailClientImpl implements KakaoPlaceDetailClient {
 
             log.error("panel3 API call failed: placeId={}, status={}, body={}",
                     placeId, e.getStatusCode().value(), e.getResponseBodyAsString());
-            return KakaoPlaceDetailFetchResult.unavailable();
+            throw new CustomException(ErrorCode.KAKAO_API_ERROR, e.getMessage());
         } catch (Exception e) {
             log.error("Unexpected error fetching place detail for placeId: {}", placeId, e);
-            return KakaoPlaceDetailFetchResult.unavailable();
+            throw new CustomException(ErrorCode.KAKAO_API_ERROR, e.getMessage());
         }
     }
 

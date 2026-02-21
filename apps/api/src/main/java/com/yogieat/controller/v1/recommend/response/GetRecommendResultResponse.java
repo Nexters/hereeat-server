@@ -1,8 +1,11 @@
 package com.yogieat.controller.v1.recommend.response;
 
+import com.yogieat.common.Region;
+import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.recommend.domain.result.RecommendResultData;
 import com.yogieat.recommend.domain.value.RecommendStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +18,8 @@ public record GetRecommendResultResponse(
         RankingRecommendResultResponse topRecommendation,
         @Schema(description = "2, 3위 추천 결과 리스트")
         List<RankingRecommendResultResponse> otherCandidates,
+        @Schema(description = "모임 정보")
+        GatheringInfo gathering,
         @Schema(description = "카테고리별 선호도 집계", example = "{\"KOREAN\": 3, \"WESTERN\": 2}")
         Map<String, Integer> preferences,
         @Schema(description = "카테고리별 불호 집계", example = "{\"CHINESE\": 1}")
@@ -24,6 +29,22 @@ public record GetRecommendResultResponse(
         @Schema(description = "의견 일치율 (%)", example = "85.5")
         Double agreementRate
 ) {
+    public record GatheringInfo(
+            LocalDate scheduledDate,
+            TimeSlot timeSlot,
+            Region region,
+            Integer peopleCount
+    ) {
+        public static GatheringInfo from(RecommendResultData.GatheringInfo info) {
+            return new GatheringInfo(
+                    info.scheduledDate(),
+                    info.timeSlot(),
+                    info.region(),
+                    info.peopleCount()
+            );
+        }
+    }
+
     public static GetRecommendResultResponse from(RecommendResultData.Get result) {
         List<RankingRecommendResultResponse> rankings = result.rankings().stream()
                 .map(RankingRecommendResultResponse::from)
@@ -39,6 +60,7 @@ public record GetRecommendResultResponse(
                 result.status(),
                 topRecommendation,
                 otherCandidates,
+                result.gathering() != null ? GatheringInfo.from(result.gathering()) : null,
                 result.preferences(),
                 result.dislikes(),
                 result.distances(),

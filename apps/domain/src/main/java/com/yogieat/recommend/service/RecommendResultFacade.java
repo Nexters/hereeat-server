@@ -2,6 +2,7 @@ package com.yogieat.recommend.service;
 
 import com.yogieat.category.domain.Category;
 import com.yogieat.category.service.CategoryService;
+import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.gathering.domain.Gathering;
@@ -25,15 +26,18 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class RecommendResultFacade {
+
+    private static final Logger log = LoggerFactory.getLogger(RecommendResultFacade.class);
+
     private final GatheringService gatheringService;
     private final RecommendResultService recommendResultService;
     private final RestaurantService restaurantService;
@@ -49,25 +53,23 @@ public class RecommendResultFacade {
     public RecommendResultData.Get getRecommendResults(String accessKey) {
         // 1. accessKey로 Gathering 조회
         Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
+        RecommendResultData.GatheringInfo gatheringInfo = RecommendResultData.GatheringInfo.of(gathering);
 
         // 2. gatheringId로 RecommendResult 목록 조회 (rank 순서대로)
         List<RecommendResult> recommendResults = recommendResultService.findByGatheringId(gathering.id());
 
         // 3. 결과가 없는 경우
         if (recommendResults.isEmpty()) {
-            return RecommendResultData.Get.ofEmpty();
+            return RecommendResultData.Get.ofEmpty(gatheringInfo);
         }
 
         // 4. PENDING 상태인 경우
         if (recommendResults.getFirst().status() == RecommendStatus.PENDING) {
-            return RecommendResultData.Get.ofPending();
+            return RecommendResultData.Get.ofPending(gatheringInfo);
         }
 
         // 5. 참여자 목록 조회
         List<Participant> participants = participantService.getByGatheringId(gathering.id());
-
-        // 6. 다수결 DistanceRange 결정
-        DistanceRange majorityDistanceRange = participantAnalyzer.determineMajorityDistanceRange(participants);
 
         // 7. 카테고리별 선호도/불호 집계
         CategoryAggregation aggregation = participantAnalyzer.aggregateCategoryPreferences(participants);
@@ -86,7 +88,7 @@ public class RecommendResultFacade {
 
         // 9. Result 생성
         List<RecommendResultData.Ranking> rankings = recommendResults.stream()
-                .map(result -> buildRankingResult(result, restaurantMap, categoryMap, majorityDistanceRange))
+                .map(result -> buildRankingResult(result, restaurantMap, categoryMap, gathering.region()))
                 .toList();
 
         // 10. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
@@ -101,7 +103,8 @@ public class RecommendResultFacade {
                 aggregation.preferences(),
                 aggregation.dislikes(),
                 distances,
-                averageAgreementRate
+                averageAgreementRate,
+                gatheringInfo
         );
     }
 
@@ -140,7 +143,7 @@ public class RecommendResultFacade {
             RecommendResult result,
             Map<Long, Restaurant> restaurantMap,
             Map<Long, Category> categoryMap,
-            DistanceRange majorityDistanceRange) {
+            Region region) {
         Restaurant restaurant = restaurantMap.get(result.restaurantId());
         if (restaurant == null) {
             throw new CustomException(ErrorCode.RESTAURANT_NOT_FOUND);
@@ -150,6 +153,9 @@ public class RecommendResultFacade {
         if (category == null) {
             throw new CustomException(ErrorCode.CATEGORY_NOT_FOUND);
         }
+
+        DistanceRange distanceRange =
+                participantAnalyzer.determineMajorityDistanceRange(restaurant.location(), region);
 
         return RecommendResultData.Ranking.of(
                 result.rank(),
@@ -165,7 +171,7 @@ public class RecommendResultFacade {
                 restaurant.location(),
                 category.largeCategory(),
                 category.mediumCategory(),
-                majorityDistanceRange,
+                distanceRange,
                 // 추천 근거 데이터
                 restaurant.reviewCount(),
                 restaurant.blogReviewCount(),

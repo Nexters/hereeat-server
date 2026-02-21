@@ -22,15 +22,17 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.stereotype.Service;
 
 @Service
 @Conditional(RestaurantCollectionProcessorCondition.class)
 @RequiredArgsConstructor
-@Slf4j
 public class RestaurantCollectionProcessor {
+
+    private static final Logger log = LoggerFactory.getLogger(RestaurantCollectionProcessor.class);
 
     private final GeminiClient geminiClient;
     private final KakaoPlaceClient kakaoPlaceClient;
@@ -70,7 +72,7 @@ public class RestaurantCollectionProcessor {
     private static final Map<String, LargeCategory> LARGE_CATEGORY_CACHE = Arrays.stream(LargeCategory.values())
         .collect(Collectors.toMap(LargeCategory::getDisplayName, Function.identity()));
 
-    private static final int RESTAURANTS_PER_REQUEST = 5;
+    private static final int RESTAURANTS_PER_REQUEST = 10;
     private static final long RATE_LIMIT_DELAY_MS = 5000; // Gemini API rate limit을 위한 지연 시간 (5초)
     private static final int LOCATION_CATEGORY_BATCH_SIZE = 5; // 한 번에 처리할 location-category 조합 개수
     private static final long BATCH_DELAY_MS = 15000; // 배치 간 휴식 시간 (15초)

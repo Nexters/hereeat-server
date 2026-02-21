@@ -2,20 +2,25 @@ package com.yogieat.restaurant.service;
 
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.category.service.CategoryService;
+import com.yogieat.common.GeoJson;
+import com.yogieat.common.GeoUtils;
 import com.yogieat.common.Region;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class RestaurantCollectionWriteService {
 
+    private static final Logger log = LoggerFactory.getLogger(RestaurantCollectionWriteService.class);
+
+    private static final double COLLECTION_REGION_RADIUS_KM = 1.0;
     private final CategoryService categoryService;
     private final RestaurantRepository restaurantRepository;
     private final RestaurantValidator restaurantValidator;
@@ -35,6 +40,14 @@ public class RestaurantCollectionWriteService {
     ) {
         try {
             if (enrichedData.externalId() == null || enrichedData.externalId().isBlank()) {
+                return false;
+            }
+
+            if (!isWithinRegionRadius(restaurantRegion, enrichedData.geoJsonLocation())) {
+                log.info("Skipping restaurant outside region radius: {} ({})",
+                        suggestion.name(),
+                        restaurantRegion.getName()
+                );
                 return false;
             }
 
@@ -84,5 +97,17 @@ public class RestaurantCollectionWriteService {
             log.error("Failed to persist restaurant: {}", suggestion.name(), e);
             return false;
         }
+    }
+
+    private boolean isWithinRegionRadius(Region region, GeoJson.Point restaurantPoint) {
+        if (region == null || region.getCoordinatesStandard() == null) {
+            return true;
+        }
+
+        if (!GeoUtils.isValidPoint(restaurantPoint)) {
+            return true;
+        }
+
+        return GeoUtils.calculateDistanceKm(region.getCoordinatesStandard(), restaurantPoint) <= COLLECTION_REGION_RADIUS_KM;
     }
 }

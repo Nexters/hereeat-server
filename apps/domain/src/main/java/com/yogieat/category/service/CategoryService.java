@@ -17,7 +17,7 @@ public class CategoryService {
         return categoryRepository.findByLargeCategoryAndMediumCategory(largeCategory, mediumCategory)
             .map(Category::id)
             .orElseGet(() -> {
-                Category category = new Category(null, largeCategory, mediumCategory);
+                Category category = new Category(null, largeCategory, mediumCategory, null);
                 return categoryRepository.save(category).id();
             });
     }

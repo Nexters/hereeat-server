@@ -32,12 +32,21 @@ restaurant:
 
 kakao:
   client:
-    enabled: ${KAKAO_CLIENT_ENABLED:false}
+    enabled: ${KAKAO_CLIENT_ENABLED:true}
   api:
     api-key: ${KAKAO_API_KEY:admin-dummy-key}
     base-url: ${KAKAO_API_BASE_URL:https://dapi.kakao.com}
     client:
       enabled: ${kakao.client.enabled}
+  admin:
+    client:
+      search-size: ${KAKAO_ADMIN_SEARCH_SIZE:5}
+      max-retry-attempts: ${KAKAO_ADMIN_MAX_RETRY_ATTEMPTS:3}
+      concurrent-permits: ${KAKAO_ADMIN_CONCURRENT_PERMITS:6}
+      retry-base-delay-ms: ${KAKAO_ADMIN_RETRY_BASE_DELAY_MS:180}
+      retry-jitter-rate: ${KAKAO_ADMIN_RETRY_JITTER_RATE:0.2}
+      api-timeout-ms: ${KAKAO_ADMIN_API_TIMEOUT_MS:1200}
+      cache-ttl-ms: ${KAKAO_ADMIN_CACHE_TTL_MS:20000}
 
 ai:
   gemini:

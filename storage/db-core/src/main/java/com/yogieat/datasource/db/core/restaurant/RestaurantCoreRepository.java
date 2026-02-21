@@ -7,6 +7,7 @@ import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
@@ -21,6 +22,7 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.sql.Types;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -89,6 +91,13 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
         entity.applyAdminPatch(command);
         return RestaurantEntity.toDomain(entity);
+    }
+
+    @Override
+    public void deleteBy(Long restaurantId) {
+        RestaurantEntity entity = restaurantJpaRepository.findById(restaurantId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
+        restaurantJpaRepository.delete(entity);
     }
 
     @Override
@@ -289,7 +298,10 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         entity.getId(),
                         entity.getName(),
                         entity.getRegion(),
-                        entity.getExternalId()
+                        entity.getExternalId(),
+                        entity.getLocation() == null
+                                ? null
+                                : new GeoJson.Point(List.of(entity.getLocation().getX(), entity.getLocation().getY()))
                 ))
                 .toList();
     }
@@ -363,23 +375,21 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     @Transactional
-    public void batchSoftDeleteByIds(List<Long> restaurantIds) {
+    public void batchDeleteByIds(List<Long> restaurantIds) {
         if (restaurantIds == null || restaurantIds.isEmpty()) {
             return;
         }
 
-        String sql = """
-                update t_restaurant
-                set deleted_at = coalesce(deleted_at, now()),
-                    updated_at = now()
-                where id in (:restaurantIds)
-                  and deleted_at is null
-                """;
-
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("restaurantIds", restaurantIds);
-
-        namedParameterJdbcTemplate.update(sql, params);
+        LocalDateTime now = LocalDateTime.now();
+        jpaQueryFactory
+                .update(restaurantEntity)
+                .set(restaurantEntity.deletedAt, now)
+                .set(restaurantEntity.updatedAt, now)
+                .where(
+                        restaurantEntity.id.in(restaurantIds),
+                        restaurantEntity.deletedAt.isNull()
+                )
+                .execute();
     }
 
     @Override
