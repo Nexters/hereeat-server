@@ -1,6 +1,7 @@
 package com.yogieat.controller.v1.auth;
 
 import com.yogieat.controller.v1.auth.request.LoginRequest;
+import com.yogieat.controller.v1.auth.request.RefreshRequest;
 import com.yogieat.controller.v1.auth.response.LoginResponse;
 import com.yogieat.controller.v1.auth.response.LogoutResponse;
 import com.yogieat.service.auth.AuthFacade;
@@ -26,5 +27,10 @@ public class AuthController {
     @PostMapping("/logout")
     public LogoutResponse logout() {
         return LogoutResponse.from(authFacade.logout());
+    }
+
+    @PostMapping("/refresh")
+    public LoginResponse refresh(@RequestBody @Valid RefreshRequest request) {
+        return LoginResponse.from(authFacade.refresh(request.refreshToken()));
     }
 }

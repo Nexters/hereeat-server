@@ -11,6 +11,7 @@ import com.yogieat.admin.service.AdminService;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.config.jwt.JwtTokenProvider;
+import com.yogieat.config.jwt.JwtTokenProvider.TokenPayload;
 import com.yogieat.fixture.AdminTestFixture;
 import com.yogieat.service.auth.result.LoginResult;
 import org.junit.jupiter.api.DisplayName;
@@ -93,5 +94,46 @@ class AuthFacadeTest {
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ADMIN_NOT_FOUND);
         verify(adminService, never()).updateLastLoginAt(1L);
+    }
+
+    @Test
+    @DisplayName("리프레시 토큰이 유효하면 액세스/리프레시 토큰을 재발급한다")
+    void refreshSuccess() {
+        Admin admin = AdminTestFixture.admin();
+        String refreshToken = "valid-refresh-token";
+        TokenPayload payload = new TokenPayload(admin.id(), admin.loginId(), admin.role(), "refresh");
+
+        when(jwtTokenProvider.parseRefreshToken(refreshToken)).thenReturn(payload);
+        when(adminService.getById(admin.id())).thenReturn(admin);
+        when(jwtTokenProvider.createAccessToken(admin)).thenReturn("new-access-token");
+        when(jwtTokenProvider.createRefreshToken(admin)).thenReturn("new-refresh-token");
+        when(jwtTokenProvider.getAccessTokenValidity()).thenReturn(3_600_000L);
+        when(jwtTokenProvider.getRefreshTokenValidity()).thenReturn(604_800_000L);
+
+        LoginResult result = authFacade.refresh(refreshToken);
+
+        assertThat(result.accessToken()).isEqualTo("new-access-token");
+        assertThat(result.refreshToken()).isEqualTo("new-refresh-token");
+        assertThat(result.tokenType()).isEqualTo("Bearer");
+        assertThat(result.accessTokenExpiresIn()).isEqualTo(3_600_000L);
+        assertThat(result.refreshTokenExpiresIn()).isEqualTo(604_800_000L);
+    }
+
+    @Test
+    @DisplayName("리프레시 토큰 payload와 관리자 정보가 불일치하면 예외가 발생한다")
+    void refreshTokenPayloadMismatch() {
+        Admin admin = AdminTestFixture.admin();
+        String refreshToken = "valid-refresh-token";
+        TokenPayload payload = new TokenPayload(admin.id(), "other-admin", admin.role(), "refresh");
+
+        when(jwtTokenProvider.parseRefreshToken(refreshToken)).thenReturn(payload);
+        when(adminService.getById(admin.id())).thenReturn(admin);
+
+        CustomException exception = assertThrows(
+                CustomException.class,
+                () -> authFacade.refresh(refreshToken)
+        );
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ADMIN_TOKEN_INVALID);
     }
 }
