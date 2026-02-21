@@ -67,7 +67,7 @@ class RestaurantSyncServiceTest {
         RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123");
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
-                .thenReturn(KakaoPlaceDetailFetchResult.success(detailDataWithCoordinate("맛집", 37.51, 127.03)));
+                .thenReturn(KakaoPlaceDetailFetchResult.success(detailDataWithCoordinate("맛집", 37.498, 127.0285)));
 
         RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(List.of(1L), Runnable::run);
 
@@ -75,8 +75,8 @@ class RestaurantSyncServiceTest {
         verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
         RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
         assertThat(command.mapUrl()).isEqualTo("https://place.map.kakao.com/123");
-        assertThat(command.longitude()).isEqualTo(127.03);
-        assertThat(command.latitude()).isEqualTo(37.51);
+        assertThat(command.longitude()).isEqualTo(127.0285);
+        assertThat(command.latitude()).isEqualTo(37.498);
     }
 
     @Test
