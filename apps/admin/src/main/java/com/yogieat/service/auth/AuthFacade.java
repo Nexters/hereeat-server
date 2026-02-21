@@ -5,6 +5,7 @@ import com.yogieat.admin.service.AdminService;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.config.jwt.JwtTokenProvider;
+import com.yogieat.config.jwt.JwtTokenProvider.TokenPayload;
 import com.yogieat.service.auth.result.LoginResult;
 import com.yogieat.service.auth.result.LogoutResult;
 import lombok.RequiredArgsConstructor;
@@ -44,5 +45,26 @@ public class AuthFacade {
 
     public LogoutResult logout() {
         return new LogoutResult(true, "로그아웃 되었습니다");
+    }
+
+    @Transactional
+    public LoginResult refresh(String refreshToken) {
+        TokenPayload payload = jwtTokenProvider.parseRefreshToken(refreshToken);
+        Admin admin = adminService.getById(payload.adminId());
+
+        if (!admin.loginId().equals(payload.loginId()) || admin.role() != payload.role()) {
+            throw new CustomException(ErrorCode.ADMIN_TOKEN_INVALID);
+        }
+
+        String accessToken = jwtTokenProvider.createAccessToken(admin);
+        String reissuedRefreshToken = jwtTokenProvider.createRefreshToken(admin);
+
+        return new LoginResult(
+                accessToken,
+                reissuedRefreshToken,
+                "Bearer",
+                jwtTokenProvider.getAccessTokenValidity(),
+                jwtTokenProvider.getRefreshTokenValidity()
+        );
     }
 }
