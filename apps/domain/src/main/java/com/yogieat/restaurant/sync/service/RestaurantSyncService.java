@@ -3,6 +3,7 @@ package com.yogieat.restaurant.sync.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yogieat.common.GeoJson;
+import com.yogieat.common.GeoUtils;
 import com.yogieat.external.kakao.KakaoPlaceClient;
 import com.yogieat.external.kakao.KakaoPlaceDetailClient;
 import com.yogieat.external.kakao.KakaoPlaceMapper;
@@ -311,38 +312,12 @@ public class RestaurantSyncService {
     }
 
     private boolean isWithinDistance(GeoJson.Point centerPoint, GeoJson.Point restaurantPoint) {
-        if (!isValidPoint(centerPoint) || !isValidPoint(restaurantPoint)) {
+        if (!GeoUtils.isValidPoint(centerPoint) || !GeoUtils.isValidPoint(restaurantPoint)) {
             return true;
         }
 
-        double distance = calculateDistanceKm(centerPoint, restaurantPoint);
+        double distance = GeoUtils.calculateDistanceKm(centerPoint, restaurantPoint);
         return distance <= SYNC_REGION_RADIUS_KM;
-    }
-
-    private boolean isValidPoint(GeoJson.Point point) {
-        return point != null
-                && point.getCoordinates() != null
-                && point.getCoordinates().size() >= 2
-                && point.getCoordinates().get(0) != null
-                && point.getCoordinates().get(1) != null;
-    }
-
-    private double calculateDistanceKm(GeoJson.Point centerPoint, GeoJson.Point restaurantPoint) {
-        double lat1 = centerPoint.getCoordinates().get(1);
-        double lon1 = centerPoint.getCoordinates().get(0);
-        double lat2 = restaurantPoint.getCoordinates().get(1);
-        double lon2 = restaurantPoint.getCoordinates().get(0);
-
-        double r = 6371;
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1))
-                * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return r * c;
     }
 
     private record SyncSource(String externalId, KaKaoPlaceDocumentResult place, KakaoPlaceDetailData detail) {
