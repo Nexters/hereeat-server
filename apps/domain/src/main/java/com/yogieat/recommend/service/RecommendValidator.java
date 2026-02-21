@@ -18,7 +18,7 @@ public class RecommendValidator {
      * @throws CustomException PARTICIPANT_MAJORITY_NOT_REACHED - 과반수 미달 시
      */
     public void validateMajorityReached(long currentCount, int peopleCount) {
-        if (currentCount * 2 <= peopleCount) {
+        if (currentCount * 2 < peopleCount) {
             throw new CustomException(ErrorCode.PARTICIPANT_MAJORITY_NOT_REACHED);
         }
     }
