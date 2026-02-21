@@ -50,7 +50,8 @@ public class CategoryEntity extends BaseEntity {
         return new Category(
                 entity.getId(),
                 entity.getLargeCategory(),
-                entity.getMediumCategory()
+                entity.getMediumCategory(),
+                entity.getCreatedAt()
         );
     }
 }
