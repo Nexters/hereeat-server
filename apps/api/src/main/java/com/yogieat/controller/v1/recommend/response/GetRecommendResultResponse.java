@@ -19,7 +19,7 @@ public record GetRecommendResultResponse(
         @Schema(description = "2, 3위 추천 결과 리스트")
         List<RankingRecommendResultResponse> otherCandidates,
         @Schema(description = "모임 정보")
-        GatheringInfo gathring,
+        GatheringInfo gathering,
         @Schema(description = "카테고리별 선호도 집계", example = "{\"KOREAN\": 3, \"WESTERN\": 2}")
         Map<String, Integer> preferences,
         @Schema(description = "카테고리별 불호 집계", example = "{\"CHINESE\": 1}")
