@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
+import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import java.util.List;
 
@@ -88,5 +89,46 @@ public record CreateRestaurant(
         } catch (JsonProcessingException e) {
             return null;
         }
+    }
+
+    public static CreateRestaurant fromKakaoPlaceDetail(
+            KakaoPlaceDetailData detail,
+            Long categoryId,
+            String externalId,
+            Region region
+    ) {
+        GeoJson.Point location = toPoint(detail);
+        String mapUrl = externalId == null || externalId.isBlank()
+                ? null
+                : "https://place.map.kakao.com/" + externalId;
+
+        return new CreateRestaurant(
+                externalId,
+                categoryId,
+                detail == null ? null : detail.placeName(),
+                detail == null ? null : detail.address(),
+                detail == null ? null : detail.rating(),
+                detail == null ? null : detail.mainPhotoUrl(),
+                mapUrl,
+                detail == null ? null : detail.representativeReview(),
+                null,
+                region,
+                location,
+                detail == null ? null : detail.reviewCount(),
+                detail == null ? null : detail.blogReviewCount(),
+                detail == null ? null : detail.representMenu(),
+                detail == null ? null : detail.representMenuPrice(),
+                detail == null ? null : detail.priceLevel(),
+                detail == null ? null : detail.aiMateSummaryTitle(),
+                toJson(detail == null ? null : detail.aiMateSummaryContents()),
+                detail == null ? null : detail.timeSlot()
+        );
+    }
+
+    private static GeoJson.Point toPoint(KakaoPlaceDetailData detail) {
+        if (detail == null || detail.latitude() == null || detail.longitude() == null) {
+            return null;
+        }
+        return new GeoJson.Point(List.of(detail.longitude(), detail.latitude()));
     }
 }

@@ -32,7 +32,7 @@ restaurant:
 
 kakao:
   client:
-    enabled: ${KAKAO_CLIENT_ENABLED:false}
+    enabled: ${KAKAO_CLIENT_ENABLED:true}
   api:
     api-key: ${KAKAO_API_KEY:admin-dummy-key}
     base-url: ${KAKAO_API_BASE_URL:https://dapi.kakao.com}

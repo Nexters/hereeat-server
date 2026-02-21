@@ -2,10 +2,12 @@ package com.yogieat.restaurant.facade;
 
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.common.Region;
+import com.yogieat.external.kakao.result.KaKaoPlaceDocumentResult;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
 import com.yogieat.restaurant.result.RestaurantAdminListResult;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
 import com.yogieat.restaurant.service.RestaurantAdminListCriteria;
+import com.yogieat.restaurant.service.RestaurantAdminLookupService;
 import com.yogieat.restaurant.service.RestaurantCommand;
 import com.yogieat.restaurant.service.RestaurantService;
 import java.util.List;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RestaurantAdminFacade {
 
     private final RestaurantService restaurantService;
+    private final RestaurantAdminLookupService restaurantAdminLookupService;
 
     public RestaurantAdminListResult getPageRestaurants(
             int page,
@@ -50,6 +53,17 @@ public class RestaurantAdminFacade {
 
     public RestaurantAdminResult.Detail getRestaurantBy(Long restaurantId) {
         return restaurantService.getAdminRestaurantDetailBy(restaurantId);
+    }
+
+    public RestaurantAdminResult.Search searchRestaurants(String keyword) {
+        String normalizedKeyword = keyword == null ? "" : keyword.strip();
+        List<KaKaoPlaceDocumentResult> items = restaurantAdminLookupService.searchByKeyword(normalizedKeyword, 5);
+        return RestaurantAdminResult.Search.of(normalizedKeyword, items);
+    }
+
+    @Transactional
+    public RestaurantAdminResult.Create createRestaurant(RestaurantCommand.Create command) {
+        return restaurantService.createRestaurant(command);
     }
 
     @Transactional

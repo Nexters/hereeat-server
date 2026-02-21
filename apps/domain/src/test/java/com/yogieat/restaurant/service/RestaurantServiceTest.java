@@ -27,6 +27,12 @@ class RestaurantServiceTest {
     @Mock
     private RestaurantRepository restaurantRepository;
 
+    @Mock
+    private RestaurantAdminLookupService restaurantAdminLookupService;
+
+    @Mock
+    private RestaurantValidator restaurantValidator;
+
     @InjectMocks
     private RestaurantService restaurantService;
 

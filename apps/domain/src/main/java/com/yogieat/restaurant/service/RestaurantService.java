@@ -2,11 +2,15 @@ package com.yogieat.restaurant.service;
 
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
+import com.yogieat.external.kakao.result.KakaoPlaceDetailFetchResult;
+import com.yogieat.external.kakao.result.KakaoPlaceDetailFetchStatus;
+import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RestaurantService {
     private final RestaurantRepository restaurantRepository;
+    private final RestaurantAdminLookupService restaurantAdminLookupService;
+    private final RestaurantValidator restaurantValidator;
 
     @Transactional(readOnly = true)
     public Restaurant getBy(Long id) {
@@ -42,8 +48,49 @@ public class RestaurantService {
         return restaurantRepository.applyAdminPatch(id, command);
     }
 
+    @Transactional
+    public RestaurantAdminResult.Create createRestaurant(RestaurantCommand.Create command) {
+        restaurantValidator.validateCreateCommand(command);
+        String externalId = command.externalId().strip();
+
+        return restaurantRepository.findByExternalId(externalId)
+                .map(restaurant -> RestaurantAdminResult.Create.duplicated(restaurant.id()))
+                .orElseGet(() -> createRestaurantByExternalId(command, externalId));
+    }
+
     @Transactional(readOnly = true)
     public long countAdminRestaurantList(RestaurantAdminListCriteria criteria) {
         return restaurantRepository.countAdminRestaurantList(criteria);
+    }
+
+    private RestaurantAdminResult.Create createRestaurantByExternalId(
+            RestaurantCommand.Create command,
+            String externalId
+    ) {
+        KakaoPlaceDetailFetchResult detailResult = restaurantAdminLookupService.fetchPlaceDetail(externalId);
+        if (detailResult.status() == KakaoPlaceDetailFetchStatus.NOT_FOUND) {
+            throw new CustomException(ErrorCode.RESTAURANT_NOT_FOUND);
+        }
+        if (detailResult.status() != KakaoPlaceDetailFetchStatus.SUCCESS || detailResult.detail() == null) {
+            throw new CustomException(ErrorCode.KAKAO_API_ERROR);
+        }
+
+        restaurantValidator.validateCreateDetail(detailResult.detail());
+
+        try {
+            Restaurant createdRestaurant = restaurantRepository.save(
+                    CreateRestaurant.fromKakaoPlaceDetail(
+                            detailResult.detail(),
+                            command.categoryId(),
+                            externalId,
+                            command.region()
+                    )
+            );
+            return RestaurantAdminResult.Create.created(createdRestaurant.id());
+        } catch (DataIntegrityViolationException e) {
+            return restaurantRepository.findByExternalId(externalId)
+                    .map(restaurant -> RestaurantAdminResult.Create.duplicated(restaurant.id()))
+                    .orElseThrow(() -> new CustomException(ErrorCode.KAKAO_API_ERROR));
+        }
     }
 }
