@@ -32,10 +32,12 @@ public class CategoryQuotaSelectionStrategy implements RecommendationSelectionSt
         Map<String, List<ScoredRestaurant>> categoryBuckets =
                 buildCategoryBuckets(scoredByCategory, candidatePoolSize);
 
+        List<String> quotaCategories = resolveQuotaCategories(categoryBuckets, preferenceVotes);
         List<String> slotSequence = buildCategorySlotSequence(
                 categoryBuckets,
                 preferenceVotes,
-                topKSize
+                topKSize,
+                quotaCategories
         );
 
         List<ScoredRestaurant> selected = new ArrayList<>(topKSize);
@@ -59,8 +61,12 @@ public class CategoryQuotaSelectionStrategy implements RecommendationSelectionSt
             return selected;
         }
 
-        // 슬롯 배분으로 부족한 경우, 전체 후보에서 점수순으로 보강
+        // 슬롯 배분으로 부족한 경우 보강:
+        // - 선호 카테고리 후보가 있으면 선호 카테고리 내에서만 보강
+        // - 선호 카테고리 후보가 없으면 전체 후보에서 점수순 보강
+        Set<String> quotaCategorySet = new HashSet<>(quotaCategories);
         List<ScoredRestaurant> remainingCandidates = scoredByCategory.stream()
+                .filter(item -> quotaCategorySet.isEmpty() || quotaCategorySet.contains(item.categoryName()))
                 .map(CategoryScoredRestaurant::scoredRestaurant)
                 .filter(candidate -> !selectedRestaurantIds.contains(candidate.restaurant().id()))
                 .sorted(Comparator.comparingDouble(ScoredRestaurant::totalScore).reversed())
@@ -100,14 +106,8 @@ public class CategoryQuotaSelectionStrategy implements RecommendationSelectionSt
     private List<String> buildCategorySlotSequence(
             Map<String, List<ScoredRestaurant>> categoryBuckets,
             Map<String, Integer> preferenceVotes,
-            int topKSize) {
-        List<String> quotaCategories = preferenceVotes.entrySet().stream()
-                .filter(entry -> entry.getValue() > 0)
-                .filter(entry -> categoryBuckets.containsKey(entry.getKey()))
-                .filter(entry -> !categoryBuckets.get(entry.getKey()).isEmpty())
-                .map(Map.Entry::getKey)
-                .toList();
-
+            int topKSize,
+            List<String> quotaCategories) {
         if (quotaCategories.isEmpty()) {
             return List.of();
         }
@@ -188,6 +188,18 @@ public class CategoryQuotaSelectionStrategy implements RecommendationSelectionSt
             }
         }
         return slotSequence;
+    }
+
+    private List<String> resolveQuotaCategories(
+            Map<String, List<ScoredRestaurant>> categoryBuckets,
+            Map<String, Integer> preferenceVotes
+    ) {
+        return preferenceVotes.entrySet().stream()
+                .filter(entry -> entry.getValue() > 0)
+                .filter(entry -> categoryBuckets.containsKey(entry.getKey()))
+                .filter(entry -> !categoryBuckets.get(entry.getKey()).isEmpty())
+                .map(Map.Entry::getKey)
+                .toList();
     }
 
     private double bestCategoryScore(

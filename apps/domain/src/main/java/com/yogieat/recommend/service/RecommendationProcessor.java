@@ -379,8 +379,13 @@ public class RecommendationProcessor {
             RecommendationParticipantContext participantContext,
             FilterStrategy strategy
     ) {
+        List<CategoryScoredRestaurant> baseCandidates = applyNoDislikePreferredFilter(
+                scoredByCategory,
+                participantContext
+        );
+
         Map<String, PreferenceScore> preferenceScoreMap = participantContext.preferenceScoreMap();
-        List<CategoryScoredRestaurant> filtered = scoredByCategory.stream()
+        List<CategoryScoredRestaurant> filtered = baseCandidates.stream()
                 .filter(item -> shouldIncludeRestaurant(
                         preferenceScoreMap.getOrDefault(item.categoryName(), PreferenceScore.empty()),
                         strategy
@@ -393,6 +398,37 @@ public class RecommendationProcessor {
                 SCORING_POLICY.candidate().topKSize(),
                 SCORING_POLICY.candidate().poolSize()
         );
+    }
+
+    /**
+     * 선호 카테고리 중 불호가 0표인 카테고리가 존재하면 해당 카테고리만 후보로 제한합니다.
+     * (예: Case 12에서 일식만 불호 0표인 경우 일식만 추천 대상)
+     */
+    private List<CategoryScoredRestaurant> applyNoDislikePreferredFilter(
+            List<CategoryScoredRestaurant> scoredByCategory,
+            RecommendationParticipantContext participantContext
+    ) {
+        CategoryVoteSummary voteSummary = participantContext.categoryVoteSummary();
+        Set<String> strictCategories = voteSummary.preferenceVotes().entrySet().stream()
+                .filter(entry -> entry.getValue() > 0)
+                .filter(entry -> voteSummary.dislikeVotes().getOrDefault(entry.getKey(), 0) == 0)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+
+        if (strictCategories.isEmpty()) {
+            return scoredByCategory;
+        }
+
+        List<CategoryScoredRestaurant> strictCandidates = scoredByCategory.stream()
+                .filter(item -> strictCategories.contains(item.categoryName()))
+                .toList();
+
+        // strict 카테고리 후보가 실제로 없으면 기존 후보를 유지
+        if (strictCandidates.isEmpty()) {
+            return scoredByCategory;
+        }
+
+        return strictCandidates;
     }
 
 

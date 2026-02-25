@@ -51,6 +51,36 @@ class CategoryQuotaSelectionStrategyTest {
                 .containsExactly(1L, 2L, 3L);
     }
 
+    @Test
+    @DisplayName("선호 카테고리 후보가 있으면 비선호 카테고리로 보강하지 않는다")
+    void shouldNotBackfillFromNonPreferredWhenPreferredCandidatesExist() {
+        // given
+        List<CategoryScoredRestaurant> scored = List.of(
+                item("한식", 101L, 100.0),
+                item("한식", 102L, 99.0),
+                item("중식", 201L, 120.0),
+                item("아시안", 301L, 119.0)
+        );
+
+        Map<String, Integer> preferenceVotes = Map.of(
+                "한식", 4,
+                "양식", 2
+        );
+
+        // when
+        List<ScoredRestaurant> top3 = strategy.selectTopRestaurants(
+                scored,
+                preferenceVotes,
+                3,
+                10
+        );
+
+        // then
+        assertThat(top3).hasSize(2);
+        assertThat(top3.stream().map(sr -> sr.restaurant().categoryId()).toList())
+                .containsExactly(1L, 1L);
+    }
+
     private CategoryScoredRestaurant item(String categoryName, Long restaurantId, double score) {
         Restaurant restaurant = new Restaurant(
                 restaurantId,

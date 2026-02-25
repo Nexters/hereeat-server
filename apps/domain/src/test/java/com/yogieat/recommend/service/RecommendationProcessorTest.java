@@ -293,6 +293,111 @@ class RecommendationProcessorTest {
         assertThat(timeSlotCaptor.getValue()).isEqualTo(TimeSlot.LUNCH);
     }
 
+    @Test
+    @DisplayName("선호 카테고리 중 불호 0표 카테고리가 있으면 해당 카테고리만 추천한다 (Case 12)")
+    @SuppressWarnings("unchecked")
+    void shouldRecommendOnlyNoDislikePreferredCategoryWhenPresent() {
+        // given
+        Long gatheringId = 31L;
+        Region region = Region.GANGNAM;
+
+        List<Participant> participants = List.of(
+                participant(1L, gatheringId, DistanceRange.ANY, "중식", "한식"),
+                participant(2L, gatheringId, DistanceRange.ANY, "아시안", "중식"),
+                participant(3L, gatheringId, DistanceRange.ANY, "한식", "양식,아시안"),
+                participant(4L, gatheringId, DistanceRange.ANY, "일식", "상관없음"),
+                participant(5L, gatheringId, DistanceRange.ANY, "한식", "상관없음"),
+                participant(6L, gatheringId, DistanceRange.ANY, "중식", "상관없음")
+        );
+
+        List<Category> categories = List.of(
+                category(1L, LargeCategory.KOREAN),
+                category(2L, LargeCategory.CHINESE),
+                category(3L, LargeCategory.JAPANESE),
+                category(4L, LargeCategory.WESTERN),
+                category(5L, LargeCategory.ASIAN)
+        );
+
+        List<Restaurant> restaurants = List.of(
+                restaurant(101L, 1L, "한식A", 4.7, point(127.0276, 37.4979), 20),
+                restaurant(201L, 2L, "중식A", 4.7, point(127.0277, 37.4978), 20),
+                restaurant(301L, 3L, "일식A", 4.7, point(127.0278, 37.4977), 20),
+                restaurant(401L, 4L, "양식A", 4.7, point(127.0279, 37.4976), 20),
+                restaurant(501L, 5L, "아시안A", 4.7, point(127.0280, 37.4975), 20)
+        );
+
+        when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
+        when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
+        when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
+                .thenReturn(restaurants);
+        when(categoryService.findAll()).thenReturn(categories);
+
+        // when
+        recommendationProcessor.processRecommendation(gatheringId, region);
+
+        // then
+        ArgumentCaptor<List<RecommendResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
+        verify(recommendResultRepository).saveAll(resultCaptor.capture());
+
+        List<RecommendResult> saved = resultCaptor.getValue();
+        assertThat(saved).hasSize(1);
+        assertThat(saved.getFirst().restaurantId()).isEqualTo(301L);
+    }
+
+    @Test
+    @DisplayName("Case 11: 한식 4표/양식 2표일 때 Top3를 한식 2개 + 양식 1개로 배분한다")
+    @SuppressWarnings("unchecked")
+    void shouldAllocateTwoKoreanAndOneWesternForCase11() {
+        // given
+        Long gatheringId = 41L;
+        Region region = Region.GANGNAM;
+
+        List<Participant> participants = List.of(
+                participant(1L, gatheringId, DistanceRange.ANY, "한식", "양식,아시안"),
+                participant(2L, gatheringId, DistanceRange.ANY, "한식", "일식,아시안"),
+                participant(3L, gatheringId, DistanceRange.ANY, "양식", "중식,한식"),
+                participant(4L, gatheringId, DistanceRange.ANY, "한식", "일식,양식"),
+                participant(5L, gatheringId, DistanceRange.ANY, "한식", "아시안,중식"),
+                participant(6L, gatheringId, DistanceRange.ANY, "양식", "한식,일식")
+        );
+
+        List<Category> categories = List.of(
+                category(1L, LargeCategory.KOREAN),
+                category(2L, LargeCategory.WESTERN),
+                category(3L, LargeCategory.JAPANESE),
+                category(4L, LargeCategory.CHINESE),
+                category(5L, LargeCategory.ASIAN)
+        );
+
+        List<Restaurant> restaurants = List.of(
+                restaurant(101L, 1L, "한식A", 4.9, point(127.0276, 37.4979), 30),
+                restaurant(102L, 1L, "한식B", 4.7, point(127.0277, 37.4978), 25),
+                restaurant(201L, 2L, "양식A", 4.8, point(127.0278, 37.4977), 25),
+                restaurant(301L, 3L, "일식A", 5.0, point(127.0279, 37.4976), 30),
+                restaurant(401L, 4L, "중식A", 5.0, point(127.0280, 37.4975), 30),
+                restaurant(501L, 5L, "아시안A", 5.0, point(127.0281, 37.4974), 30)
+        );
+
+        when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
+        when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
+        when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
+                .thenReturn(restaurants);
+        when(categoryService.findAll()).thenReturn(categories);
+
+        // when
+        recommendationProcessor.processRecommendation(gatheringId, region);
+
+        // then
+        ArgumentCaptor<List<RecommendResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
+        verify(recommendResultRepository).saveAll(resultCaptor.capture());
+
+        List<RecommendResult> saved = resultCaptor.getValue();
+        assertThat(saved).hasSize(3);
+        assertThat(restaurantIdsByRank(saved)).containsExactly(101L, 102L, 201L);
+    }
+
     private RecommendResult findRank(List<RecommendResult> results, int rank) {
         return results.stream()
                 .filter(result -> result.rank() == rank)
