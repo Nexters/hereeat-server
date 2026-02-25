@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import java.util.Objects;
 
 public final class RestaurantRequest {
 
@@ -214,7 +215,7 @@ public final class RestaurantRequest {
             return null;
         }
         List<String> cleanedList = aiMateSummaryContents.stream()
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .map(String::strip)
                 .filter(s -> !s.isBlank())
                 .toList();

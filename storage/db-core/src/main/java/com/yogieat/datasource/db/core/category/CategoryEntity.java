@@ -22,7 +22,7 @@ import lombok.NoArgsConstructor;
         @Index(
             name = "idx_category_large_medium",
             columnList = "large_category, medium_category",
-            unique = false
+            unique = true
         )
     }
 )
