@@ -48,7 +48,7 @@ public class RecommendationContextFactory {
             // 선호도 집계
             List<String> preferences = StringUtils.splitByComma(participant.preferences());
             for (int i = 0; i < preferences.size(); i++) {
-                String pref = preferences.get(i);
+                String pref = sanitizeSelection(preferences.get(i));
                 if (!isNeutralCategorySelection(pref)) {
                     String normalizedPref = normalizeToDisplayName(pref);
                     if (normalizedPref != null) {
@@ -61,6 +61,7 @@ public class RecommendationContextFactory {
             // 불호 집계
             List<String> dislikes = StringUtils.splitByComma(participant.dislikes());
             for (String dislike : dislikes) {
+                dislike = sanitizeSelection(dislike);
                 if (!isNeutralCategorySelection(dislike)) {
                     String normalizedDislike = normalizeToDisplayName(dislike);
                     if (normalizedDislike != null) {
@@ -87,6 +88,7 @@ public class RecommendationContextFactory {
             Set<String> participantDislikeSet = new HashSet<>();
 
             for (String pref : StringUtils.splitByComma(participant.preferences())) {
+                pref = sanitizeSelection(pref);
                 if (isNeutralCategorySelection(pref)) {
                     continue;
                 }
@@ -97,6 +99,7 @@ public class RecommendationContextFactory {
             }
 
             for (String dislike : StringUtils.splitByComma(participant.dislikes())) {
+                dislike = sanitizeSelection(dislike);
                 if (isNeutralCategorySelection(dislike)) {
                     continue;
                 }
@@ -181,7 +184,20 @@ public class RecommendationContextFactory {
     }
 
     private boolean isNeutralCategorySelection(String value) {
-        return "상관없음".equals(value) || "ANY".equals(value);
+        if (value == null) {
+            return true;
+        }
+
+        String sanitized = sanitizeSelection(value);
+        if (sanitized == null || sanitized.isBlank()) {
+            return true;
+        }
+
+        return "상관없음".equals(sanitized)
+                || "상관 없음".equals(sanitized)
+                || "ANY".equalsIgnoreCase(sanitized)
+                || "없음".equals(sanitized)
+                || "NONE".equalsIgnoreCase(sanitized);
     }
 
     /**
@@ -189,19 +205,35 @@ public class RecommendationContextFactory {
      * enum name ("KOREAN", "CHINESE" 등) 또는 displayName ("한식", "중식" 등) 모두 처리합니다.
      */
     private String normalizeToDisplayName(String categoryValue) {
+        if (categoryValue == null) {
+            return null;
+        }
+
+        String sanitized = sanitizeSelection(categoryValue);
+        if (sanitized == null || sanitized.isBlank()) {
+            return null;
+        }
+
         // 1. 이미 displayName이면 그대로 반환
-        LargeCategory byDisplayName = LargeCategory.fromDisplayName(categoryValue);
+        LargeCategory byDisplayName = LargeCategory.fromDisplayName(sanitized);
         if (byDisplayName != null) {
-            return categoryValue;
+            return byDisplayName.getDisplayName();
         }
 
         // 2. enum name이면 displayName으로 변환
-        LargeCategory byEnumName = LargeCategory.fromString(categoryValue);
+        LargeCategory byEnumName = LargeCategory.fromString(sanitized);
         if (byEnumName != null) {
             return byEnumName.getDisplayName();
         }
 
         // 3. 알 수 없는 값
         return null;
+    }
+
+    private String sanitizeSelection(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.strip();
     }
 }
