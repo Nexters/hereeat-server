@@ -8,6 +8,7 @@ import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.Restaurant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 public final class RestaurantAdminResult {
 
@@ -44,7 +45,7 @@ public final class RestaurantAdminResult {
             List<SearchItem> mappedItems = items == null
                     ? List.of()
                     : items.stream()
-                        .filter(java.util.Objects::nonNull)
+                        .filter(Objects::nonNull)
                         .map(SearchItem::from)
                         .toList();
             return new Search(keyword, mappedItems);

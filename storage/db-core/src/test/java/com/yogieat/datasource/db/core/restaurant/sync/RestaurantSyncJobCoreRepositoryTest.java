@@ -2,6 +2,8 @@ package com.yogieat.datasource.db.core.restaurant.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,6 +13,7 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncTriggerType;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +35,7 @@ class RestaurantSyncJobCoreRepositoryTest {
     @DisplayName("claimNextPendingJob은 가장 오래된 PENDING Job을 RUNNING으로 점유한다")
     void claimNextPendingJob_ShouldReturnClaimedJob() {
         RestaurantSyncJobEntity entity = RestaurantSyncJobEntity.from(newJob());
-        when(syncJobJpaRepository.claimNextPendingJobIds()).thenReturn(java.util.List.of(1L));
+        when(syncJobJpaRepository.claimNextPendingJobIds()).thenReturn(List.of(1L));
         when(syncJobJpaRepository.findById(1L)).thenReturn(Optional.of(entity));
 
         Optional<RestaurantSyncJob> claimed = coreRepository.claimNextPendingJob();
@@ -45,14 +48,14 @@ class RestaurantSyncJobCoreRepositoryTest {
     @Test
     @DisplayName("claim할 PENDING Job이 없으면 empty를 반환한다")
     void claimNextPendingJob_ShouldReturnEmpty_WhenNoPendingJob() {
-        when(syncJobJpaRepository.claimNextPendingJobIds()).thenReturn(java.util.List.of());
+        when(syncJobJpaRepository.claimNextPendingJobIds()).thenReturn(List.of());
         assertThat(coreRepository.claimNextPendingJob()).isEmpty();
     }
 
     @Test
     @DisplayName("failStaleRunningJobs는 stale RUNNING job 정리 건수를 반환한다")
     void failStaleRunningJobs_ShouldReturnUpdatedCount() {
-        when(syncJobJpaRepository.failStaleRunningJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
+        when(syncJobJpaRepository.failStaleRunningJobs(any(), anyString()))
                 .thenReturn(2);
 
         int updated = coreRepository.failStaleRunningJobs(Duration.ofMinutes(60), "stale");
