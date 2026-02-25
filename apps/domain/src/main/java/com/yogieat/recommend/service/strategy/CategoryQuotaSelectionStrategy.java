@@ -135,30 +135,38 @@ public class CategoryQuotaSelectionStrategy implements RecommendationSelectionSt
             allocatedSlots += baseSlots;
         }
 
-        while (allocatedSlots < topKSize) {
-            String nextCategory = quotaCategories.stream()
-                    .filter(category -> slotCounts.getOrDefault(category, 0) < categoryBuckets.get(category).size())
-                    .sorted(Comparator
-                            .comparingDouble((String category) -> remainders.getOrDefault(category, 0.0))
-                            .reversed()
-                            .thenComparing(
-                                    Comparator.comparingInt((String category) -> preferenceVotes.getOrDefault(category, 0))
-                                            .reversed()
-                            )
-                            .thenComparing(
-                                    (String category) -> bestCategoryScore(category, categoryBuckets),
-                                    Comparator.reverseOrder()
-                            )
-                            .thenComparing(Comparator.naturalOrder()))
-                    .findFirst()
-                    .orElse(null);
+        List<String> remainderOrder = quotaCategories.stream()
+                .sorted(Comparator
+                        .comparingDouble((String category) -> remainders.getOrDefault(category, 0.0))
+                        .reversed()
+                        .thenComparing(
+                                Comparator.comparingInt((String category) -> preferenceVotes.getOrDefault(category, 0))
+                                        .reversed()
+                        )
+                        .thenComparing(
+                                (String category) -> bestCategoryScore(category, categoryBuckets),
+                                Comparator.reverseOrder()
+                        )
+                        .thenComparing(Comparator.naturalOrder()))
+                .toList();
 
-            if (nextCategory == null) {
-                break;
+        while (allocatedSlots < topKSize) {
+            boolean allocatedInRound = false;
+            for (String category : remainderOrder) {
+                if (allocatedSlots >= topKSize) {
+                    break;
+                }
+                if (slotCounts.getOrDefault(category, 0) >= categoryBuckets.get(category).size()) {
+                    continue;
+                }
+                slotCounts.merge(category, 1, Integer::sum);
+                allocatedSlots++;
+                allocatedInRound = true;
             }
 
-            slotCounts.merge(nextCategory, 1, Integer::sum);
-            allocatedSlots++;
+            if (!allocatedInRound) {
+                break;
+            }
         }
 
         List<String> slotOrder = quotaCategories.stream()
