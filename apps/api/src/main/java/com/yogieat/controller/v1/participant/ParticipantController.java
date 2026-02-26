@@ -1,6 +1,7 @@
 package com.yogieat.controller.v1.participant;
 
 import com.yogieat.controller.v1.participant.request.CreateParticipantRequest;
+import com.yogieat.controller.v1.participant.request.ValidateNicknameRequest;
 import com.yogieat.controller.v1.participant.response.CreateParticipantResponse;
 import com.yogieat.participant.service.ParticipantFacade;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +19,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ParticipantController {
     private final ParticipantFacade participantFacade;
+
+    // 닉네임 사전 중복 검증 API
+    @Operation(summary = "닉네임 중복 사전 검증", description = "모임 참여 전 닉네임 중복 여부를 사전에 검증합니다.")
+    @PostMapping("/nickname/validation")
+    public void validateNickname(
+            @RequestBody @Valid ValidateNicknameRequest request
+    ) {
+        participantFacade.validateNickname(request.accessKey(), request.nickname());
+    }
 
     // 참여 API
     @Operation(summary = "모임 참여", description = "사용자가 모임에 참여합니다.")
