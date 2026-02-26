@@ -6,8 +6,6 @@ import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.gathering.domain.Gathering;
-import com.yogieat.gathering.domain.result.GatheringResult;
-import com.yogieat.gathering.service.GatheringEventNotifier;
 import com.yogieat.gathering.service.GatheringService;
 import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.domain.value.DistanceRange;
@@ -17,7 +15,7 @@ import com.yogieat.recommend.domain.RecommendResult;
 import com.yogieat.recommend.domain.result.RecommendResultData;
 import com.yogieat.recommend.domain.value.CategoryAggregation;
 import com.yogieat.recommend.domain.value.RecommendStatus;
-import com.yogieat.recommend.event.GatheringFullEvent;
+import com.yogieat.recommend.event.RecommendResultCreatedEvent;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantService;
 import com.yogieat.util.LockManager;
@@ -46,7 +44,6 @@ public class RecommendResultFacade {
     private final ParticipantAnalyzer participantAnalyzer;
     private final LockManager lockManager;
     private final ApplicationEventPublisher eventPublisher;
-    private final GatheringEventNotifier gatheringEventNotifier;
     private final RecommendValidator recommendValidator;
 
     @Transactional(readOnly = true)
@@ -124,16 +121,11 @@ public class RecommendResultFacade {
             recommendValidator.validateNotAlreadyProceeded(
                     recommendResultService.existsByGatheringId(gathering.id()));
 
-            // 5. SSE 알림
-            GatheringResult.ParticipantCount status =
-                    GatheringResult.ParticipantCount.of(currentCount, gathering.peopleCount());
-            gatheringEventNotifier.notifyGatheringFull(accessKey, status);
-
-            // 6. PENDING 상태 생성 및 이벤트 발행
+            // 5. PENDING 상태 생성 및 이벤트 발행
             recommendResultService.createPendingStatus(gathering.id());
-            log.info("Publishing GatheringFullEvent by majority for gathering: {}", gathering.id());
-            eventPublisher.publishEvent(new GatheringFullEvent(
-                    this, gathering.id(), gathering.region(), gathering.peopleCount()
+            log.info("Publishing RecommendResultCreatedEvent by majority for gathering: {}", gathering.id());
+            eventPublisher.publishEvent(new RecommendResultCreatedEvent(
+                    this, gathering.id(), gathering.region(), gathering.peopleCount(), accessKey, currentCount
             ));
             return null;
         });

@@ -19,8 +19,8 @@ public class SseGatheringEventNotifier implements GatheringEventNotifier {
     }
 
     @Override
-    public void notifyGatheringFull(String accessKey, GatheringResult.ParticipantCount status) {
-        sseEmitterManager.send(accessKey, "gathering-full",
+    public void notifyRecommendResultCreated(String accessKey, GatheringResult.ParticipantCount status) {
+        sseEmitterManager.send(accessKey, "recommend-result-created",
                 GetParticipantCountResponse.from(status));
         sseEmitterManager.complete(accessKey);
     }
