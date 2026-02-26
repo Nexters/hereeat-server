@@ -66,9 +66,10 @@ class ParticipantFacadeConcurrencyTest {
             executor.submit(
                     () -> {
                         try {
+                            String nickname = "참여자" + (char) ('A' + index);
                             ParticipantCommand.Create command =
                                     new ParticipantCommand.Create(
-                                            gathering.accessKey(), "참여자" + index, null, List.of(), List.of());
+                                            gathering.accessKey(), nickname, null, List.of(), List.of());
                             participantFacade.participate(command);
                             successCount.incrementAndGet();
                         } catch (CustomException e) {
