@@ -103,6 +103,7 @@ class ParticipantValidatorTest {
     @Test
     @DisplayName("닉네임이 null이면 중복 검증 없이 통과한다")
     void validateNicknameDuplicate_WhenNicknameIsNull_ShouldNotThrowException() {
-        assertThatCode(() -> participantValidator.validateNicknameDuplicate(1L, null));
+        assertThatCode(() -> participantValidator.validateNicknameDuplicate(1L, null))
+                .doesNotThrowAnyException();
     }
 }
