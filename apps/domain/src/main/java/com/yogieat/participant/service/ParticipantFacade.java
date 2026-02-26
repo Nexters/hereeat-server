@@ -30,13 +30,12 @@ public class ParticipantFacade {
     private final ApplicationEventPublisher eventPublisher;
     private final RecommendResultService recommendResultService;
     private final GatheringEventNotifier gatheringEventNotifier;
+    private final ParticipantValidator participantValidator;
 
     @Transactional(readOnly = true)
     public void validateNickname(String accessKey, String nickname) {
         Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
-        if (participantService.existsByGatheringIdAndNickname(gathering.id(), nickname)) {
-            throw new CustomException(ErrorCode.DUPLICATE_NICKNAME);
-        }
+        participantValidator.validateNicknameDuplicate(gathering.id(), nickname);
     }
 
     @Transactional
@@ -64,11 +63,7 @@ public class ParticipantFacade {
                     gatheringService.validateGatheringNotFull(gathering, currentParticipantCount);
 
                     // 3-1. 같은 모임 내 닉네임 중복 검증
-                    if (command.nickname() != null &&
-                            participantService.existsByGatheringIdAndNickname(
-                                    gathering.id(), command.nickname())) {
-                        throw new CustomException(ErrorCode.DUPLICATE_NICKNAME);
-                    }
+                    participantValidator.validateNicknameDuplicate(gathering.id(), command.nickname());
 
                     // 4. Double distance를 DistanceRange로 변환 (null이면 ANY)
                     DistanceRange distanceRange = DistanceRange.fromDistance(command.distance());
