@@ -23,11 +23,13 @@ public record CreateParticipantRequest(
     private static final int MAX_PREFERENCES_SIZE = 3;
 
     /**
-     * Compact constructor for normalization and input boundary validation.
-     * 닉네임 형식 검증은 ParticipantValidator에서 수행한다.
+     * Compact constructor for validation.
+     * dislikes: 최소 1개, 최대 2개, preferences: 최대 3개까지만 허용
      */
     public CreateParticipantRequest {
-        nickname = nickname != null ? nickname.strip() : null;
+        if (nickname != null) {
+            nickname = nickname.strip();
+        }
 
         if (dislikes == null || dislikes.isEmpty() || dislikes.size() > MAX_DISLIKES_SIZE) {
             throw new CustomException(ErrorCode.PARTICIPANT_DISLIKES_EXCEEDED);

@@ -25,15 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class ParticipantFacade {
     private final ParticipantService participantService;
+    private final ParticipantValidator participantValidator;
     private final GatheringService gatheringService;
     private final LockManager lockManager;
     private final ApplicationEventPublisher eventPublisher;
     private final RecommendResultService recommendResultService;
     private final GatheringEventNotifier gatheringEventNotifier;
-    private final ParticipantValidator participantValidator;
 
     @Transactional(readOnly = true)
     public void validateNickname(String accessKey, String nickname) {
+        participantValidator.validateNicknameFormat(nickname);
         Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
         participantValidator.validateNicknameDuplicate(gathering.id(), nickname);
     }
@@ -62,7 +63,8 @@ public class ParticipantFacade {
                     // 3. Gathering 참여 인원 초과 검증
                     gatheringService.validateGatheringNotFull(gathering, currentParticipantCount);
 
-                    // 3-1. 같은 모임 내 닉네임 중복 검증
+                    // 3-1. 닉네임 형식 및 중복 검증
+                    participantValidator.validateNicknameFormat(command.nickname());
                     participantValidator.validateNicknameDuplicate(gathering.id(), command.nickname());
 
                     // 4. Double distance를 DistanceRange로 변환 (null이면 ANY)

@@ -22,8 +22,59 @@ class ParticipantValidatorTest {
     @InjectMocks
     private ParticipantValidator participantValidator;
 
+    // ── validateNicknameFormat ──────────────────────────────────────────────
+
     @Test
-    @DisplayName("닉네임이 중복되면 예외가 발생한다")
+    @DisplayName("정상 닉네임이면 예외가 발생하지 않는다")
+    void validateNicknameFormat_ValidNickname_ShouldNotThrow() {
+        assertThatCode(() -> participantValidator.validateNicknameFormat("철수"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("닉네임이 null이면 PARTICIPANT_NICKNAME_REQUIRED 예외가 발생한다")
+    void validateNicknameFormat_NullNickname_ShouldThrowRequired() {
+        assertThatThrownBy(() -> participantValidator.validateNicknameFormat(null))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_NICKNAME_REQUIRED);
+    }
+
+    @Test
+    @DisplayName("닉네임이 공백이면 PARTICIPANT_NICKNAME_REQUIRED 예외가 발생한다")
+    void validateNicknameFormat_BlankNickname_ShouldThrowRequired() {
+        assertThatThrownBy(() -> participantValidator.validateNicknameFormat("   "))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_NICKNAME_REQUIRED);
+    }
+
+    @Test
+    @DisplayName("닉네임이 8자를 초과하면 PARTICIPANT_NICKNAME_TOO_LONG 예외가 발생한다")
+    void validateNicknameFormat_TooLongNickname_ShouldThrowTooLong() {
+        assertThatThrownBy(() -> participantValidator.validateNicknameFormat("닉네임이너무길어요"))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_NICKNAME_TOO_LONG);
+    }
+
+    @Test
+    @DisplayName("닉네임에 숫자가 포함되면 PARTICIPANT_NICKNAME_INVALID 예외가 발생한다")
+    void validateNicknameFormat_NicknameWithNumber_ShouldThrowInvalid() {
+        assertThatThrownBy(() -> participantValidator.validateNicknameFormat("철수123"))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_NICKNAME_INVALID);
+    }
+
+    @Test
+    @DisplayName("닉네임에 특수문자가 포함되면 PARTICIPANT_NICKNAME_INVALID 예외가 발생한다")
+    void validateNicknameFormat_NicknameWithSpecialChar_ShouldThrowInvalid() {
+        assertThatThrownBy(() -> participantValidator.validateNicknameFormat("철수!"))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PARTICIPANT_NICKNAME_INVALID);
+    }
+
+    // ── validateNicknameDuplicate ───────────────────────────────────────────
+
+    @Test
+    @DisplayName("닉네임이 중복되면 DUPLICATE_NICKNAME 예외가 발생한다")
     void validateNicknameDuplicate_WhenDuplicate_ShouldThrowException() {
         // Given
         Long gatheringId = 1L;
@@ -50,14 +101,8 @@ class ParticipantValidatorTest {
     }
 
     @Test
-    @DisplayName("닉네임이 null이면 검증 없이 통과한다")
+    @DisplayName("닉네임이 null이면 중복 검증 없이 통과한다")
     void validateNicknameDuplicate_WhenNicknameIsNull_ShouldNotThrowException() {
-        // Given
-        Long gatheringId = 1L;
-        String nickname = null;
-
-        // When & Then
-        assertThatCode(() -> participantValidator.validateNicknameDuplicate(gatheringId, nickname))
-                .doesNotThrowAnyException();
+        assertThatCode(() -> participantValidator.validateNicknameDuplicate(1L, null));
     }
 }
