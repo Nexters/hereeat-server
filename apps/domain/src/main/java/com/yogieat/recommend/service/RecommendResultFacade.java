@@ -124,7 +124,7 @@ public class RecommendResultFacade {
             // 5. PENDING 상태 생성 및 이벤트 발행
             recommendResultService.createPendingStatus(gathering.id());
             log.info("Publishing RecommendResultCreatedEvent by majority for gathering: {}", gathering.id());
-            eventPublisher.publishEvent(new RecommendResultCreatedEvent(
+            eventPublisher.publishEvent(RecommendResultCreatedEvent.of(
                     this, gathering.id(), gathering.region(), gathering.peopleCount(), accessKey, currentCount
             ));
             return null;

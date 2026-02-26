@@ -12,12 +12,16 @@ public class RecommendResultCreatedEvent extends ApplicationEvent {
     private final String accessKey;
     private final long currentCount;
 
-    public RecommendResultCreatedEvent(Object source, Long gatheringId, Region region, Integer peopleCount, String accessKey, long currentCount) {
+    private RecommendResultCreatedEvent(Object source, Long gatheringId, Region region, Integer peopleCount, String accessKey, long currentCount) {
         super(source);
         this.gatheringId = gatheringId;
         this.region = region;
         this.peopleCount = peopleCount;
         this.accessKey = accessKey;
         this.currentCount = currentCount;
+    }
+
+    public static RecommendResultCreatedEvent of(Object source, Long gatheringId, Region region, Integer peopleCount, String accessKey, long currentCount) {
+        return new RecommendResultCreatedEvent(source, gatheringId, region, peopleCount, accessKey, currentCount);
     }
 }

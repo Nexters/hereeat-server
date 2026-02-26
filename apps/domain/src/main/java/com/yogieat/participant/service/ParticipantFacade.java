@@ -96,7 +96,7 @@ public class ParticipantFacade {
                         recommendResultService.createPendingStatus(gathering.id());
 
                         log.info("Publishing RecommendResultCreatedEvent for gathering: {}", gathering.id());
-                        eventPublisher.publishEvent(new RecommendResultCreatedEvent(
+                        eventPublisher.publishEvent(RecommendResultCreatedEvent.of(
                                 this,
                                 gathering.id(),
                                 gathering.region(),
