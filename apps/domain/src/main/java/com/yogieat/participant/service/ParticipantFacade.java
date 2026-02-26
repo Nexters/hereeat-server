@@ -31,6 +31,14 @@ public class ParticipantFacade {
     private final RecommendResultService recommendResultService;
     private final GatheringEventNotifier gatheringEventNotifier;
 
+    @Transactional(readOnly = true)
+    public void validateNickname(String accessKey, String nickname) {
+        Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
+        if (participantService.existsByGatheringIdAndNickname(gathering.id(), nickname)) {
+            throw new CustomException(ErrorCode.DUPLICATE_NICKNAME);
+        }
+    }
+
     @Transactional
     public ParticipantResult.Create participate(ParticipantCommand.Create command) {
         // Gathering별 락을 사용하여 동시성 제어
