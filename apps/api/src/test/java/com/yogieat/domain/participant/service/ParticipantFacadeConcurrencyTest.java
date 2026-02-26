@@ -62,12 +62,13 @@ class ParticipantFacadeConcurrencyTest {
 
         // When: 10개 스레드가 동시에 참여 시도
         for (int i = 0; i < threadCount; i++) {
+            final int index = i;
             executor.submit(
                     () -> {
                         try {
                             ParticipantCommand.Create command =
                                     new ParticipantCommand.Create(
-                                            gathering.accessKey(), null, null, List.of(), List.of());
+                                            gathering.accessKey(), "참여자" + index, null, List.of(), List.of());
                             participantFacade.participate(command);
                             successCount.incrementAndGet();
                         } catch (CustomException e) {
@@ -110,7 +111,8 @@ class ParticipantFacadeConcurrencyTest {
                 () -> {
                     try {
                         startLatch.await();
-                        participantFacade.participate(createCommand(gathering1.accessKey()));
+                        participantFacade.participate(
+                                new ParticipantCommand.Create(gathering1.accessKey(), "참여자A", null, List.of(), List.of()));
                         successCount.incrementAndGet();
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
@@ -127,7 +129,8 @@ class ParticipantFacadeConcurrencyTest {
                 () -> {
                     try {
                         startLatch.await();
-                        participantFacade.participate(createCommand(gathering2.accessKey()));
+                        participantFacade.participate(
+                                new ParticipantCommand.Create(gathering2.accessKey(), "참여자B", null, List.of(), List.of()));
                         successCount.incrementAndGet();
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
@@ -155,11 +158,6 @@ class ParticipantFacadeConcurrencyTest {
         assertThat(participantRepository.countByGatheringId(gathering2.id())).isEqualTo(1);
     }
 
-    private Gathering createGathering(String title) {
-        GatheringEntity gatheringEntity = GatheringFixture.create(title, 4);
-        return gatheringRepository.save(GatheringEntity.toDomain(gatheringEntity));
-    }
-
     private Gathering createGatheringWithAccessKey(String accessKey, String title) {
         GatheringEntity gatheringEntity = GatheringFixture.create(
                 accessKey,
@@ -170,9 +168,5 @@ class ParticipantFacadeConcurrencyTest {
                 4
         );
         return gatheringRepository.save(GatheringEntity.toDomain(gatheringEntity));
-    }
-
-    private ParticipantCommand.Create createCommand(String accessKey) {
-        return new ParticipantCommand.Create(accessKey, null, null, List.of(), List.of());
     }
 }
