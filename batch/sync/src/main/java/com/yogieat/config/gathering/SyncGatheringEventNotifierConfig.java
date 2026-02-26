@@ -19,7 +19,7 @@ public class SyncGatheringEventNotifierConfig {
             }
 
             @Override
-            public void notifyGatheringFull(String accessKey, GatheringResult.ParticipantCount status) {
+            public void notifyRecommendResultCreated(String accessKey, GatheringResult.ParticipantCount status) {
                 // Sync app does not publish SSE events.
             }
         };
