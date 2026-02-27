@@ -2,6 +2,7 @@ package com.yogieat.restaurant.sync.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yogieat.category.service.CategoryService;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.GeoUtils;
 import com.yogieat.external.kakao.KakaoPlaceClient;
@@ -12,6 +13,7 @@ import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailFetchResult;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailFetchStatus;
 import com.yogieat.external.kakao.result.KakaoRestaurantData;
+import com.yogieat.restaurant.service.RestaurantCategoryResolver;
 import com.yogieat.restaurant.service.RestaurantRepository;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncChunkResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
@@ -58,6 +60,7 @@ public class RestaurantSyncService {
 
     private final ObjectProvider<RestaurantSyncService> selfProvider;
     private final RestaurantRepository restaurantRepository;
+    private final CategoryService categoryService;
     private final KakaoPlaceClient kakaoPlaceClient;
     private final KakaoPlaceDetailClient kakaoPlaceDetailClient;
     private final KakaoPlaceMapper kakaoPlaceMapper;
@@ -79,12 +82,14 @@ public class RestaurantSyncService {
     public RestaurantSyncService(
             ObjectProvider<RestaurantSyncService> selfProvider,
             RestaurantRepository restaurantRepository,
+            CategoryService categoryService,
             KakaoPlaceClient kakaoPlaceClient,
             KakaoPlaceDetailClient kakaoPlaceDetailClient,
             KakaoPlaceMapper kakaoPlaceMapper
     ) {
         this.selfProvider = selfProvider;
         this.restaurantRepository = restaurantRepository;
+        this.categoryService = categoryService;
         this.kakaoPlaceClient = kakaoPlaceClient;
         this.kakaoPlaceDetailClient = kakaoPlaceDetailClient;
         this.kakaoPlaceMapper = kakaoPlaceMapper;
@@ -502,6 +507,7 @@ public class RestaurantSyncService {
         String priceLevel = detail != null ? detail.priceLevel() : null;
         String aiMateSummaryTitle = detail != null ? detail.aiMateSummaryTitle() : null;
         String aiMateSummaryContents = detail != null ? toJson(detail.aiMateSummaryContents()) : null;
+        Long categoryId = resolveCategoryId(detail);
 
         return new RestaurantSyncPatch(
                 externalId,
@@ -518,7 +524,29 @@ public class RestaurantSyncService {
                 priceLevel,
                 aiMateSummaryTitle,
                 aiMateSummaryContents,
-                detail != null ? detail.timeSlot() : null
+                detail != null ? detail.timeSlot() : null,
+                categoryId
+        );
+    }
+
+    private Long resolveCategoryId(KakaoPlaceDetailData detail) {
+        if (detail == null) {
+            return null;
+        }
+
+        RestaurantCategoryResolver.CategoryResolution categoryResolution =
+                RestaurantCategoryResolver.resolveFromKakao(
+                        detail.apiLargeCategory(),
+                        detail.apiMediumCategory(),
+                        detail.apiCategoryName2(),
+                        detail.apiCategoryName3()
+                );
+        if (categoryResolution == null || categoryResolution.largeCategory() == null) {
+            return null;
+        }
+        return categoryService.findOrCreateCategory(
+                categoryResolution.largeCategory(),
+                categoryResolution.mediumCategory()
         );
     }
 

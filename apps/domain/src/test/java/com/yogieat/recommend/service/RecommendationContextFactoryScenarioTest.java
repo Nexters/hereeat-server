@@ -135,7 +135,7 @@ class RecommendationContextFactoryScenarioTest {
                 Arguments.of(
                         "Case 7 (전 카테고리 등장)",
                         List.of(
-                                participant(1L, "한식", "한식,일식"),
+                                participant(1L, "양식", "한식,일식"),
                                 participant(2L, "일식", "중식"),
                                 participant(3L, "중식", "한식"),
                                 participant(4L, "양식", "일식,중식"),
@@ -164,15 +164,15 @@ class RecommendationContextFactoryScenarioTest {
                                 participant(3L, "양식,일식", "한식"),
                                 participant(4L, "양식", "한식"),
                                 participant(5L, "중식", "한식"),
-                                participant(6L, "한식", "한식")
+                                participant(6L, "상관없음", "한식")
                         ),
                         Set.of("한식")
                 ),
                 Arguments.of(
                         "Case 10 (균등한 불호)",
                         List.of(
-                                participant(1L, "중식", "일식,중식"),
-                                participant(2L, "중식", "일식,중식"),
+                                participant(1L, "중식", "일식,아시안"),
+                                participant(2L, "중식", "일식,아시안"),
                                 participant(3L, "중식", "양식,아시안"),
                                 participant(4L, "중식", "양식,아시안"),
                                 participant(5L, "중식", "한식"),
@@ -185,24 +185,24 @@ class RecommendationContextFactoryScenarioTest {
                         List.of(
                                 participant(1L, "한식", "한식,양식"),
                                 participant(2L, "한식", "일식,아시안"),
-                                participant(3L, "한식", "중식,한식"),
+                                participant(3L, "양식", "중식,한식"),
                                 participant(4L, "한식", "일식,양식"),
                                 participant(5L, "한식", "아시안,중식"),
-                                participant(6L, "한식", "한식,일식")
+                                participant(6L, "양식", "한식,일식")
                         ),
-                        Set.of("일식", "중식", "양식", "아시안")
+                        Set.of("일식", "중식", "아시안")
                 ),
                 Arguments.of(
                         "Case 12 (데이터 최소)",
                         List.of(
                                 participant(1L, "중식", "한식"),
-                                participant(2L, "아시안", "아시안"),
-                                participant(3L, "양식", "양식,아시안"),
+                                participant(2L, "아시안", "중식"),
+                                participant(3L, "한식", "양식,아시안"),
                                 participant(4L, "일식", "상관없음"),
                                 participant(5L, "한식", "상관없음"),
                                 participant(6L, "중식", "상관없음")
                         ),
-                        Set.of("아시안")
+                        Set.of("양식")
                 )
         );
     }

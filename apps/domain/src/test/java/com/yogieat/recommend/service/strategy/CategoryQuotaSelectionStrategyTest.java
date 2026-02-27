@@ -52,8 +52,8 @@ class CategoryQuotaSelectionStrategyTest {
     }
 
     @Test
-    @DisplayName("선호 카테고리 후보가 있으면 비선호 카테고리로 보강하지 않는다")
-    void shouldNotBackfillFromNonPreferredWhenPreferredCandidatesExist() {
+    @DisplayName("선호 카테고리 후보가 부족하면 비선호 카테고리로 보강해 TopK를 채운다")
+    void shouldBackfillFromNonPreferredWhenPreferredCandidatesAreInsufficient() {
         // given
         List<CategoryScoredRestaurant> scored = List.of(
                 item("한식", 101L, 100.0),
@@ -76,9 +76,9 @@ class CategoryQuotaSelectionStrategyTest {
         );
 
         // then
-        assertThat(top3).hasSize(2);
+        assertThat(top3).hasSize(3);
         assertThat(top3.stream().map(sr -> sr.restaurant().categoryId()).toList())
-                .containsExactly(1L, 1L);
+                .containsExactly(1L, 1L, 2L);
     }
 
     private CategoryScoredRestaurant item(String categoryName, Long restaurantId, double score) {

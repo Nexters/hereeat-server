@@ -27,6 +27,7 @@ import com.yogieat.restaurant.service.RestaurantRepository;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -379,9 +380,11 @@ public class RecommendationProcessor {
             RecommendationParticipantContext participantContext,
             FilterStrategy strategy
     ) {
+        int topKSize = SCORING_POLICY.candidate().topKSize();
         List<CategoryScoredRestaurant> baseCandidates = applyNoDislikePreferredFilter(
                 scoredByCategory,
-                participantContext
+                participantContext,
+                topKSize
         );
 
         Map<String, PreferenceScore> preferenceScoreMap = participantContext.preferenceScoreMap();
@@ -392,21 +395,74 @@ public class RecommendationProcessor {
                 ))
                 .toList();
 
+        Map<String, Integer> quotaVotes = buildQuotaPreferenceVotes(filtered, participantContext);
+
         return recommendationSelectionStrategy.selectTopRestaurants(
                 filtered,
-                participantContext.categoryVoteSummary().preferenceVotes(),
-                SCORING_POLICY.candidate().topKSize(),
+                quotaVotes,
+                topKSize,
                 SCORING_POLICY.candidate().poolSize()
         );
     }
 
     /**
-     * 선호 카테고리 중 불호가 0표인 카테고리가 존재하면 해당 카테고리만 후보로 제한합니다.
-     * (예: Case 12에서 일식만 불호 0표인 경우 일식만 추천 대상)
+     * 카테고리 슬롯 배분용 투표값을 계산합니다.
+     * - 1차: 랭크 가중 선호점수(3/2/1) - 불호 패널티(2점)를 반영한 유효표
+     * - 2차: 기존 단순 선호표(하위 호환)
+     * - 3차: 선호 입력이 모두 비어있는 경우 후보 카테고리 균등표
+     */
+    private Map<String, Integer> buildQuotaPreferenceVotes(
+            List<CategoryScoredRestaurant> candidates,
+            RecommendationParticipantContext participantContext
+    ) {
+        if (candidates == null || candidates.isEmpty()) {
+            return Map.of();
+        }
+
+        Set<String> candidateCategories = candidates.stream()
+                .map(CategoryScoredRestaurant::categoryName)
+                .collect(Collectors.toSet());
+
+        Map<String, Integer> dislikeVotes = participantContext.categoryVoteSummary().dislikeVotes();
+        Map<String, PreferenceScore> preferenceScoreMap = participantContext.preferenceScoreMap();
+
+        Map<String, Integer> adjustedVotes = new HashMap<>();
+        for (String category : candidateCategories) {
+            PreferenceScore score = preferenceScoreMap.getOrDefault(category, PreferenceScore.empty());
+            int weightedPreference = (int) Math.round(score.totalPreferenceScore());
+            int dislikePenalty = dislikeVotes.getOrDefault(category, 0) * 2;
+            int effectiveVotes = Math.max(0, weightedPreference - dislikePenalty);
+
+            if (effectiveVotes > 0) {
+                adjustedVotes.put(category, effectiveVotes);
+            }
+        }
+
+        if (!adjustedVotes.isEmpty()) {
+            return Map.copyOf(adjustedVotes);
+        }
+
+        Map<String, Integer> rawPreferenceVotes = participantContext.categoryVoteSummary().preferenceVotes().entrySet().stream()
+                .filter(entry -> entry.getValue() > 0)
+                .filter(entry -> candidateCategories.contains(entry.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        if (!rawPreferenceVotes.isEmpty()) {
+            return rawPreferenceVotes;
+        }
+
+        return candidateCategories.stream()
+                .collect(Collectors.toMap(category -> category, category -> 1));
+    }
+
+    /**
+     * 선호 카테고리 중 불호가 0표인 카테고리가 존재하면 우선 해당 카테고리를 사용합니다.
+     * 단, strict 후보 수가 topK 미만이면 Top3 보장을 위해 전체 후보로 복귀합니다.
      */
     private List<CategoryScoredRestaurant> applyNoDislikePreferredFilter(
             List<CategoryScoredRestaurant> scoredByCategory,
-            RecommendationParticipantContext participantContext
+            RecommendationParticipantContext participantContext,
+            int topKSize
     ) {
         CategoryVoteSummary voteSummary = participantContext.categoryVoteSummary();
         Set<String> strictCategories = voteSummary.preferenceVotes().entrySet().stream()
@@ -425,6 +481,10 @@ public class RecommendationProcessor {
 
         // strict 카테고리 후보가 실제로 없으면 기존 후보를 유지
         if (strictCandidates.isEmpty()) {
+            return scoredByCategory;
+        }
+
+        if (strictCandidates.size() < topKSize) {
             return scoredByCategory;
         }
 
