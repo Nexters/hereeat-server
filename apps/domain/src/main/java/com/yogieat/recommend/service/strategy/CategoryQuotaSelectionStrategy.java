@@ -77,6 +77,23 @@ public class CategoryQuotaSelectionStrategy implements RecommendationSelectionSt
                 break;
             }
             selected.add(remaining);
+            selectedRestaurantIds.add(remaining.restaurant().id());
+        }
+
+        if (selected.size() < topKSize && !quotaCategorySet.isEmpty()) {
+            List<ScoredRestaurant> globalRemainingCandidates = scoredByCategory.stream()
+                    .map(CategoryScoredRestaurant::scoredRestaurant)
+                    .filter(candidate -> !selectedRestaurantIds.contains(candidate.restaurant().id()))
+                    .sorted(Comparator.comparingDouble(ScoredRestaurant::totalScore).reversed())
+                    .toList();
+
+            for (ScoredRestaurant remaining : globalRemainingCandidates) {
+                if (selected.size() >= topKSize) {
+                    break;
+                }
+                selected.add(remaining);
+                selectedRestaurantIds.add(remaining.restaurant().id());
+            }
         }
 
         return selected;

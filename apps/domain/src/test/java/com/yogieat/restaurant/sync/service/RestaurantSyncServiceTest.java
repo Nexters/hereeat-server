@@ -3,11 +3,14 @@ package com.yogieat.restaurant.sync.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.yogieat.category.domain.value.LargeCategory;
+import com.yogieat.category.service.CategoryService;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.external.kakao.KakaoPlaceClient;
@@ -35,6 +38,9 @@ class RestaurantSyncServiceTest {
 
     @Mock
     private RestaurantRepository restaurantRepository;
+
+    @Mock
+    private CategoryService categoryService;
 
     @Mock
     private KakaoPlaceClient kakaoPlaceClient;
@@ -83,6 +89,23 @@ class RestaurantSyncServiceTest {
         assertThat(command.mapUrl()).isEqualTo("https://place.map.kakao.com/123");
         assertThat(command.longitude()).isEqualTo(127.0285);
         assertThat(command.latitude()).isEqualTo(37.498);
+    }
+
+    @Test
+    void syncChunk_whenKakaoCategoryIsInferable_updatesCategoryId() {
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "와인코르크", Region.GANGNAM, "123",
+                new GeoJson.Point(List.of(127.0280, 37.4980)));
+        when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
+        when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
+                .thenReturn(KakaoPlaceDetailFetchResult.success(detailDataWithCategory("술집", "와인바")));
+        when(categoryService.findOrCreateCategory(eq(LargeCategory.WESTERN), eq("와인바"))).thenReturn(88L);
+
+        RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(List.of(1L), Runnable::run);
+
+        assertThat(result.successCount()).isEqualTo(1);
+        verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
+        RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
+        assertThat(command.categoryId()).isEqualTo(88L);
     }
 
     @Test
@@ -186,6 +209,8 @@ class RestaurantSyncServiceTest {
                 List.of("a", "b"),
                 null,
                 null,
+                null,
+                null,
                 null
         );
     }
@@ -209,6 +234,34 @@ class RestaurantSyncServiceTest {
                 "요약",
                 List.of("a", "b"),
                 null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    private KakaoPlaceDetailData detailDataWithCategory(String name2, String name3) {
+        return new KakaoPlaceDetailData(
+                "123",
+                "와인코르크",
+                null,
+                37.498,
+                127.0285,
+                4.3,
+                "https://img",
+                List.of(),
+                "리뷰",
+                100,
+                100,
+                "메뉴",
+                15000,
+                "₩₩",
+                "요약",
+                List.of("a", "b"),
+                null,
+                name2,
+                name3,
                 null,
                 null
         );

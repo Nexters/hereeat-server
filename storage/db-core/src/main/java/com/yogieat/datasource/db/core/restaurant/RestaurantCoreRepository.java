@@ -445,6 +445,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                     ai_mate_summary_title = coalesce(:aiMateSummaryTitle, ai_mate_summary_title),
                     ai_mate_summary_contents = coalesce(:aiMateSummaryContents, ai_mate_summary_contents),
                     time_slot = coalesce(:timeSlot, time_slot),
+                    category_id = coalesce(:categoryId, category_id),
                     updated_at = now()
                 where id = :restaurantId
                   and deleted_at is null
@@ -472,6 +473,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         .addValue("aiMateSummaryTitle", command.aiMateSummaryTitle())
                         .addValue("aiMateSummaryContents", command.aiMateSummaryContents())
                         .addValue("timeSlot", command.timeSlot() != null ? command.timeSlot().name() : null)
+                        .addValue("categoryId", command.categoryId())
                 )
                 .toArray(MapSqlParameterSource[]::new);
 

@@ -22,7 +22,9 @@ final class RestaurantEnrichedData {
     String aiMateSummaryTitle;
     List<String> aiMateSummaryContents;
     TimeSlot timeSlot;
-    // 카카오 API에서 추출한 카테고리 정보 (null이면 기존 Suggestion 값 사용)
+    // 카카오 API에서 추출한 카테고리 정보
+    String apiCategoryName2;
+    String apiCategoryName3;
     LargeCategory apiLargeCategory;
     String apiMediumCategory;
     boolean skip;
@@ -104,6 +106,14 @@ final class RestaurantEnrichedData {
 
     LargeCategory apiLargeCategory() {
         return skip ? null : apiLargeCategory;
+    }
+
+    String apiCategoryName2() {
+        return skip ? null : apiCategoryName2;
+    }
+
+    String apiCategoryName3() {
+        return skip ? null : apiCategoryName3;
     }
 
     String apiMediumCategory() {

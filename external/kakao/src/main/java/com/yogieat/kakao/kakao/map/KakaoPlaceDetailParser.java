@@ -68,9 +68,11 @@ public class KakaoPlaceDetailParser {
             // TimeSlot 추출 (폴백 전략: blog_summaries → visitor 데이터)
             TimeSlot timeSlot = extractTimeSlot(panel);
 
-            // 카테고리 추출 (name2 → LargeCategory 매핑, name3 → mediumCategory)
-            LargeCategory apiLargeCategory = extractApiLargeCategory(panel);
-            String apiMediumCategory = extractApiMediumCategory(panel, apiLargeCategory);
+            // 카테고리 추출 (원본 name2/name3 + 매핑 결과)
+            String apiCategoryName2 = extractText(panel.at("/summary/category"), "name2");
+            String apiCategoryName3 = extractText(panel.at("/summary/category"), "name3");
+            LargeCategory apiLargeCategory = extractApiLargeCategory(apiCategoryName2);
+            String apiMediumCategory = extractApiMediumCategory(apiCategoryName3, apiLargeCategory);
 
             log.debug("Successfully parsed place: placeId={}, rating={}, photos={}, review={}, reviewCount={}, blogReviewCount={}, timeSlot={}, apiLargeCategory={}, apiMediumCategory={}",
                     confirmId, rating, photoUrls.size(), representativeReview != null, reviewCount, blogReviewCount, timeSlot, apiLargeCategory, apiMediumCategory);
@@ -93,6 +95,8 @@ public class KakaoPlaceDetailParser {
                     aiMateSummaryTitle,
                     aiMateSummaryContents,
                     timeSlot,
+                    apiCategoryName2,
+                    apiCategoryName3,
                     apiLargeCategory,
                     apiMediumCategory
             );
@@ -667,12 +671,9 @@ public class KakaoPlaceDetailParser {
     }
 
     /**
-     * API 응답에서 LargeCategory 추출
-     * JSON 경로: /summary/category/name2
-     * name2를 LargeCategory enum으로 매핑 시도, 실패 시 null 반환
+     * API 응답의 name2 문자열을 LargeCategory로 매핑합니다.
      */
-    private LargeCategory extractApiLargeCategory(JsonNode panel) {
-        String name2 = extractText(panel.at("/summary/category"), "name2");
+    private LargeCategory extractApiLargeCategory(String name2) {
         if (name2 == null || name2.isBlank()) {
             return null;
         }
@@ -680,18 +681,13 @@ public class KakaoPlaceDetailParser {
     }
 
     /**
-     * API 응답에서 mediumCategory 추출
-     * JSON 경로: /summary/category/name3
-     * LargeCategory 매핑 성공 시에만 name3 반환, 실패 시 null 반환
-     *
-     * @param panel JSON 응답
-     * @param apiLargeCategory 매핑된 LargeCategory (null이면 name3도 반환하지 않음)
-     * @return mediumCategory 문자열 또는 null
+     * API 응답의 name3 문자열을 mediumCategory로 반환합니다.
+     * LargeCategory 매핑에 실패한 경우에는 null을 반환합니다.
      */
-    private String extractApiMediumCategory(JsonNode panel, LargeCategory apiLargeCategory) {
+    private String extractApiMediumCategory(String name3, LargeCategory apiLargeCategory) {
         if (apiLargeCategory == null) {
             return null;
         }
-        return extractText(panel.at("/summary/category"), "name3");
+        return name3;
     }
 }

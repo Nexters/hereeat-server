@@ -65,13 +65,6 @@ public class RestaurantCollectionProcessor {
     private static final Map<String, Region> PLACE_CACHE = Arrays.stream(Region.values())
         .collect(Collectors.toMap(Region::getName, Function.identity()));
 
-    /**
-     * Enum 변환 캐시: LargeCategory displayName → LargeCategory enum
-     * 매번 stream().filter()를 사용하지 않고 O(1) 조회
-     */
-    private static final Map<String, LargeCategory> LARGE_CATEGORY_CACHE = Arrays.stream(LargeCategory.values())
-        .collect(Collectors.toMap(LargeCategory::getDisplayName, Function.identity()));
-
     private static final int RESTAURANTS_PER_REQUEST = 10;
     private static final long RATE_LIMIT_DELAY_MS = 5000; // Gemini API rate limit을 위한 지연 시간 (5초)
     private static final int LOCATION_CATEGORY_BATCH_SIZE = 5; // 한 번에 처리할 location-category 조합 개수
@@ -234,13 +227,28 @@ public class RestaurantCollectionProcessor {
                 continue;
             }
 
-            // 카테고리 결정: API 카테고리 우선, 없으면 Suggestion 값 사용
-            LargeCategory largeCategory = enrichedData.apiLargeCategory() != null
-                    ? enrichedData.apiLargeCategory()
-                    : getLargeCategoryFromDisplayName(suggestion.largeCategory());
-            String mediumCategory = enrichedData.apiMediumCategory() != null
-                    ? enrichedData.apiMediumCategory()
-                    : suggestion.mediumCategory();
+            RestaurantCategoryResolver.CategoryResolution categoryResolution =
+                    RestaurantCategoryResolver.resolveForCollection(
+                            category,
+                            suggestion.largeCategory(),
+                            suggestion.mediumCategory(),
+                            enrichedData.apiLargeCategory(),
+                            enrichedData.apiMediumCategory(),
+                            enrichedData.apiCategoryName2(),
+                            enrichedData.apiCategoryName3()
+                    );
+
+            if (categoryResolution == null) {
+                log.info("Skipping restaurant due to unresolved category: {} (requested={}, kakaoName2={}, kakaoName3={})",
+                        suggestion.name(),
+                        category,
+                        enrichedData.apiCategoryName2(),
+                        enrichedData.apiCategoryName3());
+                continue;
+            }
+
+            LargeCategory largeCategory = categoryResolution.largeCategory();
+            String mediumCategory = categoryResolution.mediumCategory();
 
             boolean saved = restaurantCollectionWriteService.persistRestaurant(
                     suggestion,
@@ -274,15 +282,6 @@ public class RestaurantCollectionProcessor {
             throw new CustomException(ErrorCode.INVALID_LOCATION_NAME);
         }
         return region;
-    }
-
-    private LargeCategory getLargeCategoryFromDisplayName(String displayName) {
-        LargeCategory category = LARGE_CATEGORY_CACHE.get(displayName);
-        if (category == null) {
-            log.error("Unknown large category: {}. Available: {}", displayName, FOOD_CATEGORIES);
-            throw new CustomException(ErrorCode.INVALID_CATEGORY_NAME);
-        }
-        return category;
     }
 
     private RestaurantEnrichedData enrichRestaurantData(SuggestionRestaurant suggestion, String locationName) {
@@ -348,6 +347,8 @@ public class RestaurantCollectionProcessor {
         enrichedData.aiMateSummaryTitle = detail.aiMateSummaryTitle();
         enrichedData.aiMateSummaryContents = detail.aiMateSummaryContents();
         enrichedData.timeSlot = detail.timeSlot();
+        enrichedData.apiCategoryName2 = detail.apiCategoryName2();
+        enrichedData.apiCategoryName3 = detail.apiCategoryName3();
         enrichedData.apiLargeCategory = detail.apiLargeCategory();
         enrichedData.apiMediumCategory = detail.apiMediumCategory();
 

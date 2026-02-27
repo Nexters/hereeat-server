@@ -28,7 +28,10 @@ public record KakaoPlaceDetailData(
         List<String> aiMateSummaryContents,
         // 추천 시간대 (신규 필드)
         TimeSlot timeSlot,
-        // 카카오 API에서 추출한 카테고리 정보 (null이면 기존 Suggestion 값 사용)
+        // 카카오 API 원본 카테고리 텍스트
+        String apiCategoryName2,
+        String apiCategoryName3,
+        // 카카오 API에서 추출한 카테고리 정보
         LargeCategory apiLargeCategory,
         String apiMediumCategory
 ) {
@@ -53,6 +56,8 @@ public record KakaoPlaceDetailData(
                 null,
                 null,
                 List.of(),
+                null,
+                null,
                 null,
                 null,
                 null

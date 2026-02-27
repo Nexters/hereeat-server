@@ -18,6 +18,7 @@ public record RestaurantSyncPatch(
         String priceLevel,
         String aiMateSummaryTitle,
         String aiMateSummaryContents,
-        TimeSlot timeSlot
+        TimeSlot timeSlot,
+        Long categoryId
 ) {
 }

@@ -284,6 +284,9 @@ public class RestaurantEntity extends BaseEntity {
         if (patch.timeSlot() != null) {
             this.timeSlot = patch.timeSlot();
         }
+        if (patch.categoryId() != null) {
+            this.categoryId = patch.categoryId();
+        }
     }
 
     public void applyAdminPatch(RestaurantCommand.Patch command) {
