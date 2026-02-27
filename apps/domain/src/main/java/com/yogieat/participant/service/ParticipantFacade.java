@@ -10,7 +10,7 @@ import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.domain.command.ParticipantCommand;
 import com.yogieat.participant.domain.result.ParticipantResult;
 import com.yogieat.participant.domain.value.DistanceRange;
-import com.yogieat.recommend.event.GatheringFullEvent;
+import com.yogieat.recommend.event.RecommendResultCreatedEvent;
 import com.yogieat.recommend.service.RecommendResultService;
 import com.yogieat.util.LockManager;
 import com.yogieat.util.StringUtils;
@@ -25,11 +25,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class ParticipantFacade {
     private final ParticipantService participantService;
+    private final ParticipantValidator participantValidator;
     private final GatheringService gatheringService;
     private final LockManager lockManager;
     private final ApplicationEventPublisher eventPublisher;
     private final RecommendResultService recommendResultService;
     private final GatheringEventNotifier gatheringEventNotifier;
+
+    @Transactional(readOnly = true)
+    public void validateNickname(String accessKey, String nickname) {
+        participantValidator.validateNicknameFormat(nickname);
+        Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
+        participantValidator.validateNicknameDuplicate(gathering.id(), nickname);
+    }
 
     @Transactional
     public ParticipantResult.Create participate(ParticipantCommand.Create command) {
@@ -55,12 +63,9 @@ public class ParticipantFacade {
                     // 3. Gathering 참여 인원 초과 검증
                     gatheringService.validateGatheringNotFull(gathering, currentParticipantCount);
 
-                    // 3-1. 같은 모임 내 닉네임 중복 검증
-                    if (command.nickname() != null &&
-                            participantService.existsByGatheringIdAndNickname(
-                                    gathering.id(), command.nickname())) {
-                        throw new CustomException(ErrorCode.DUPLICATE_NICKNAME);
-                    }
+                    // 3-1. 닉네임 형식 및 중복 검증
+                    participantValidator.validateNicknameFormat(command.nickname());
+                    participantValidator.validateNicknameDuplicate(gathering.id(), command.nickname());
 
                     // 4. Double distance를 DistanceRange로 변환 (null이면 ANY)
                     DistanceRange distanceRange = DistanceRange.fromDistance(command.distance());
@@ -84,17 +89,17 @@ public class ParticipantFacade {
                     if (newCount == gathering.peopleCount()) {
                         log.info("Gathering is full. Creating PENDING status for gathering: {}", gathering.id());
 
-                        gatheringEventNotifier.notifyGatheringFull(command.accessKey(), status);
-
                         // PENDING 레코드 생성 (동기적)
                         recommendResultService.createPendingStatus(gathering.id());
 
-                        log.info("Publishing GatheringFullEvent for gathering: {}", gathering.id());
-                        eventPublisher.publishEvent(new GatheringFullEvent(
+                        log.info("Publishing RecommendResultCreatedEvent for gathering: {}", gathering.id());
+                        eventPublisher.publishEvent(RecommendResultCreatedEvent.of(
                                 this,
                                 gathering.id(),
                                 gathering.region(),
-                                gathering.peopleCount()
+                                gathering.peopleCount(),
+                                command.accessKey(),
+                                newCount
                         ));
                     }
 

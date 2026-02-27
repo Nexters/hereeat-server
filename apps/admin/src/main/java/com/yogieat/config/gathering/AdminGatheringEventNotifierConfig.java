@@ -19,7 +19,7 @@ public class AdminGatheringEventNotifierConfig {
             }
 
             @Override
-            public void notifyGatheringFull(String accessKey, GatheringResult.ParticipantCount status) {
+            public void notifyRecommendResultCreated(String accessKey, GatheringResult.ParticipantCount status) {
                 // Admin app does not publish SSE events.
             }
         };

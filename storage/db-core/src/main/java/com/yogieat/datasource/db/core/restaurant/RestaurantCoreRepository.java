@@ -3,6 +3,8 @@ package com.yogieat.datasource.db.core.restaurant;
 import static com.yogieat.datasource.db.core.category.QCategoryEntity.*;
 import static com.yogieat.datasource.db.core.restaurant.QRestaurantEntity.*;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
@@ -11,6 +13,7 @@ import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
+import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
@@ -24,9 +27,12 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.locationtech.jts.geom.Point;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -35,6 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @RequiredArgsConstructor
 public class RestaurantCoreRepository implements RestaurantRepository {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
 
     private final RestaurantJpaRepository restaurantJpaRepository;
     private final JPAQueryFactory jpaQueryFactory;
@@ -68,6 +77,45 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     public List<Restaurant> findByRegion(Region region) {
         return restaurantJpaRepository.findByRegionAndDeletedAtIsNull(region).stream()
                 .map(RestaurantEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Restaurant> findRecommendationCandidates(
+            Region region,
+            Collection<Long> categoryIds,
+            TimeSlot gatheringTimeSlot
+    ) {
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            return List.of();
+        }
+
+        return jpaQueryFactory
+                .select(
+                        restaurantEntity.id,
+                        restaurantEntity.categoryId,
+                        restaurantEntity.name,
+                        restaurantEntity.rating,
+                        restaurantEntity.region,
+                        restaurantEntity.location,
+                        restaurantEntity.reviewCount,
+                        restaurantEntity.blogReviewCount,
+                        restaurantEntity.aiMateSummaryTitle,
+                        restaurantEntity.aiMateSummaryContents,
+                        restaurantEntity.timeSlot,
+                        restaurantEntity.createdAt,
+                        restaurantEntity.updatedAt
+                )
+                .from(restaurantEntity)
+                .where(
+                        restaurantEntity.deletedAt.isNull(),
+                        restaurantEntity.region.eq(region),
+                        restaurantEntity.categoryId.in(categoryIds),
+                        recommendationTimeSlotCondition(gatheringTimeSlot)
+                )
+                .fetch()
+                .stream()
+                .map(this::toRecommendationCandidate)
                 .toList();
     }
 
@@ -289,6 +337,63 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         }
 
         return keywordCondition;
+    }
+
+    private BooleanExpression recommendationTimeSlotCondition(TimeSlot gatheringTimeSlot) {
+        if (gatheringTimeSlot == null || gatheringTimeSlot == TimeSlot.BOTH) {
+            return null;
+        }
+
+        return restaurantEntity.timeSlot.isNull()
+                .or(restaurantEntity.timeSlot.eq(TimeSlot.BOTH))
+                .or(restaurantEntity.timeSlot.eq(gatheringTimeSlot));
+    }
+
+    private Restaurant toRecommendationCandidate(Tuple tuple) {
+        Point location = tuple.get(restaurantEntity.location);
+
+        return new Restaurant(
+                tuple.get(restaurantEntity.id),
+                null,
+                tuple.get(restaurantEntity.categoryId),
+                tuple.get(restaurantEntity.name),
+                null,
+                tuple.get(restaurantEntity.rating),
+                null,
+                null,
+                null,
+                null,
+                tuple.get(restaurantEntity.region),
+                toGeoJsonPoint(location),
+                tuple.get(restaurantEntity.reviewCount),
+                tuple.get(restaurantEntity.blogReviewCount),
+                null,
+                null,
+                null,
+                tuple.get(restaurantEntity.aiMateSummaryTitle),
+                parseAiMateSummaryContents(tuple.get(restaurantEntity.aiMateSummaryContents)),
+                tuple.get(restaurantEntity.timeSlot),
+                tuple.get(restaurantEntity.createdAt),
+                tuple.get(restaurantEntity.updatedAt)
+        );
+    }
+
+    private GeoJson.Point toGeoJsonPoint(Point location) {
+        if (location == null) {
+            return null;
+        }
+        return new GeoJson.Point(List.of(location.getX(), location.getY()));
+    }
+
+    private List<String> parseAiMateSummaryContents(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return OBJECT_MAPPER.readValue(json, STRING_LIST_TYPE);
+        } catch (Exception ignored) {
+            return Collections.emptyList();
+        }
     }
 
     @Override

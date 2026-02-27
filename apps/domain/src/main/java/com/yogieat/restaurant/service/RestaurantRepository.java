@@ -1,6 +1,7 @@
 package com.yogieat.restaurant.service;
 
 import com.yogieat.common.Region;
+import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
@@ -8,6 +9,7 @@ import com.yogieat.restaurant.result.RestaurantAdminResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,6 +19,11 @@ public interface RestaurantRepository {
     Restaurant save(CreateRestaurant createRestaurant);
     List<Restaurant> findAll();
     List<Restaurant> findByRegion(Region region);
+    List<Restaurant> findRecommendationCandidates(
+            Region region,
+            Collection<Long> categoryIds,
+            TimeSlot gatheringTimeSlot
+    );
     Optional<Restaurant> findById(Long id);
     List<Restaurant> findByIds(List<Long> ids);
     long countByRegion(Region region);  // 지역별 맛집 수 조회 (신규)

@@ -30,6 +30,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -384,7 +385,7 @@ public class RestaurantSyncService {
 
     private <T> T executeKakaoApiWithRetry(
             String operationName,
-            java.util.function.Supplier<T> supplier,
+            Supplier<T> supplier,
             LongAdder durationMetric
     ) {
         long startedAt = System.nanoTime();
@@ -397,7 +398,7 @@ public class RestaurantSyncService {
         }
     }
 
-    private <T> T executeWithRetry(String operationName, java.util.function.Supplier<T> supplier) {
+    private <T> T executeWithRetry(String operationName, Supplier<T> supplier) {
         RuntimeException lastError = null;
         int maxAttempts = Math.max(1, kakaoSyncMaxRetryAttempts);
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -430,7 +431,7 @@ public class RestaurantSyncService {
         throw lastError;
     }
 
-    private <T> T executeWithSemaphore(java.util.function.Supplier<T> supplier, String operationName) {
+    private <T> T executeWithSemaphore(Supplier<T> supplier, String operationName) {
         try {
             kakaoApiSemaphore.acquire();
             return supplier.get();

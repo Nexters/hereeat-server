@@ -1,7 +1,6 @@
 package com.yogieat.recommend.service;
 
 import com.yogieat.category.domain.Category;
-import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.category.service.CategoryService;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.GeoUtils;
@@ -11,26 +10,26 @@ import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.gathering.service.GatheringRepository;
 import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.domain.value.DistanceRange;
-import com.yogieat.participant.service.ParticipantAnalyzer;
 import com.yogieat.participant.service.ParticipantRepository;
 import com.yogieat.recommend.domain.RecommendResult;
 import com.yogieat.recommend.domain.RecommendResultFailed;
+import com.yogieat.recommend.domain.value.CategoryScoredRestaurant;
+import com.yogieat.recommend.domain.value.CategoryVoteSummary;
+import com.yogieat.recommend.domain.value.DistanceScoreContext;
 import com.yogieat.recommend.domain.value.FailureReason;
 import com.yogieat.recommend.domain.value.PreferenceScore;
 import com.yogieat.recommend.domain.value.RecommendStatus;
+import com.yogieat.recommend.domain.value.RecommendationParticipantContext;
 import com.yogieat.recommend.domain.value.ScoredRestaurant;
+import com.yogieat.recommend.service.strategy.RecommendationSelectionStrategy;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantRepository;
-import com.yogieat.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -41,56 +40,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class RecommendationService {
+public class RecommendationProcessor {
 
-    private static final Logger log = LoggerFactory.getLogger(RecommendationService.class);
-
-    // ========== 점수 가중치 상수 ==========
-    private static final double PREFERENCE_RANK_1_SCORE = 3.0;
-    private static final double PREFERENCE_RANK_2_SCORE = 2.0;
-    private static final double PREFERENCE_RANK_3_SCORE = 1.0;
-    private static final double DISLIKE_PENALTY = 2.0;
-
-    private static final double DISTANCE_BONUS = 1.0;
-    private static final double DIVERSITY_BONUS = 0.5;
-    private static final double NEUTRAL_PENALTY = -0.5;
-
-    // AI 요약 부스트 상수
-    private static final double AI_GROUP_BOOST = 0.5;
-    private static final double AI_POSITIVE_BOOST = 0.3;
-    private static final double AI_NEGATIVE_PENALTY = -0.2;
-    private static final int GROUP_SIZE_THRESHOLD = 4;
-
-    // ========== Cold Start / Freshness 상수 ==========
-    private static final int COLD_START_DAYS_THRESHOLD = 30;
-    private static final int COLD_START_REVIEW_THRESHOLD = 10;
-    private static final double COLD_START_RATING_THRESHOLD = 4.0;
-    private static final double COLD_START_BOOST = 0.3;
-
-    private static final int FRESHNESS_RECENT_DAYS = 7;
-    private static final int FRESHNESS_MODERATE_DAYS = 30;
-    private static final int FRESHNESS_STALE_DAYS = 90;
-    private static final double FRESHNESS_RECENT_BOOST = 0.3;
-    private static final double FRESHNESS_MODERATE_BOOST = 0.1;
-    private static final double FRESHNESS_STALE_PENALTY = -0.2;
-
-    // ========== 신뢰도 점수 상수 ==========
-    private static final double BLOG_REVIEW_WEIGHT_MULTIPLIER = 1.5;
-    private static final double MAX_REVIEW_WEIGHT = 5.0;
-    private static final double RATING_MIN = 3.0;
-    private static final double RATING_MAX = 5.0;
-
-    // ========== 후보 선정 상수 ==========
-    private static final int CANDIDATE_POOL_SIZE = 10;
-    private static final int TOP_K_SIZE = 3;
+    private static final Logger log = LoggerFactory.getLogger(RecommendationProcessor.class);
+    private static final RecommendationScoringPolicy SCORING_POLICY = RecommendationScoringPolicy.DEFAULT;
 
     private final ParticipantRepository participantRepository;
     private final RestaurantRepository restaurantRepository;
     private final CategoryService categoryService;
     private final RecommendResultRepository recommendResultRepository;
     private final RecommendResultFailedRepository recommendResultFailedRepository;
-    private final ParticipantAnalyzer participantAnalyzer;
     private final GatheringRepository gatheringRepository;
+    private final RecommendationContextFactory recommendationContextFactory;
+    private final RecommendationSelectionStrategy recommendationSelectionStrategy;
 
     @Transactional
     public void processRecommendation(Long gatheringId, Region region) {
@@ -125,35 +87,44 @@ public class RecommendationService {
                 return;
             }
 
-            // 4. Restaurant 조회
-            List<Restaurant> restaurants = restaurantRepository.findByRegion(region);
+            // 4. 참여자 입력 기반 추천 컨텍스트 생성
+            RecommendationParticipantContext participantContext =
+                    recommendationContextFactory.create(participants, SCORING_POLICY);
+
+            // 5. Category 조회 및 캐싱 (Spring Cache 적용)
+            Map<Long, Category> categoryMap = categoryService.findAll().stream()
+                    .collect(Collectors.toMap(Category::id, category -> category));
+
+            // 6. 불호 우세 카테고리를 제외한 대상 카테고리 산출
+            Set<Long> candidateCategoryIds = buildCandidateCategoryIds(
+                    categoryMap,
+                    participantContext.categoryVoteSummary().excludedCategories()
+            );
+            if (candidateCategoryIds.isEmpty()) {
+                saveFailedResult(gatheringId, FailureReason.NO_RESTAURANTS,
+                                 "No candidate categories available after preference/dislike filtering");
+                return;
+            }
+
+            // 7. Restaurant 조회 (지역 + 카테고리 + TimeSlot 사전 필터링)
+            List<Restaurant> restaurants = restaurantRepository.findRecommendationCandidates(
+                    region,
+                    candidateCategoryIds,
+                    gatheringTimeSlot
+            );
             if (restaurants.isEmpty()) {
                 saveFailedResult(gatheringId, FailureReason.NO_RESTAURANTS,
                                  "No restaurants found in region: " + region);
                 return;
             }
 
-            // 5. Category 조회 및 캐싱 (Spring Cache 적용)
-            Map<Long, Category> categoryMap = categoryService.findAll().stream()
-                    .collect(Collectors.toMap(Category::id, category -> category));
-
-            // 6. DistanceRange 다수결 결정
-            DistanceRange majorityRange = participantAnalyzer.determineMajorityDistanceRange(participants);
-
-            // 7. 선호도/불호 사전 집계 (성능 최적화: O(P×3) 한 번으로 O(R×P×3) 제거)
-            Map<String, PreferenceScore> preferenceScoreMap = aggregatePreferenceScores(participants);
-
-            // 7-1. 불호 카테고리 추출
-            Set<String> dislikedCategories = extractDislikedCategories(participants);
-
             // 8. Region별 중심 좌표
             GeoJson.Point centerPoint = region.getCoordinatesStandard();
 
             // 9. 다단계 Fallback으로 Top 3 레스토랑 추천 (TimeSlot 필터링 포함)
             List<ScoredRestaurant> top3 = findTopRestaurantsWithFallback(
-                restaurants, categoryMap, preferenceScoreMap,
-                dislikedCategories,
-                participants, majorityRange, centerPoint,
+                restaurants, categoryMap, participantContext,
+                participants, centerPoint,
                 gatheringTimeSlot
             );
 
@@ -199,93 +170,28 @@ public class RecommendationService {
         }
     }
 
-    /**
-     * 참여자들의 선호도와 불호를 카테고리별로 미리 집계
-     * O(P × 3) 시간에 모든 선호도 점수를 계산하여 O(R × P × 3) 반복을 제거
-     * enum name ("KOREAN") 또는 displayName ("한식") 모두 처리하며, displayName으로 정규화합니다.
-     */
-    private Map<String, PreferenceScore> aggregatePreferenceScores(List<Participant> participants) {
-        Map<String, PreferenceScore> scoreMap = new HashMap<>();
-
-        for (Participant participant : participants) {
-            // 선호도 집계
-            List<String> preferences = StringUtils.splitByComma(participant.preferences());
-            for (int i = 0; i < preferences.size(); i++) {
-                String pref = preferences.get(i);
-                if (!pref.equals("상관없음") && !pref.equals("ANY")) {
-                    // enum name 또는 displayName을 displayName으로 정규화
-                    String normalizedPref = normalizeToDisplayName(pref);
-                    if (normalizedPref != null) {
-                        PreferenceScore current = scoreMap.getOrDefault(normalizedPref, PreferenceScore.empty());
-                        scoreMap.put(normalizedPref, current.addPreference(i + 1)); // rank는 1-based
-                    }
-                }
-            }
-
-            // 불호 집계
-            List<String> dislikes = StringUtils.splitByComma(participant.dislikes());
-            for (String dislike : dislikes) {
-                if (!dislike.equals("상관없음") && !dislike.equals("ANY")) {
-                    // enum name 또는 displayName을 displayName으로 정규화
-                    String normalizedDislike = normalizeToDisplayName(dislike);
-                    if (normalizedDislike != null) {
-                        PreferenceScore current = scoreMap.getOrDefault(normalizedDislike, PreferenceScore.empty());
-                        scoreMap.put(normalizedDislike, current.addDislike());
-                    }
-                }
-            }
+    private Set<Long> buildCandidateCategoryIds(
+            Map<Long, Category> categoryMap,
+            Set<String> excludedLargeCategories
+    ) {
+        if (categoryMap == null || categoryMap.isEmpty()) {
+            return Set.of();
         }
 
-        return scoreMap;
-    }
-
-    /**
-     * 참여자들의 선호 카테고리를 추출합니다.
-     * "상관없음"이 아닌 모든 선호 카테고리를 Set으로 반환합니다.
-     *
-     * @param participants 참여자 목록
-     * @return 선호 카테고리 Set (비어있으면 필터링 없이 모든 카테고리 허용)
-     */
-    private Set<String> extractPreferredCategories(List<Participant> participants) {
-        Set<String> preferredCategories = new HashSet<>();
-
-        for (Participant participant : participants) {
-            List<String> preferences = StringUtils.splitByComma(participant.preferences());
-            for (String pref : preferences) {
-                if (!pref.equals("상관없음")) {
-                    preferredCategories.add(pref);
-                }
-            }
+        if (excludedLargeCategories == null || excludedLargeCategories.isEmpty()) {
+            return categoryMap.values().stream()
+                    .map(Category::id)
+                    .filter(id -> id != null)
+                    .collect(Collectors.toSet());
         }
 
-        return preferredCategories;
-    }
-
-    /**
-     * 참여자들의 불호 카테고리를 추출합니다.
-     * "상관없음"이 아닌 모든 불호 카테고리를 Set으로 반환합니다.
-     * enum name ("KOREAN") 또는 displayName ("한식") 모두 처리하며, displayName으로 정규화합니다.
-     *
-     * @param participants 참여자 목록
-     * @return 불호 카테고리 Set (displayName 형식)
-     */
-    private Set<String> extractDislikedCategories(List<Participant> participants) {
-        Set<String> dislikedCategories = new HashSet<>();
-
-        for (Participant participant : participants) {
-            List<String> dislikes = StringUtils.splitByComma(participant.dislikes());
-            for (String dislike : dislikes) {
-                if (!dislike.equals("상관없음") && !dislike.equals("ANY")) {
-                    // enum name 또는 displayName을 displayName으로 정규화
-                    String normalizedDislike = normalizeToDisplayName(dislike);
-                    if (normalizedDislike != null) {
-                        dislikedCategories.add(normalizedDislike);
-                    }
-                }
-            }
-        }
-
-        return dislikedCategories;
+        return categoryMap.values().stream()
+                .filter(category -> category.id() != null)
+                .filter(category -> !excludedLargeCategories.contains(
+                        category.largeCategory().getDisplayName()
+                ))
+                .map(Category::id)
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -310,10 +216,8 @@ public class RecommendationService {
      *
      * @param restaurants 전체 레스토랑 목록
      * @param categoryMap 카테고리 정보 Map
-     * @param preferenceScoreMap 카테고리별 선호도 점수 Map
-     * @param dislikedCategories 불호 카테고리 Set
+     * @param participantContext 참여자 기반 추천 컨텍스트
      * @param participants 참여자 목록
-     * @param majorityRange 다수결 거리 범위
      * @param centerPoint 지역 중심 좌표
      * @param gatheringTimeSlot 모임 시간대 (LUNCH/DINNER/BOTH)
      * @return Top 3 레스토랑 목록 (점수 높은 순)
@@ -321,36 +225,42 @@ public class RecommendationService {
     private List<ScoredRestaurant> findTopRestaurantsWithFallback(
             List<Restaurant> restaurants,
             Map<Long, Category> categoryMap,
-            Map<String, PreferenceScore> preferenceScoreMap,
-            Set<String> dislikedCategories,
+            RecommendationParticipantContext participantContext,
             List<Participant> participants,
-            DistanceRange majorityRange,
             GeoJson.Point centerPoint,
             TimeSlot gatheringTimeSlot) {
 
-        // 1단계: 선호도 점수 > 0인 레스토랑만
-        List<ScoredRestaurant> results = scoreAndFilterRestaurants(
-            restaurants, categoryMap, preferenceScoreMap,
-            dislikedCategories,
-            participants, majorityRange, centerPoint,
-            FilterStrategy.PREFERENCE_SCORE_POSITIVE,
+        int topKSize = SCORING_POLICY.candidate().topKSize();
+
+        // 점수 계산은 1회만 수행하고, 필터 전략만 다르게 적용
+        List<CategoryScoredRestaurant> scoredCandidates = scoreRestaurants(
+            restaurants, categoryMap, participantContext,
+            participants, centerPoint,
             gatheringTimeSlot
         );
 
-        if (!results.isEmpty()) {
-            return results;
+        // 1단계: 선호도 점수 > 0인 레스토랑만
+        List<ScoredRestaurant> primaryResults = selectTopRestaurantsByStrategy(
+                scoredCandidates,
+                participantContext,
+                FilterStrategy.PREFERENCE_SCORE_POSITIVE
+        );
+        if (primaryResults.size() >= topKSize) {
+            return primaryResults;
         }
 
         // 2단계: 불호만 필터링
-        results = scoreAndFilterRestaurants(
-            restaurants, categoryMap, preferenceScoreMap,
-            dislikedCategories,
-            participants, majorityRange, centerPoint,
-            FilterStrategy.DISLIKED_EXCLUDED,
-            gatheringTimeSlot
+        List<ScoredRestaurant> fallbackResults = selectTopRestaurantsByStrategy(
+                scoredCandidates,
+                participantContext,
+                FilterStrategy.DISLIKED_EXCLUDED
         );
 
-        return results;
+        if (primaryResults.isEmpty()) {
+            return fallbackResults;
+        }
+
+        return mergeRecommendationResults(primaryResults, fallbackResults, topKSize);
     }
 
     /**
@@ -359,33 +269,27 @@ public class RecommendationService {
      *
      * @param restaurants 전체 레스토랑 목록
      * @param categoryMap 카테고리 정보 Map
-     * @param preferenceScoreMap 카테고리별 선호도 점수 Map
-     * @param dislikedCategories 불호 카테고리 Set
+     * @param participantContext 참여자 기반 추천 컨텍스트
      * @param participants 참여자 목록
-     * @param majorityRange 다수결 거리 범위
      * @param centerPoint 지역 중심 좌표
-     * @param strategy 필터링 전략
      * @param gatheringTimeSlot 모임 시간대 (LUNCH/DINNER/BOTH)
-     * @return Top 3 레스토랑 목록 (점수 높은 순)
+     * @return 카테고리 정보가 포함된 점수 계산 결과
      */
-    private List<ScoredRestaurant> scoreAndFilterRestaurants(
+    private List<CategoryScoredRestaurant> scoreRestaurants(
             List<Restaurant> restaurants,
             Map<Long, Category> categoryMap,
-            Map<String, PreferenceScore> preferenceScoreMap,
-            Set<String> dislikedCategories,
+            RecommendationParticipantContext participantContext,
             List<Participant> participants,
-            DistanceRange majorityRange,
             GeoJson.Point centerPoint,
-            FilterStrategy strategy,
             TimeSlot gatheringTimeSlot) {
-
-        // 1단계: 다양성 부스트 없이 기본 점수로 상위 후보 선정
-        PriorityQueue<ScoredRestaurant> candidateHeap = new PriorityQueue<>(
-            Comparator.comparingDouble(ScoredRestaurant::totalScore)
-        );
 
         int totalParticipants = participants.size();
         LocalDateTime now = LocalDateTime.now();
+        List<CategoryScoredRestaurant> scoredByCategory = new ArrayList<>();
+        Map<String, PreferenceScore> preferenceScoreMap = participantContext.preferenceScoreMap();
+        CategoryVoteSummary categoryVoteSummary = participantContext.categoryVoteSummary();
+        DistanceScoreContext distanceScoreContext = participantContext.distanceScoreContext();
+        Set<String> excludedCategories = categoryVoteSummary.excludedCategories();
 
         for (Restaurant restaurant : restaurants) {
             // TimeSlot 필터링 (최우선)
@@ -399,16 +303,14 @@ public class RecommendationService {
             }
 
             String categoryName = category.largeCategory().getDisplayName();
+            if (excludedCategories.contains(categoryName)) {
+                continue;
+            }
 
             PreferenceScore preferenceScore = preferenceScoreMap.getOrDefault(
                 categoryName,
                 PreferenceScore.empty()
             );
-
-            // 전략별 필터링 적용 (순수 선호수 기준으로 변경)
-            if (!shouldIncludeRestaurant(categoryName, preferenceScore, dislikedCategories, strategy)) {
-                continue;
-            }
 
             // 기본 점수 계산 (다양성 부스트 제외)
             double baseScore = 0.0;
@@ -427,10 +329,12 @@ public class RecommendationService {
             );
 
             // 4. 거리 가산점
-            if (majorityRange != DistanceRange.ANY && restaurant.location() != null) {
+            if (distanceScoreContext.preferredRange() != DistanceRange.ANY
+                    && distanceScoreContext.effectiveDistanceBonus() > 0.0
+                    && restaurant.location() != null) {
                 double distance = calculateDistance(centerPoint, restaurant.location());
-                if (isWithinDistanceRange(distance, majorityRange)) {
-                    baseScore += DISTANCE_BONUS;
+                if (isWithinDistanceRange(distance, distanceScoreContext.preferredRange())) {
+                    baseScore += distanceScoreContext.effectiveDistanceBonus();
                 }
             }
 
@@ -464,74 +368,96 @@ public class RecommendationService {
             );
 
             ScoredRestaurant scored = new ScoredRestaurant(restaurant, baseScore, agreementRate, reasonText);
-
-            // 상위 후보만 유지 (CANDIDATE_POOL_SIZE개)
-            if (candidateHeap.size() < CANDIDATE_POOL_SIZE) {
-                candidateHeap.offer(scored);
-            } else if (scored.totalScore() > candidateHeap.peek().totalScore()) {
-                candidateHeap.poll();
-                candidateHeap.offer(scored);
-            }
+            scoredByCategory.add(new CategoryScoredRestaurant(categoryName, scored));
         }
 
-        // 2단계: 후보 중에서 다양성을 고려하여 최종 Top 3 선정 (Post-processing Diversification)
-        List<ScoredRestaurant> candidates = new ArrayList<>(candidateHeap);
-        candidates.sort(Comparator.comparingDouble(ScoredRestaurant::totalScore).reversed());
+        return scoredByCategory;
+    }
 
-        return selectTop3WithDiversity(candidates);
+    private List<ScoredRestaurant> selectTopRestaurantsByStrategy(
+            List<CategoryScoredRestaurant> scoredByCategory,
+            RecommendationParticipantContext participantContext,
+            FilterStrategy strategy
+    ) {
+        List<CategoryScoredRestaurant> baseCandidates = applyNoDislikePreferredFilter(
+                scoredByCategory,
+                participantContext
+        );
+
+        Map<String, PreferenceScore> preferenceScoreMap = participantContext.preferenceScoreMap();
+        List<CategoryScoredRestaurant> filtered = baseCandidates.stream()
+                .filter(item -> shouldIncludeRestaurant(
+                        preferenceScoreMap.getOrDefault(item.categoryName(), PreferenceScore.empty()),
+                        strategy
+                ))
+                .toList();
+
+        return recommendationSelectionStrategy.selectTopRestaurants(
+                filtered,
+                participantContext.categoryVoteSummary().preferenceVotes(),
+                SCORING_POLICY.candidate().topKSize(),
+                SCORING_POLICY.candidate().poolSize()
+        );
+    }
+
+    /**
+     * 선호 카테고리 중 불호가 0표인 카테고리가 존재하면 해당 카테고리만 후보로 제한합니다.
+     * (예: Case 12에서 일식만 불호 0표인 경우 일식만 추천 대상)
+     */
+    private List<CategoryScoredRestaurant> applyNoDislikePreferredFilter(
+            List<CategoryScoredRestaurant> scoredByCategory,
+            RecommendationParticipantContext participantContext
+    ) {
+        CategoryVoteSummary voteSummary = participantContext.categoryVoteSummary();
+        Set<String> strictCategories = voteSummary.preferenceVotes().entrySet().stream()
+                .filter(entry -> entry.getValue() > 0)
+                .filter(entry -> voteSummary.dislikeVotes().getOrDefault(entry.getKey(), 0) == 0)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+
+        if (strictCategories.isEmpty()) {
+            return scoredByCategory;
+        }
+
+        List<CategoryScoredRestaurant> strictCandidates = scoredByCategory.stream()
+                .filter(item -> strictCategories.contains(item.categoryName()))
+                .toList();
+
+        // strict 카테고리 후보가 실제로 없으면 기존 후보를 유지
+        if (strictCandidates.isEmpty()) {
+            return scoredByCategory;
+        }
+
+        return strictCandidates;
     }
 
 
-    /**
-     * 후보 중에서 다양성을 고려하여 Top 3 선정 (MMR-style Greedy Selection)
-     *
-     * <p>각 슬롯마다 남은 전체 후보에 현재 선정 컨텍스트 기반 다양성 부스트를 적용하고,
-     * 그 중 최고 점수를 가진 후보를 선택한다. 이를 통해 낮은 base score를 가진 후보라도
-     * 다양성 부스트를 통해 상위권으로 진입할 수 있다.
-     *
-     * @param candidates 점수 내림차순 정렬된 후보 목록
-     * @return 다양성이 고려된 Top 3
-     */
-    private List<ScoredRestaurant> selectTop3WithDiversity(List<ScoredRestaurant> candidates) {
-        if (candidates.size() <= TOP_K_SIZE) {
-            return candidates;
-        }
+    private List<ScoredRestaurant> mergeRecommendationResults(
+            List<ScoredRestaurant> primary,
+            List<ScoredRestaurant> fallback,
+            int topKSize) {
+        List<ScoredRestaurant> merged = new ArrayList<>(topKSize);
+        Set<Long> seenRestaurantIds = new HashSet<>();
 
-        List<ScoredRestaurant> remaining = new ArrayList<>(candidates);
-        List<ScoredRestaurant> result = new ArrayList<>();
-        Set<String> selectedMenuTypes = new HashSet<>();
-
-        while (result.size() < TOP_K_SIZE && !remaining.isEmpty()) {
-            // 매 슬롯마다 현재 선정 컨텍스트 기준으로 모든 후보 재평가
-            int bestIndex = 0;
-            double bestScore = Double.NEGATIVE_INFINITY;
-
-            for (int i = 0; i < remaining.size(); i++) {
-                ScoredRestaurant candidate = remaining.get(i);
-                String menuType = classifyMenuType(candidate.restaurant().representMenu());
-                double diversityBoost = selectedMenuTypes.contains(menuType) ? 0.0 : DIVERSITY_BONUS;
-                double boostedScore = roundToThreeDecimals(candidate.totalScore() + diversityBoost);
-
-                if (boostedScore > bestScore) {
-                    bestScore = boostedScore;
-                    bestIndex = i;
-                }
+        for (ScoredRestaurant scored : primary) {
+            if (merged.size() >= topKSize) {
+                break;
             }
-
-            ScoredRestaurant selected = remaining.remove(bestIndex);
-            String selectedMenuType = classifyMenuType(selected.restaurant().representMenu());
-
-            result.add(new ScoredRestaurant(
-                    selected.restaurant(),
-                    bestScore,
-                    selected.agreementRate(),
-                    selected.reasonText()
-            ));
-            selectedMenuTypes.add(selectedMenuType);
+            if (seenRestaurantIds.add(scored.restaurant().id())) {
+                merged.add(scored);
+            }
         }
 
-        result.sort(Comparator.comparingDouble(ScoredRestaurant::totalScore).reversed());
-        return result;
+        for (ScoredRestaurant scored : fallback) {
+            if (merged.size() >= topKSize) {
+                break;
+            }
+            if (seenRestaurantIds.add(scored.restaurant().id())) {
+                merged.add(scored);
+            }
+        }
+
+        return merged;
     }
 
     private static double getAgreementRate(List<Participant> participants, PreferenceScore preferenceScore) {
@@ -582,16 +508,12 @@ public class RecommendationService {
      * 전략에 따라 레스토랑을 추천 대상에 포함할지 결정합니다.
      * (개선: 순수 선호수 기준으로 필터링)
      *
-     * @param categoryName 레스토랑의 카테고리명
      * @param preferenceScore 해당 카테고리의 선호도 점수
-     * @param dislikedCategories 불호 카테고리 Set
      * @param strategy 필터링 전략
      * @return 추천 대상에 포함 여부
      */
     private boolean shouldIncludeRestaurant(
-            String categoryName,
             PreferenceScore preferenceScore,
-            Set<String> dislikedCategories,
             FilterStrategy strategy) {
 
         return switch (strategy) {
@@ -627,6 +549,7 @@ public class RecommendationService {
         if (rating == null || ((reviewCount == null || reviewCount == 0) && (blogReviewCount == null || blogReviewCount == 0))) {
             return 0.0;
         }
+        RecommendationScoringPolicy.Credibility credibility = SCORING_POLICY.credibility();
 
         // 카카오맵 리뷰 수 가중치 (로그 스케일로 급격한 증가 방지)
         double kakaoWeight = (reviewCount != null && reviewCount > 0)
@@ -636,14 +559,14 @@ public class RecommendationService {
         // 블로그 리뷰 가중치 (블로그 리뷰는 더 상세하므로 가중치 적용)
         double blogWeight = 0.0;
         if (blogReviewCount != null && blogReviewCount > 0) {
-            blogWeight = Math.log10(blogReviewCount + 1) * BLOG_REVIEW_WEIGHT_MULTIPLIER;
+            blogWeight = Math.log10(blogReviewCount + 1) * credibility.blogReviewWeightMultiplier();
         }
 
         // 총 리뷰 가중치 (최대값으로 제한)
-        double totalReviewWeight = Math.min(kakaoWeight + blogWeight, MAX_REVIEW_WEIGHT);
+        double totalReviewWeight = Math.min(kakaoWeight + blogWeight, credibility.maxReviewWeight());
 
-        // 평점 정규화 (RATING_MIN~RATING_MAX → 0.0~1.0)
-        double normalizedRating = (rating - RATING_MIN) / (RATING_MAX - RATING_MIN);
+        // 평점 정규화 (정책의 최소/최대 평점 범위 → 0.0~1.0)
+        double normalizedRating = (rating - credibility.ratingMin()) / (credibility.ratingMax() - credibility.ratingMin());
         normalizedRating = Math.max(0.0, Math.min(1.0, normalizedRating));
 
         // 신뢰도 점수 = 평점 × 총 리뷰 가중치
@@ -658,23 +581,24 @@ public class RecommendationService {
      *
      * @param restaurant 레스토랑 정보
      * @param now 현재 시간
-     * @return Cold Start 부스트 점수 (0.0 또는 COLD_START_BOOST)
+     * @return Cold Start 부스트 점수 (0.0 또는 정책 부스트 값)
      */
     private double calculateColdStartBoost(Restaurant restaurant, LocalDateTime now) {
         if (restaurant.createdAt() == null) {
             return 0.0;
         }
+        RecommendationScoringPolicy.ColdStart coldStart = SCORING_POLICY.coldStart();
 
         boolean isNewRestaurant = ChronoUnit.DAYS.between(
-                restaurant.createdAt(), now) <= COLD_START_DAYS_THRESHOLD;
+                restaurant.createdAt(), now) <= coldStart.daysThreshold();
         boolean hasLowReviewCount = restaurant.reviewCount() == null
-                || restaurant.reviewCount() < COLD_START_REVIEW_THRESHOLD;
+                || restaurant.reviewCount() < coldStart.reviewThreshold();
         boolean hasGoodRating = restaurant.rating() != null
-                && restaurant.rating() >= COLD_START_RATING_THRESHOLD;
+                && restaurant.rating() >= coldStart.ratingThreshold();
 
         // 신규 맛집이면서 평점이 좋은 경우에만 부스트
         if ((isNewRestaurant || hasLowReviewCount) && hasGoodRating) {
-            return COLD_START_BOOST;
+            return coldStart.boost();
         }
 
         return 0.0;
@@ -692,16 +616,17 @@ public class RecommendationService {
         if (restaurant.updatedAt() == null) {
             return 0.0;
         }
+        RecommendationScoringPolicy.Freshness freshness = SCORING_POLICY.freshness();
 
         long daysSinceUpdate = ChronoUnit.DAYS.between(
                 restaurant.updatedAt(), now);
 
-        if (daysSinceUpdate <= FRESHNESS_RECENT_DAYS) {
-            return FRESHNESS_RECENT_BOOST;  // 7일 이내: +0.3
-        } else if (daysSinceUpdate <= FRESHNESS_MODERATE_DAYS) {
-            return FRESHNESS_MODERATE_BOOST;  // 30일 이내: +0.1
-        } else if (daysSinceUpdate >= FRESHNESS_STALE_DAYS) {
-            return FRESHNESS_STALE_PENALTY;  // 90일 이상: -0.2
+        if (daysSinceUpdate <= freshness.recentDays()) {
+            return freshness.recentBoost();  // 7일 이내: +0.3
+        } else if (daysSinceUpdate <= freshness.moderateDays()) {
+            return freshness.moderateBoost();  // 30일 이내: +0.1
+        } else if (daysSinceUpdate >= freshness.staleDays()) {
+            return freshness.stalePenalty();  // 90일 이상: -0.2
         }
 
         return 0.0;  // 30~90일: 0점
@@ -719,24 +644,25 @@ public class RecommendationService {
         if (summaryItems == null || summaryItems.isEmpty()) {
             return 0.0;
         }
+        RecommendationScoringPolicy.AiSummary aiSummary = SCORING_POLICY.aiSummary();
 
         double boost = 0.0;
 
-        // 그룹 친화 키워드 매칭 (GROUP_SIZE_THRESHOLD명 이상일 때)
-        if (participantCount >= GROUP_SIZE_THRESHOLD) {
+        // 그룹 친화 키워드 매칭 (정책 임계 인원 이상일 때)
+        if (participantCount >= aiSummary.groupSizeThreshold()) {
             if (containsAnyKeyword(summaryItems, "단체석", "대형 테이블", "모임", "단체")) {
-                boost += AI_GROUP_BOOST;
+                boost += aiSummary.groupBoost();
             }
         }
 
         // 긍정 키워드 가산
         if (containsAnyKeyword(summaryItems, "추천", "인기", "맛집", "특별", "유명")) {
-            boost += AI_POSITIVE_BOOST;
+            boost += aiSummary.positiveBoost();
         }
 
         // 부정 키워드 감점 (웨이팅이 있으면 모임에 불편)
         if (containsAnyKeyword(summaryItems, "웨이팅 필수", "예약 필수", "대기 시간")) {
-            boost += AI_NEGATIVE_PENALTY;
+            boost += aiSummary.negativePenalty();
         }
 
         return boost;
@@ -754,87 +680,6 @@ public class RecommendationService {
             }
         }
         return false;
-    }
-
-    /**
-     * 메뉴 다양성 부스트 점수 계산
-     * Top 3 추천 시 메뉴 타입이 중복되지 않도록 다양성 확보
-     *
-     * @param representMenu 대표 메뉴
-     * @param alreadyRecommendedMenuTypes 이미 추천된 메뉴 타입 Set
-     * @return 다양성 점수 (0.0 or 0.5)
-     */
-    private double calculateMenuDiversityBoost(String representMenu, Set<String> alreadyRecommendedMenuTypes) {
-        if (representMenu == null || representMenu.isBlank()) {
-            return 0.0;
-        }
-
-        String menuType = classifyMenuType(representMenu);
-
-        // 이미 추천된 메뉴 타입이 아니면 가산점
-        if (!alreadyRecommendedMenuTypes.contains(menuType)) {
-            return 0.5;
-        }
-
-        return 0.0;
-    }
-
-    /**
-     * 메뉴를 타입별로 분류
-     * 키워드 기반 단순 분류
-     */
-    private String classifyMenuType(String menu) {
-        if (menu == null || menu.isBlank()) {
-            return "기타";
-        }
-
-        String lowerMenu = menu.toLowerCase();
-
-        // 튀김류
-        if (lowerMenu.contains("돈카츠") || lowerMenu.contains("카츠") || lowerMenu.contains("튀김")
-                || lowerMenu.contains("가라아게") || lowerMenu.contains("텐동")) {
-            return "튀김류";
-        }
-        // 탕/국류
-        if (lowerMenu.contains("국밥") || lowerMenu.contains("탕") || lowerMenu.contains("찌개")
-                || lowerMenu.contains("전골") || lowerMenu.contains("샤브샤브")) {
-            return "탕류";
-        }
-        // 면류
-        if (lowerMenu.contains("면") || lowerMenu.contains("라멘") || lowerMenu.contains("우동")
-                || lowerMenu.contains("파스타") || lowerMenu.contains("짬뽕") || lowerMenu.contains("냉면")
-                || lowerMenu.contains("칼국수") || lowerMenu.contains("소바")) {
-            return "면류";
-        }
-        // 구이류
-        if (lowerMenu.contains("구이") || lowerMenu.contains("삼겹살") || lowerMenu.contains("갈비")
-                || lowerMenu.contains("스테이크") || lowerMenu.contains("바베큐") || lowerMenu.contains("불고기")) {
-            return "구이류";
-        }
-        // 회/생선류
-        if (lowerMenu.contains("회") || lowerMenu.contains("사시미") || lowerMenu.contains("스시")
-                || lowerMenu.contains("초밥") || lowerMenu.contains("오마카세")) {
-            return "회류";
-        }
-        // 볶음류
-        if (lowerMenu.contains("볶음") || lowerMenu.contains("덮밥") || lowerMenu.contains("비빔")) {
-            return "볶음류";
-        }
-        // 빵/디저트류
-        if (lowerMenu.contains("빵") || lowerMenu.contains("케이크") || lowerMenu.contains("디저트")
-                || lowerMenu.contains("브런치")) {
-            return "디저트류";
-        }
-        // 피자/양식
-        if (lowerMenu.contains("피자") || lowerMenu.contains("버거") || lowerMenu.contains("햄버거")) {
-            return "양식류";
-        }
-        // 치킨
-        if (lowerMenu.contains("치킨") || lowerMenu.contains("닭")) {
-            return "치킨류";
-        }
-
-        return "기타";
     }
 
     /**
@@ -882,31 +727,6 @@ public class RecommendationService {
         /** 불호 카테고리만 제외 (2단계 Fallback) */
         DISLIKED_EXCLUDED
     }
-
-    /**
-     * 카테고리 값을 displayName으로 정규화합니다.
-     * enum name ("KOREAN", "CHINESE" 등) 또는 displayName ("한식", "중식" 등) 모두 처리합니다.
-     *
-     * @param categoryValue 카테고리 값 (enum name 또는 displayName)
-     * @return displayName 형식으로 정규화된 값, 알 수 없는 값이면 null
-     */
-    private String normalizeToDisplayName(String categoryValue) {
-        // 1. 이미 displayName이면 그대로 반환
-        LargeCategory byDisplayName = LargeCategory.fromDisplayName(categoryValue);
-        if (byDisplayName != null) {
-            return categoryValue;
-        }
-
-        // 2. enum name이면 displayName으로 변환
-        LargeCategory byEnumName = LargeCategory.fromString(categoryValue);
-        if (byEnumName != null) {
-            return byEnumName.getDisplayName();
-        }
-
-        // 3. 알 수 없는 값
-        return null;
-    }
-
 
     /**
      * 소수점 셋째 자리 반올림 유틸리티

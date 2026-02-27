@@ -34,6 +34,35 @@ class CreateParticipantRequestTest {
     }
 
     @Test
+    @DisplayName("닉네임 앞뒤 공백은 자동으로 제거된다")
+    void nicknameWithSurroundingSpaces_shouldBeStripped() {
+        // Given
+        String nickname = "  철수  ";
+        List<String> dislikes = List.of("양파");
+
+        // When
+        CreateParticipantRequest request =
+                CreateParticipantRequest.of("key", nickname, null, dislikes, null);
+
+        // Then
+        assertThat(request.nickname()).isEqualTo("철수");
+    }
+
+    @Test
+    @DisplayName("닉네임이 null이어도 DTO 생성에 성공한다 (형식 검증은 ParticipantValidator에서 수행)")
+    void nullNickname_shouldCreateSuccessfully() {
+        // Given
+        List<String> dislikes = List.of("양파");
+
+        // When
+        CreateParticipantRequest request =
+                CreateParticipantRequest.of("key", null, null, dislikes, null);
+
+        // Then
+        assertThat(request.nickname()).isNull();
+    }
+
+    @Test
     @DisplayName("dislikes가 null이면 예외가 발생한다")
     void dislikesNull_shouldThrowException() {
         // Given

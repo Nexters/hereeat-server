@@ -2,406 +2,278 @@
 
 ## 개요
 
-`RecommendationService.processRecommendation()` 메서드는 모임(Gathering)에 참여한 참가자들의 선호도를 분석하여 최적의 맛집 Top 3를 추천하는 핵심 비즈니스 로직입니다.
+현재 추천 파이프라인의 진입점은 `RecommendationProcessor.processRecommendation()` 입니다.  
+모임 참여자의 선호/불호/거리 선호를 집계해 Top 3 맛집을 산출하고, 결과를 `RecommendResult`에 저장합니다.
+
+핵심 목표는 아래 3가지입니다.
+
+1. 선호 투표 비율을 반영한 카테고리 안배 추천
+2. 불호 우세 카테고리 제거
+3. 쿼리/메모리 병목 최소화
 
 ---
 
-## 전체 처리 흐름
+## 핵심 컴포넌트
+
+| 컴포넌트 | 역할 |
+|:--|:--|
+| `RecommendationProcessor` | 추천 처리 오케스트레이션, 점수 계산, fallback 제어 |
+| `RecommendationContextFactory` | 참여자 입력을 추천용 파생 컨텍스트로 집계 |
+| `RecommendationSelectionStrategy` | Top-K 선정 전략 인터페이스 |
+| `CategoryQuotaSelectionStrategy` | 카테고리 투표 비율 기반 슬롯 배분(최대 나머지 방식) |
+| `RecommendationScoringPolicy` | 가중치/임계값 정책 객체(Record) |
+| `PreferenceScore` | 카테고리별 선호 점수 + 선호자/불호자 카운트 값 객체 |
+| `CategoryVoteSummary` | 카테고리별 선호표/불호표/제외 카테고리 |
+| `DistanceScoreContext` | 거리 다수결 결과 + ANY 비중 반영 가중치 |
+
+---
+
+## 처리 흐름
 
 ```mermaid
 flowchart TD
-    A[processRecommendation 시작] --> B[1. 기존 레코드 확인<br/>중복 처리 방지]
-    B --> C[2. Gathering 조회<br/>TimeSlot 필터링용]
-    C --> D[3. 참여자 조회]
-    D --> E{참여자 존재?}
-    E -->|No| F[FAILED: NO_PARTICIPANTS]
-    E -->|Yes| G[4. Region 기반 Restaurant 조회]
-    G --> H{맛집 존재?}
-    H -->|No| I[FAILED: NO_RESTAURANTS]
-    H -->|Yes| J[5. Category 조회 및 캐싱]
-    J --> K[6. DistanceRange 다수결 결정]
-    K --> L[7. 선호도/불호 사전 집계]
-    L --> M[8. 불호 카테고리 추출]
-    M --> N[9. 지역 중심 좌표 조회]
-    N --> O[10. 다단계 Fallback Top 3 추천]
-    O --> P{추천 결과?}
-    P -->|Empty| Q[FAILED: NO_RESTAURANTS]
-    P -->|Found| R[11. RecommendResult 저장]
-    R --> S[COMPLETED]
+    A["processRecommendation 시작"] --> B["기존 추천 상태 확인(PENDING/COMPLETED/FAILED)"]
+    B --> C["Gathering 조회(TimeSlot)"]
+    C --> D["Participant 조회"]
+    D --> E{"참여자 존재?"}
+    E -->|No| F["FAILED: NO_PARTICIPANTS"]
+    E -->|Yes| G["RecommendationContextFactory.create()"]
+    G --> H["Category 조회(캐시)"]
+    H --> I["불호 우세 카테고리 제외 후 candidateCategoryIds 구성"]
+    I --> J["findRecommendationCandidates(region, categoryIds, timeSlot)"]
+    J --> K{"후보 존재?"}
+    K -->|No| L["FAILED: NO_RESTAURANTS"]
+    K -->|Yes| M["후보 점수 계산 1회(scoreRestaurants)"]
+    M --> N["1단계 선택: PREFERENCE_SCORE_POSITIVE"]
+    N --> O{"TopK 충족?"}
+    O -->|Yes| P["저장(COMPLETED)"]
+    O -->|No| Q["2단계 선택: DISLIKED_EXCLUDED"]
+    Q --> R["merge(primary, fallback)"]
+    R --> P
 ```
 
 ---
 
-## 점수 계산 요소 및 가중치
+## 점수 모델
 
-### 1. 선호도 점수 (Preference Score)
+최종 점수는 아래 요소의 합이며, 소수점 셋째 자리 반올림을 적용합니다.
 
-참여자가 선택한 카테고리 순위에 따라 점수가 부여됩니다.
-
-| 순위 | 가중치 |
-|:----:|:------:|
-| 1순위 | **+3.0점** |
-| 2순위 | **+2.0점** |
-| 3순위 | **+1.0점** |
-
-**불호(Dislike) 페널티**: **-2.0점** (per dislike)
-
-**계산식**: `totalPreferenceScore - (dislikeCount × 2.0)`
-
----
-
-### 2. 순수 선호수 가산점 (Net Preference Bonus)
-
-순수 선호수 = 선호자 수 - 불호자 수
-
-| 조건 | 가산점 |
-|:-----|:------:|
-| 순수 선호 > 0 | **+1.0점 × 순수 선호수** |
-| 순수 선호 = 0 (중립) | **-0.5점** |
-| 순수 선호 < 0 | **-2.0점 × |순수 선호수|** (강한 페널티) |
-
----
-
-### 3. 신뢰도 점수 (Credibility Score)
-
-Wilson Score 기반 간소화 버전으로, 리뷰 수가 많고 평점이 높은 맛집을 우선합니다.
-**블로그 리뷰는 일반 리뷰보다 상세하므로 1.5배 가중치를 적용합니다.**
-
-```
-4.5점 100개 리뷰 > 5.0점 1개 리뷰
+```text
+totalScore
+ = 선호도 점수
+ + 순수 선호수 가산점
+ + 신뢰도 점수
+ + 거리 가산점(ANY 비중 반영)
+ + 의견일치율 가산점
+ + AI 요약 부스트
+ + Cold Start 부스트
+ + Freshness 부스트
 ```
 
-**계산식**:
-```java
-카카오 리뷰 가중치 = log₁₀(reviewCount + 1)
-// 100개 → 2.0, 1000개 → 3.0
+### 1) 선호도 점수
 
-블로그 리뷰 가중치 = log₁₀(blogReviewCount + 1) × 1.5
-// 블로그 리뷰는 더 상세하므로 1.5배 가중
+| 항목 | 값 |
+|:--|:--|
+| 1순위 선호 | +3.0 |
+| 2순위 선호 | +2.0 |
+| 3순위 선호 | +1.0 |
+| 불호 | -2.0 (개수당) |
 
-총 리뷰 가중치 = min(카카오 가중치 + 블로그 가중치, 5.0)
-// 최대 5.0으로 제한
+계산식:
 
-정규화 평점 = (rating - 3.0) / 2.0
-// 3.0~5.0 → 0.0~1.0으로 정규화
-
-신뢰도 점수 = 정규화 평점 × 총 리뷰 가중치
+```text
+preferenceScore = totalPreferenceScore - (dislikeCount * 2.0)
 ```
 
----
+### 2) 순수 선호수 가산점
 
-### 4. 거리 가산점 (Distance Bonus)
-
-참여자 다수결로 결정된 거리 범위 내에 위치한 맛집에 가산점을 부여합니다.
-
-| 거리 범위 | 조건 | 가산점 |
-|:----------|:-----|:------:|
-| RANGE_500M | 500m 이내 | **+1.0점** |
-| RANGE_1KM | 1km 이내 | **+1.0점** |
-| ANY | 제한 없음 | 가산점 없음 |
-
-**거리 다수결**: 참여자들의 `distanceRange` 값 중 가장 많이 선택된 값으로 결정
-
----
-
-### 5. 의견일치율 가산점 (Agreement Rate Bonus)
-
-```
-의견일치율 = (해당 카테고리 선호자 수 / 총 참여자 수) × 100%
-가산점 = 의견일치율 / 100.0  (0~1점 범위)
+```text
+netPreference = preferenceCount - dislikeCount
+if netPreference > 0  -> +1.0 * netPreference
+if netPreference = 0  -> -0.5
+if netPreference < 0  -> +2.0 * netPreference (음수 페널티)
 ```
 
-예: 5명 중 3명이 한식 선택 → 60% → **+0.6점**
+### 3) 신뢰도 점수
 
----
-
-### 6. AI 요약 부스트 (AI Summary Boost)
-
-`aiMateSummaryContents` JSON 배열에서 키워드를 추출하여 그룹 특성과 매칭합니다.
-
-| 조건 | 가산점 |
-|:-----|:------:|
-| 참여자 4명 이상 + "단체석", "대형 테이블" 키워드 | **+0.5점** |
-| "추천", "인기", "맛집" 등 긍정 키워드 | **+0.3점** |
-| "웨이팅 필수", "예약 필수" 등 부정 키워드 | **-0.2점** |
-
----
-
-### 7. 메뉴 다양성 부스트 (Menu Diversity Boost)
-
-Top 3 추천 시 메뉴 타입이 중복되지 않도록 **Post-processing Diversification** 패턴을 적용합니다.
-
-**알고리즘**:
-1. 다양성 부스트 없이 기본 점수로 상위 후보 10개 선정
-2. 후보 중에서 Greedy 방식으로 Top 3 선정 시 다양성 부스트 적용
-
-| 조건 | 가산점 |
-|:-----|:------:|
-| 이미 선택된 메뉴 타입과 다른 경우 | **+0.5점** |
-| 이미 선택된 메뉴 타입과 같은 경우 | 0점 |
-
-**메뉴 타입 분류**: 튀김류, 탕류, 면류, 구이류, 회류, 볶음류, 디저트류, 양식류, 치킨류, 기타
-
-> ⚠️ 이전 버전에서는 점수 계산과 타입 추적 시점이 불일치하여 순서 의존적인 버그가 있었습니다.
-> 현재 버전에서는 Post-processing 패턴을 적용하여 순서에 독립적인 결정을 보장합니다.
-
----
-
-### 8. Cold Start 부스트 (Cold Start Boost)
-
-신규 맛집이 리뷰 부족으로 불이익을 받지 않도록 가산점을 부여합니다.
-
-**신규 맛집 판단 기준**:
-- 등록일(`createdAt`)이 **30일 이내**, 또는
-- 리뷰 수가 **10개 미만**
-
-**부스트 조건**:
-| 조건 | 가산점 |
-|:-----|:------:|
-| 신규 맛집 + 평점 ≥ 4.0 | **+0.3점** |
-| 신규 맛집 + 평점 < 4.0 | 0점 (관망) |
-| 기존 맛집 | 0점 |
-
-> 💡 평점이 좋은 신규 맛집에만 부스트를 적용하여, 잠재력 있는 맛집을 발굴합니다.
-
----
-
-### 9. Freshness 부스트 (Freshness Boost)
-
-정보가 최신인 맛집을 우선하고, 오래된 정보에는 페널티를 부여합니다.
-
-**업데이트 시점 기준** (`updatedAt`):
-| 기간 | 부스트 |
-|:-----|:------:|
-| 7일 이내 | **+0.3점** (최신) |
-| 30일 이내 | **+0.1점** (보통) |
-| 30~90일 | 0점 |
-| 90일 이상 | **-0.2점** (정보 오래됨) |
-
-> 💡 카카오맵 동기화로 정보가 갱신되면 `updatedAt`이 업데이트되어 자동으로 Freshness 점수에 반영됩니다.
-
----
-
-## 최종 점수 계산
-
-```
-totalScore = 선호도 점수
-           + 순수 선호수 가산점
-           + 신뢰도 점수 (blogReviewCount 반영)
-           + 거리 가산점 (범위 내: +1.0)
-           + 의견일치율 가산점 (0~1)
-           + AI 요약 부스트 (-0.2 ~ +0.8)
-           + Cold Start 부스트 (0 or +0.3)
-           + Freshness 부스트 (-0.2 ~ +0.3)
-           + 메뉴 다양성 부스트 (0 or +0.5, Post-processing 단계)
+```text
+kakaoWeight = log10(reviewCount + 1)
+blogWeight = log10(blogReviewCount + 1) * 1.5
+totalWeight = min(kakaoWeight + blogWeight, 5.0)
+normalizedRating = clamp((rating - 3.0) / (5.0 - 3.0), 0.0, 1.0)
+credibility = normalizedRating * totalWeight
 ```
 
-**소수점 셋째 자리 반올림** 적용
+### 4) 거리 가산점 (ANY 비중 반영)
 
-### 점수 범위 요약
+거리 다수결은 `RANGE_500M` vs `RANGE_1KM`로 결정하며, 동률은 `RANGE_500M` 우선입니다.  
+`ANY` 선택 비중이 높을수록 거리 보너스를 선형 축소합니다.
 
-| 요소 | 최소 | 최대 | 비고 |
-|:-----|:----:|:----:|:-----|
-| 선호도 점수 | 0 | +9.0 | 3명 모두 1순위 시 |
-| 순수 선호수 가산점 | -∞ | +∞ | 참여자 수에 비례 |
-| 신뢰도 점수 | 0 | +5.0 | 평점×리뷰가중치 |
-| 거리 가산점 | 0 | +1.0 | 범위 내 |
-| 의견일치율 가산점 | 0 | +1.0 | 100%일 때 |
-| AI 요약 부스트 | -0.2 | +0.8 | 키워드 매칭 |
-| Cold Start 부스트 | 0 | +0.3 | 신규 맛집 |
-| Freshness 부스트 | -0.2 | +0.3 | 정보 신선도 |
-| 메뉴 다양성 부스트 | 0 | +0.5 | Post-processing |
+```text
+anyRatio = anyCount / participantCount
+effectiveDistanceBonus = distanceBonus * (1 - anyRatio)
+```
+
+| 예시 | effectiveDistanceBonus |
+|:--|:--|
+| ANY 0% | 1.0 |
+| ANY 50% | 0.5 |
+| ANY 100% | 0.0 |
+
+### 5) 의견일치율 가산점
+
+```text
+agreementRate = (해당 카테고리 선호자 수 / 총 참여자 수) * 100
+agreementBonus = agreementRate / 100
+```
+
+### 6) AI 요약 부스트
+
+| 조건 | 점수 |
+|:--|:--|
+| 참여자 수 >= 4 + 단체 키워드(단체석/대형 테이블/모임/단체) | +0.5 |
+| 긍정 키워드(추천/인기/맛집/특별/유명) | +0.3 |
+| 부정 키워드(웨이팅 필수/예약 필수/대기 시간) | -0.2 |
+
+### 7) Cold Start + Freshness
+
+| 항목 | 규칙 |
+|:--|:--|
+| Cold Start | 등록 30일 이내 또는 리뷰 10개 미만이며 평점 4.0 이상이면 +0.3 |
+| Freshness | 7일 이내 +0.3, 30일 이내 +0.1, 90일 이상 -0.2 |
+
+참고: `RecommendationScoringPolicy`에 `diversityBonus` 파라미터가 정의되어 있으나, 현재 점수 합산에는 사용하지 않습니다.
 
 ---
 
-## 필터링 로직
+## 카테고리 필터링 정책
 
-### TimeSlot 필터링 (최우선)
+`RecommendationContextFactory`가 카테고리별 선호표/불호표를 집계하고, 아래 규칙으로 추천 제외 카테고리를 결정합니다.
 
-모임의 시간대와 맛집의 운영 시간대가 호환되어야 합니다.
+1. `dislikeCount > preferenceCount` 인 카테고리 제외
+2. `preferenceCount = 0 && dislikeCount > 0` 인 카테고리 제외
 
-| 모임 TimeSlot | 맛집 TimeSlot | 호환 여부 |
-|:--------------|:--------------|:---------:|
-| LUNCH | LUNCH | O |
-| LUNCH | DINNER | X |
-| LUNCH | BOTH | O |
-| DINNER | LUNCH | X |
-| DINNER | DINNER | O |
-| DINNER | BOTH | O |
-| BOTH | * | O (모두 허용) |
+이 제외 카테고리는 추천 후보 조회 전에 SQL 조건으로 먼저 반영합니다.
 
 ---
 
-### 다단계 Fallback 전략
+## Top-K 선정 알고리즘
 
-```mermaid
-flowchart TD
-    A[추천 시작] --> B[1단계: PREFERENCE_SCORE_POSITIVE]
-    B --> C{선호도 점수 > 0?}
-    C -->|Yes| D{순수 선호수 >= -1?}
-    D -->|Yes| E[추천 대상 포함]
-    D -->|No| F[제외: 불호가 2명 이상 많음]
-    C -->|No| F
-    
-    E --> G{Top 3 결과 있음?}
-    G -->|Yes| H[추천 완료]
-    G -->|No| I[2단계: DISLIKED_EXCLUDED<br/>Fallback]
-    
-    I --> J{순수 선호수 >= -1?}
-    J -->|Yes| K[추천 대상 포함]
-    J -->|No| L[제외: 불호가 2명 이상 많음]
-    
-    K --> M[Top 3 추출]
-    M --> H
-```
+`CategoryQuotaSelectionStrategy`는 카테고리별 투표 비율 기반으로 Top-K 슬롯을 배분합니다.
+
+1. 카테고리별 후보를 점수순으로 정렬하고 카테고리당 최대 `candidatePoolSize(10)`개 유지
+2. `rawQuota = (categoryVotes / totalVotes) * topK(3)` 계산
+3. 바닥값 슬롯을 우선 할당
+4. 남는 슬롯은 최대 나머지 방식으로 배분
+5. 부족 시 전체 후보 점수순으로 보강
+
+이 방식으로 예를 들어 `일식 3표, 아시안 2표`일 때 Top3 슬롯이 `2:1`로 배분됩니다.
 
 ---
 
-## 추천 근거 텍스트 생성
+## 쿼리/메모리 최적화
 
-추천 결과와 함께 사용자에게 보여줄 근거 텍스트가 자동 생성됩니다.
+### 1) 추천 후보 전용 쿼리 도입
 
-**형식**:
-```
-{총 참여자}명 중 {선호자 수}명이 {카테고리}을 골라서
-{AI 요약 타이틀}
-을(를) 추천해요
-```
+기존은 `findByRegion()`으로 지역 전체 맛집을 메모리로 가져온 뒤 자바에서 필터링했습니다.  
+현재는 `findRecommendationCandidates(region, categoryIds, timeSlot)`로 SQL 선필터링을 수행합니다.
 
-**예시**:
-```
-5명 중 3명이 일식을 골라서
-400시간 숙성으로 완성한 겉바속촉 돈카츠
-을(를) 추천해요
-```
+적용 조건:
 
----
+1. `deleted_at IS NULL`
+2. `region = ?`
+3. `category_id IN (?)`
+4. `time_slot IS NULL OR time_slot = BOTH OR time_slot = gatheringTimeSlot`
 
-## Top-K 알고리즘
+또한 추천 계산에 필요한 컬럼만 projection 조회해 row 폭을 줄였습니다.
 
-PriorityQueue(Min-Heap)를 사용하여 **O(N log K)** 시간 복잡도로 상위 3개 맛집을 추출합니다.
+### 2) fallback 점수 계산 중복 제거
 
-```java
-if (heap.size() < 3) {
-    heap.offer(scored);
-} else if (scored.totalScore() > heap.peek().totalScore()) {
-    heap.poll();
-    heap.offer(scored);
-}
-```
+기존에는 1단계/2단계 fallback 각각에서 점수 계산을 반복했습니다.  
+현재는 `scoreRestaurants()`로 점수 계산 1회 후, 전략별 필터만 분기합니다.
+
+### 3) Category 캐시
+
+`CategoryService.findAll()`에 `@Cacheable("categories")`를 적용했고, 카테고리 생성 시 캐시를 비웁니다.  
+`CacheManager`는 `ObjectProvider`로 optional 처리해 컨텍스트별 빈 유무 차이에도 안전합니다.
 
 ---
 
-## 성능 최적화
+## 시간/공간 복잡도
 
-### 선호도 사전 집계
+기호:
 
-기존: O(R × P × 3) — 레스토랑마다 모든 참여자의 선호도 순회
+| 기호 | 의미 |
+|:--|:--|
+| `P` | 참여자 수 |
+| `M` | 카테고리 수 |
+| `R` | 쿼리 후 추천 후보 맛집 수 |
+| `S` | 투표에 등장한 카테고리 수 (`S <= M`) |
+| `K` | 최종 추천 개수 (`K = 3`) |
 
-개선: O(P × 3) + O(R) — 선호도를 미리 Map으로 집계 후 레스토랑별 조회
+### 현재 복잡도
 
-```java
-Map<String, PreferenceScore> preferenceScoreMap = aggregatePreferenceScores(participants);
+| 단계 | 시간 복잡도 | 공간 복잡도 |
+|:--|:--|:--|
+| 참여자 컨텍스트 집계 | `O(P)` | `O(M)` |
+| 카테고리 맵/후보 카테고리 구성 | `O(M)` | `O(M)` |
+| 후보 점수 계산 1회 | `O(R)` | `O(R)` |
+| 카테고리 버킷 정렬/슬롯 배분 | 최악 `O(R log R) + O(S log S)` | `O(R + S)` |
+| fallback 병합 | `O(K)` | `O(K)` |
+
+총합(지배항):
+
+```text
+Time: O(P + M + R log R)
+Space: O(M + R)
 ```
 
-### Category 캐싱
+`K=3`, `candidatePoolSize=10`이 고정이므로 실제 런타임은 `R`과 카테고리 분포에 가장 민감합니다.
 
-Spring Cache를 적용하여 Category 조회 결과를 캐싱합니다.
+### 개선 전/후 관점
+
+| 항목 | 이전 | 현재 |
+|:--|:--|:--|
+| DB 조회 범위 | 지역 전체 | 지역+카테고리+TimeSlot 선필터링 |
+| fallback 점수 계산 | 최대 2회 | 1회 |
+| 카테고리 조회 | 매번 DB hit | 캐시 기반 |
+| 선호도 집계 | 레스토랑 루프 내부 반복 위험 | 사전 집계 컨텍스트 재사용 |
 
 ---
 
-## 관련 클래스
+## 사용 기술
 
-| 클래스 | 역할 |
-|:-------|:-----|
-| `RecommendationService` | 추천 로직 핵심 서비스 |
-| `PreferenceScore` | 카테고리별 선호도 점수 값 객체 |
-| `ScoredRestaurant` | 점수가 계산된 레스토랑 래퍼 |
-| `ParticipantAnalyzer` | 참여자 분석 (거리 다수결 등) |
-| `RecommendResult` | 추천 결과 도메인 |
-
----
-
-## 상수 정의 (RecommendationService)
-
-코드 가독성과 유지보수를 위해 모든 가중치와 임계값이 상수로 정의되어 있습니다.
-
-```java
-// 점수 가중치
-private static final double DISTANCE_BONUS = 1.0;
-private static final double DIVERSITY_BONUS = 0.5;
-
-// AI 요약 부스트
-private static final double AI_GROUP_BOOST = 0.5;
-private static final double AI_POSITIVE_BOOST = 0.3;
-private static final double AI_NEGATIVE_PENALTY = -0.2;
-private static final int GROUP_SIZE_THRESHOLD = 4;
-
-// Cold Start
-private static final int COLD_START_DAYS_THRESHOLD = 30;
-private static final int COLD_START_REVIEW_THRESHOLD = 10;
-private static final double COLD_START_RATING_THRESHOLD = 4.0;
-private static final double COLD_START_BOOST = 0.3;
-
-// Freshness
-private static final int FRESHNESS_RECENT_DAYS = 7;
-private static final int FRESHNESS_MODERATE_DAYS = 30;
-private static final int FRESHNESS_STALE_DAYS = 90;
-private static final double FRESHNESS_RECENT_BOOST = 0.3;
-private static final double FRESHNESS_MODERATE_BOOST = 0.1;
-private static final double FRESHNESS_STALE_PENALTY = -0.2;
-
-// 후보 선정
-private static final int CANDIDATE_POOL_SIZE = 10;
-private static final int TOP_K_SIZE = 3;
-```
+| 구분 | 기술 |
+|:--|:--|
+| 언어/모델 | Java Record 기반 Value Object |
+| 프레임워크 | Spring Boot, Spring Transactional, Spring Cache |
+| 데이터 접근 | Spring Data JPA, QueryDSL |
+| 지리 계산 | GeoJson + Haversine(`GeoUtils`) |
+| 패턴 | Strategy(`RecommendationSelectionStrategy`), Context Factory(`RecommendationContextFactory`), Processor Orchestration |
+| 테스트 | JUnit 5, Mockito |
 
 ---
 
 ## 실패 처리
 
-| FailureReason | 설명 |
-|:--------------|:-----|
-| `NO_PARTICIPANTS` | 참여자가 없음 |
-| `NO_RESTAURANTS` | 해당 지역에 맛집이 없거나 필터링 후 적합한 맛집이 없음 |
-| `PROCESSING_EXCEPTION` | 처리 중 예외 발생 |
+| FailureReason | 의미 |
+|:--|:--|
+| `NO_PARTICIPANTS` | 참여자 없음 |
+| `NO_RESTAURANTS` | 후보가 없거나 필터링 후 추천 불가 |
+| `PROCESSING_EXCEPTION` | 처리 중 예외 |
 
-실패 시 `RecommendResultFailed` 테이블에 실패 사유와 함께 저장됩니다.
+실패 시:
+
+1. `t_recommend_result`에 `FAILED` 상태 저장
+2. `t_recommend_result_failed`에 상세 실패 컨텍스트 저장
 
 ---
 
-## 시퀀스 다이어그램
+## 테스트 포인트
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant RS as RecommendationService
-    participant Repo as Repository
-    participant PA as ParticipantAnalyzer
+현재 핵심 시나리오는 `RecommendationProcessorTest`로 검증합니다.
 
-    User->>RS: processRecommendation(gatheringId, region)
-    
-    RS->>Repo: findByGatheringId()
-    Repo-->>RS: List<RecommendResult>
-    
-    RS->>Repo: findById(gatheringId)
-    Repo-->>RS: Gathering
-    
-    RS->>Repo: findByGatheringId(participants)
-    Repo-->>RS: List<Participant>
-    
-    RS->>Repo: findByRegion(region)
-    Repo-->>RS: List<Restaurant>
-    
-    RS->>PA: determineMajorityDistanceRange(participants)
-    PA-->>RS: DistanceRange
-    
-    Note over RS: aggregatePreferenceScores()
-    Note over RS: scoreAndFilterRestaurants()
-    Note over RS: 내부 점수 계산 및 Top 3 추출
-    
-    RS->>Repo: saveAll(results)
-    Repo-->>RS: saved
-    
-    RS-->>User: 추천 완료
-```
+1. 선호표 비율 기반 슬롯 배분(3:2 -> 2:1)
+2. 불호 우세 카테고리 제외
+3. ANY 비중에 따른 거리 보너스 선형 축소
+4. 후보 조회 시 category/timeSlot 선필터 파라미터 전달
