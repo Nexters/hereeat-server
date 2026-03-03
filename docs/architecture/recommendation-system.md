@@ -1,5 +1,7 @@
 # 맛집 추천 시스템 아키텍처
 
+> 최종 업데이트: 2026-03-03
+
 ## 개요
 
 현재 추천 파이프라인의 진입점은 `RecommendationProcessor.processRecommendation()` 입니다.  
@@ -9,7 +11,7 @@
 
 1. 선호 투표 비율을 반영한 카테고리 안배 추천
 2. 불호 우세 카테고리 제거
-3. 쿼리/메모리 병목 최소화
+3. Top3 보장과 선호 우선 정책의 균형 유지(Strict + Fallback)
 
 ---
 
@@ -45,7 +47,8 @@ flowchart TD
     K -->|No| L["FAILED: NO_RESTAURANTS"]
     K -->|Yes| M["후보 점수 계산 1회(scoreRestaurants)"]
     M --> N["1단계 선택: PREFERENCE_SCORE_POSITIVE"]
-    N --> O{"TopK 충족?"}
+    N --> N1["Strict 후보 필터(불호 0표 선호 카테고리) + 슬롯용 유효표 계산"]
+    N1 --> O{"TopK 충족?"}
     O -->|Yes| P["저장(COMPLETED)"]
     O -->|No| Q["2단계 선택: DISLIKED_EXCLUDED"]
     Q --> R["merge(primary, fallback)"]
@@ -155,19 +158,46 @@ agreementBonus = agreementRate / 100
 
 이 제외 카테고리는 추천 후보 조회 전에 SQL 조건으로 먼저 반영합니다.
 
+입력 매핑 규칙:
+
+1. `LargeCategory.displayName` 기준 입력(예: `아시안`)을 처리
+2. enum name 입력(예: `ASIAN`)도 처리
+3. 그 외 별칭 문자열은 현재 별도 정규화하지 않음
+
 ---
 
 ## Top-K 선정 알고리즘
 
-`CategoryQuotaSelectionStrategy`는 카테고리별 투표 비율 기반으로 Top-K 슬롯을 배분합니다.
+`RecommendationProcessor` + `CategoryQuotaSelectionStrategy` 조합으로 Top-K를 결정합니다.
 
-1. 카테고리별 후보를 점수순으로 정렬하고 카테고리당 최대 `candidatePoolSize(10)`개 유지
+### 1) Strict 후보 우선 규칙 (`applyNoDislikePreferredFilter`)
+
+선호 카테고리 중 `dislikeVotes == 0`인 카테고리가 있으면 strict 후보로 우선 사용합니다.
+
+1. strict 카테고리가 없으면 전체 후보 유지
+2. strict 후보가 비어있으면 전체 후보 유지
+3. strict 후보 수가 `topK` 미만이면 Top3 보장을 위해 전체 후보로 복귀
+4. strict 후보 수가 `topK` 이상이면 strict 후보만 사용
+
+### 2) 슬롯 배분용 유효표 산정 (`buildQuotaPreferenceVotes`)
+
+카테고리 슬롯 비율은 아래 우선순위로 투표값을 사용합니다.
+
+1. 가중 선호 유효표: `round(totalPreferenceScore) - dislikeVotes * 2` (0 미만은 0으로 절삭)
+2. 위가 전부 0이면 단순 선호표(`preferenceVotes`)
+3. 선호 입력 자체가 없으면 후보 카테고리 균등표(카테고리당 1표)
+
+### 3) `CategoryQuotaSelectionStrategy` 슬롯 배분
+
+1. 카테고리별 후보를 점수순 정렬하고 카테고리당 최대 `candidatePoolSize(10)`개 유지
 2. `rawQuota = (categoryVotes / totalVotes) * topK(3)` 계산
-3. 바닥값 슬롯을 우선 할당
-4. 남는 슬롯은 최대 나머지 방식으로 배분
-5. 부족 시 전체 후보 점수순으로 보강
+3. 바닥값 슬롯 우선 할당
+4. 남은 슬롯은 최대 나머지 방식으로 배분
+5. 슬롯으로 부족하면
+: 먼저 quota 카테고리 내부에서 점수순 보강
+: 그래도 부족하면 전체 카테고리에서 점수순 보강해 TopK를 채움
 
-이 방식으로 예를 들어 `일식 3표, 아시안 2표`일 때 Top3 슬롯이 `2:1`로 배분됩니다.
+이 방식으로 `일식 3표, 아시안 2표`일 때 Top3 슬롯은 `2:1`로 배분됩니다.
 
 ---
 
@@ -271,9 +301,18 @@ Space: O(M + R)
 
 ## 테스트 포인트
 
-현재 핵심 시나리오는 `RecommendationProcessorTest`로 검증합니다.
+현재 핵심 시나리오는 아래 테스트로 검증합니다.
 
-1. 선호표 비율 기반 슬롯 배분(3:2 -> 2:1)
-2. 불호 우세 카테고리 제외
-3. ANY 비중에 따른 거리 보너스 선형 축소
-4. 후보 조회 시 category/timeSlot 선필터 파라미터 전달
+1. `RecommendationContextFactoryScenarioTest`
+: Case 1~12 시나리오의 제외 카테고리 계산 검증
+2. `RecommendationProcessorTest`
+: 선호표 비율 슬롯 배분(3:2 -> 2:1)
+: Case 11(`한식 4표/양식 2표 -> 2:1`)
+: strict 후보 우선(불호 0표 선호 카테고리) 및 strict 후보 부족 시 Top3 보강
+: 가중 선호 유효표 기반 동률 우선순위
+: 선호 중립 입력(상관없음)에서도 Top3 반환
+: ANY 비중에 따른 거리 보너스 선형 축소
+: 후보 조회 시 category/timeSlot 선필터 파라미터 전달
+3. `CategoryQuotaSelectionStrategyTest`
+: 동률 카테고리 슬롯 분산
+: 선호 후보 부족 시 비선호 카테고리 보강으로 TopK 충족
