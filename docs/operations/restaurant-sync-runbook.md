@@ -1,5 +1,7 @@
 # Restaurant Sync 실행 가이드 (전체 + NULL 우선 단건)
 
+> 최종 업데이트: 2026-03-09
+
 ## 1) API/BATCH 재빌드 + 재기동
 
 코드 반영 후 반드시 API/BATCH를 재기동한다.
@@ -71,6 +73,7 @@ where deleted_at is null
   or image_url is null
   or representative_review is null
   );
+```
 
 ## 5) 관리자 검색 인덱스 반영 (PostgreSQL)
 
@@ -90,5 +93,4 @@ ANALYZE t_restaurant;
 
 ```bash
 psql "$DATASOURCE_DB_CORE_JDBC_URL" -v ON_ERROR_STOP=1 -f scripts/sync/sql/restaurant-admin-search-index-down.sql
-```
 ```
