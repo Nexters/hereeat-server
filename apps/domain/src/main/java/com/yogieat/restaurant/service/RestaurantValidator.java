@@ -6,9 +6,9 @@ import com.yogieat.common.error.ErrorCode;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,8 +46,8 @@ public class RestaurantValidator {
 
         List<Restaurant> existingRestaurants = restaurantRepository.findByRegion(region);
 
-        Set<String> cachedExternalIds = new HashSet<>();
-        Set<String> cachedNameAddressPairs = new HashSet<>();
+        Set<String> cachedExternalIds = ConcurrentHashMap.newKeySet();
+        Set<String> cachedNameAddressPairs = ConcurrentHashMap.newKeySet();
 
         for (Restaurant restaurant : existingRestaurants) {
             if (hasText(restaurant.externalId())) {

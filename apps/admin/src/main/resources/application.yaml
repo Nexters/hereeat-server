@@ -45,7 +45,6 @@ kakao:
       concurrent-permits: ${KAKAO_ADMIN_CONCURRENT_PERMITS:6}
       retry-base-delay-ms: ${KAKAO_ADMIN_RETRY_BASE_DELAY_MS:180}
       retry-jitter-rate: ${KAKAO_ADMIN_RETRY_JITTER_RATE:0.2}
-      api-timeout-ms: ${KAKAO_ADMIN_API_TIMEOUT_MS:1200}
       cache-ttl-ms: ${KAKAO_ADMIN_CACHE_TTL_MS:20000}
 
 ai:

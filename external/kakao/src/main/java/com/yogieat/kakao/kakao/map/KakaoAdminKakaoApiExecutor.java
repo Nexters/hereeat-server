@@ -32,7 +32,6 @@ public class KakaoAdminKakaoApiExecutor {
     private final int kakaoAdminMaxRetryAttempts;
     private final long kakaoAdminRetryBaseDelayMs;
     private final double kakaoAdminRetryJitterRate;
-    private final long kakaoAdminApiTimeoutMs;
     private final long kakaoAdminCacheTtlMs;
 
     private final ConcurrentHashMap<String, CompletableFuture<List<KaKaoPlaceDocumentResult>>> searchInFlight =
@@ -50,7 +49,6 @@ public class KakaoAdminKakaoApiExecutor {
         this.kakaoAdminMaxRetryAttempts = kakaoAdminClientProperties.maxRetryAttempts();
         this.kakaoAdminRetryBaseDelayMs = kakaoAdminClientProperties.retryBaseDelayMs();
         this.kakaoAdminRetryJitterRate = kakaoAdminClientProperties.retryJitterRate();
-        this.kakaoAdminApiTimeoutMs = kakaoAdminClientProperties.apiTimeoutMs();
         this.kakaoAdminCacheTtlMs = kakaoAdminClientProperties.cacheTtlMs();
     }
 
@@ -151,7 +149,7 @@ public class KakaoAdminKakaoApiExecutor {
         RuntimeException lastError = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                return executeWithSemaphore(() -> executeWithTimeout(supplier), operationName);
+                return executeWithSemaphore(supplier, operationName);
             } catch (RuntimeException e) {
                 lastError = e;
                 if (attempt >= maxAttempts) {
@@ -181,40 +179,15 @@ public class KakaoAdminKakaoApiExecutor {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("kakao api semaphore interrupted: " + operationName, e);
+        } catch (RestClientResponseException e) {
+            if (HttpStatus.TOO_MANY_REQUESTS.equals(e.getStatusCode())) {
+                throw new CustomException(ErrorCode.KAKAO_RATE_LIMIT_EXCEEDED);
+            }
+            throw new CustomException(ErrorCode.KAKAO_API_ERROR);
         } finally {
             if (acquired) {
                 kakaoApiSemaphore.release();
             }
-        }
-    }
-
-    private <T> T executeWithTimeout(Supplier<T> supplier) {
-        try {
-            return CompletableFuture.supplyAsync(supplier)
-                    .orTimeout(kakaoAdminApiTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-                    .join();
-        } catch (CompletionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof java.util.concurrent.TimeoutException) {
-                throw new CustomException(ErrorCode.KAKAO_API_ERROR);
-            }
-
-            if (cause instanceof RestClientResponseException restClientResponseException) {
-                if (HttpStatus.TOO_MANY_REQUESTS.equals(restClientResponseException.getStatusCode())) {
-                    throw new CustomException(ErrorCode.KAKAO_RATE_LIMIT_EXCEEDED);
-                }
-                throw new CustomException(ErrorCode.KAKAO_API_ERROR);
-            }
-
-            if (cause instanceof CustomException customException) {
-                throw customException;
-            }
-
-            if (cause instanceof RuntimeException runtimeException) {
-                throw new CustomException(ErrorCode.KAKAO_API_ERROR, runtimeException.getMessage());
-            }
-
-            throw new CustomException(ErrorCode.KAKAO_API_ERROR);
         }
     }
 
