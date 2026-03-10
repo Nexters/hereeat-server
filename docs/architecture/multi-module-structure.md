@@ -45,6 +45,7 @@ Yogieat은 **모임 참여자의 음식 취향을 투표로 수집하고, AI 기
 | 인증 | JWT (jjwt 0.12.6) + Spring Security (Admin 전용) |
 | API 문서화 | SpringDoc OpenAPI 2.8.5 |
 | 모니터링 | Spring Actuator + Micrometer + Prometheus |
+| 동시성 | Virtual Thread (배치 동기화, 비동기 이벤트, SSE) |
 | 분산 추적 | Micrometer Tracing (Brave) |
 | 코드 품질 | Spotless (자동 포맷팅 + import 정리) |
 | 컨테이너 | Docker Compose (API / Admin / Batch / DB) |
@@ -218,7 +219,7 @@ apps:domain (포트 인터페이스 정의)
 |:--|:--|
 | 포트 | 9090 (외부 노출 안 함) |
 | 실행 방식 | 주간 스케줄 + 수동 API 트리거 |
-| 처리 방식 | 청크 처리(50건) + 병렬 실행(4 스레드) + 청크 재시도(최대 2회) |
+| 처리 방식 | 청크 처리(50건) + Virtual Thread 병렬 실행 + Semaphore 동시성 제어 + 청크 재시도(최대 2회) |
 | 상태 관리 | `t_restaurant_sync_job` 테이블 기반 |
 | 실행 스코프 | ALL(전체 동기화), SINGLE(단건 동기화) |
 | 의존 모듈 | domain, db-core, kakao, ai, logging |
