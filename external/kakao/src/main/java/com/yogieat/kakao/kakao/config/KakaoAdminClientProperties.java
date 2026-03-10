@@ -1,4 +1,4 @@
-package com.yogieat.restaurant.config;
+package com.yogieat.kakao.kakao.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

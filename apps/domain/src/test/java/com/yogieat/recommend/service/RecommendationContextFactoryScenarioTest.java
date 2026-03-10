@@ -28,7 +28,7 @@ class RecommendationContextFactoryScenarioTest {
             Set<String> expectedExcludedCategories
     ) {
         RecommendationParticipantContext context =
-                contextFactory.create(participants, RecommendationScoringPolicy.DEFAULT);
+                contextFactory.create(participants, RecommendationScoringPolicy.defaults());
         CategoryVoteSummary voteSummary = context.categoryVoteSummary();
 
         assertThat(voteSummary.excludedCategories())
@@ -45,7 +45,7 @@ class RecommendationContextFactoryScenarioTest {
         );
 
         RecommendationParticipantContext context =
-                contextFactory.create(participants, RecommendationScoringPolicy.DEFAULT);
+                contextFactory.create(participants, RecommendationScoringPolicy.defaults());
 
         assertThat(context.categoryVoteSummary().preferenceVotes())
                 .containsEntry("한식", 1)

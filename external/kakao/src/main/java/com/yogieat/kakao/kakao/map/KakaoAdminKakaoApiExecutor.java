@@ -5,7 +5,7 @@ import com.yogieat.common.error.ErrorCode;
 import com.yogieat.external.kakao.result.KaKaoPlaceDocumentResult;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailFetchResult;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailFetchStatus;
-import com.yogieat.restaurant.config.KakaoAdminClientProperties;
+import com.yogieat.kakao.kakao.config.KakaoAdminClientProperties;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;

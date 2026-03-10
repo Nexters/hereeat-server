@@ -44,8 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class RecommendationProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(RecommendationProcessor.class);
-    private static final RecommendationScoringPolicy SCORING_POLICY = RecommendationScoringPolicy.DEFAULT;
 
+    private final RecommendationScoringPolicy scoringPolicy;
     private final ParticipantRepository participantRepository;
     private final RestaurantRepository restaurantRepository;
     private final CategoryService categoryService;
@@ -90,7 +90,7 @@ public class RecommendationProcessor {
 
             // 4. 참여자 입력 기반 추천 컨텍스트 생성
             RecommendationParticipantContext participantContext =
-                    recommendationContextFactory.create(participants, SCORING_POLICY);
+                    recommendationContextFactory.create(participants, scoringPolicy);
 
             // 5. Category 조회 및 캐싱 (Spring Cache 적용)
             Map<Long, Category> categoryMap = categoryService.findAll().stream()
@@ -203,11 +203,10 @@ public class RecommendationProcessor {
     }
 
     private boolean isWithinDistanceRange(double distance, DistanceRange range) {
-        return switch (range) {
-            case RANGE_500M -> distance <= 0.5;
-            case RANGE_1KM -> distance <= 1.0;
-            case ANY -> true;
-        };
+        if (range == DistanceRange.ANY || range.getDistance() == null) {
+            return true;
+        }
+        return distance <= range.getDistance();
     }
 
     /**
@@ -231,7 +230,7 @@ public class RecommendationProcessor {
             GeoJson.Point centerPoint,
             TimeSlot gatheringTimeSlot) {
 
-        int topKSize = SCORING_POLICY.candidate().topKSize();
+        int topKSize = scoringPolicy.candidate().topKSize();
 
         // 점수 계산은 1회만 수행하고, 필터 전략만 다르게 적용
         List<CategoryScoredRestaurant> scoredCandidates = scoreRestaurants(
@@ -380,7 +379,7 @@ public class RecommendationProcessor {
             RecommendationParticipantContext participantContext,
             FilterStrategy strategy
     ) {
-        int topKSize = SCORING_POLICY.candidate().topKSize();
+        int topKSize = scoringPolicy.candidate().topKSize();
         List<CategoryScoredRestaurant> baseCandidates = applyNoDislikePreferredFilter(
                 scoredByCategory,
                 participantContext,
@@ -401,7 +400,7 @@ public class RecommendationProcessor {
                 filtered,
                 quotaVotes,
                 topKSize,
-                SCORING_POLICY.candidate().poolSize()
+                scoringPolicy.candidate().poolSize()
         );
     }
 
@@ -609,7 +608,7 @@ public class RecommendationProcessor {
         if (rating == null || ((reviewCount == null || reviewCount == 0) && (blogReviewCount == null || blogReviewCount == 0))) {
             return 0.0;
         }
-        RecommendationScoringPolicy.Credibility credibility = SCORING_POLICY.credibility();
+        RecommendationScoringPolicy.Credibility credibility = scoringPolicy.credibility();
 
         // 카카오맵 리뷰 수 가중치 (로그 스케일로 급격한 증가 방지)
         double kakaoWeight = (reviewCount != null && reviewCount > 0)
@@ -647,7 +646,7 @@ public class RecommendationProcessor {
         if (restaurant.createdAt() == null) {
             return 0.0;
         }
-        RecommendationScoringPolicy.ColdStart coldStart = SCORING_POLICY.coldStart();
+        RecommendationScoringPolicy.ColdStart coldStart = scoringPolicy.coldStart();
 
         boolean isNewRestaurant = ChronoUnit.DAYS.between(
                 restaurant.createdAt(), now) <= coldStart.daysThreshold();
@@ -676,7 +675,7 @@ public class RecommendationProcessor {
         if (restaurant.updatedAt() == null) {
             return 0.0;
         }
-        RecommendationScoringPolicy.Freshness freshness = SCORING_POLICY.freshness();
+        RecommendationScoringPolicy.Freshness freshness = scoringPolicy.freshness();
 
         long daysSinceUpdate = ChronoUnit.DAYS.between(
                 restaurant.updatedAt(), now);
@@ -704,24 +703,24 @@ public class RecommendationProcessor {
         if (summaryItems == null || summaryItems.isEmpty()) {
             return 0.0;
         }
-        RecommendationScoringPolicy.AiSummary aiSummary = SCORING_POLICY.aiSummary();
+        RecommendationScoringPolicy.AiSummary aiSummary = scoringPolicy.aiSummary();
 
         double boost = 0.0;
 
         // 그룹 친화 키워드 매칭 (정책 임계 인원 이상일 때)
         if (participantCount >= aiSummary.groupSizeThreshold()) {
-            if (containsAnyKeyword(summaryItems, "단체석", "대형 테이블", "모임", "단체")) {
+            if (containsAnyKeyword(summaryItems, aiSummary.groupKeywords())) {
                 boost += aiSummary.groupBoost();
             }
         }
 
         // 긍정 키워드 가산
-        if (containsAnyKeyword(summaryItems, "추천", "인기", "맛집", "특별", "유명")) {
+        if (containsAnyKeyword(summaryItems, aiSummary.positiveKeywords())) {
             boost += aiSummary.positiveBoost();
         }
 
         // 부정 키워드 감점 (웨이팅이 있으면 모임에 불편)
-        if (containsAnyKeyword(summaryItems, "웨이팅 필수", "예약 필수", "대기 시간")) {
+        if (containsAnyKeyword(summaryItems, aiSummary.negativeKeywords())) {
             boost += aiSummary.negativePenalty();
         }
 
@@ -731,7 +730,7 @@ public class RecommendationProcessor {
     /**
      * 문자열 리스트에 특정 키워드들 중 하나라도 포함되어 있는지 확인
      */
-    private boolean containsAnyKeyword(List<String> items, String... keywords) {
+    private boolean containsAnyKeyword(List<String> items, List<String> keywords) {
         for (String item : items) {
             for (String keyword : keywords) {
                 if (item.contains(keyword)) {

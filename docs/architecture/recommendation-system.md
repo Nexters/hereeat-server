@@ -214,6 +214,21 @@ agreementBonus = agreementRate / 100
 
 참고: `RecommendationScoringPolicy`에 `diversityBonus` 파라미터가 정의되어 있으나, 현재 점수 합산에는 사용하지 않습니다.
 
+### 설정 오버라이드
+
+`RecommendationScoringPolicy`는 `@ConfigurationProperties(prefix = "recommendation.scoring")`로 바인딩되어, `application.yaml`에서 모든 파라미터를 오버라이드할 수 있습니다. AI 요약 키워드(그룹/긍정/부정)도 설정으로 관리됩니다.
+
+```yaml
+recommendation:
+  scoring:
+    distance-bonus: 1.0
+    ai-summary:
+      group-size-threshold: 4
+      group-keywords: ["단체석", "대형 테이블", "모임", "단체"]
+      positive-keywords: ["추천", "인기", "맛집", "특별", "유명"]
+      negative-keywords: ["웨이팅 필수", "예약 필수", "대기 시간"]
+```
+
 ---
 
 ## 카테고리 필터링 정책

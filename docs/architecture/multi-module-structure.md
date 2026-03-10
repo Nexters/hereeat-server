@@ -218,7 +218,7 @@ apps:domain (포트 인터페이스 정의)
 |:--|:--|
 | 포트 | 9090 (외부 노출 안 함) |
 | 실행 방식 | 주간 스케줄 + 수동 API 트리거 |
-| 처리 방식 | 청크 처리(50건) + 병렬 실행(4 스레드) |
+| 처리 방식 | 청크 처리(50건) + 병렬 실행(4 스레드) + 청크 재시도(최대 2회) |
 | 상태 관리 | `t_restaurant_sync_job` 테이블 기반 |
 | 실행 스코프 | ALL(전체 동기화), SINGLE(단건 동기화) |
 | 의존 모듈 | domain, db-core, kakao, ai, logging |
@@ -252,7 +252,7 @@ Kakao 장소 검색 및 상세 정보 조회를 담당합니다.
 | 항목 | 내용 |
 |:--|:--|
 | 주요 클래스 | KakaoPlaceClientImpl, KakaoPlaceDetailClientImpl, KakaoPlaceDetailParser, KakaoPlaceMapperImpl |
-| 관리자 전용 | KakaoAdminKakaoApiExecutor (관리자 맛집 수집용) |
+| 관리자 전용 | KakaoAdminKakaoApiExecutor (관리자 맛집 수집용), KakaoAdminClientProperties (관리자 API 설정) |
 | 용도 | 장소 검색, 상세 정보(리뷰 수, 블로그 리뷰 수, 이미지 등) 수집 |
 
 ### Storage Layer — 데이터 영속성 계층

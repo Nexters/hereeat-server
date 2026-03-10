@@ -20,7 +20,8 @@
 
 - `t_restaurant_sync_job` 기반 Job 상태 영속화
 - `ALL`/`SINGLE` 두 가지 실행 스코프
-- 청크 처리 (50건) + 병렬 처리 (4 스레드)
+- 청크 처리 (50건) + 병렬 처리 (4 스레드) + 청크 레벨 재시도 (최대 2회, 지수 백오프)
+- Graceful shutdown (awaitTermination 30초)
 - 주간 스케줄 + 수동 API 트리거
 
 ---
