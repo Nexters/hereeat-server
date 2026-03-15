@@ -65,6 +65,14 @@ public class GatheringService {
         return gathering;
     }
 
+    @Transactional
+    public Gathering getGatheringByAccessKeyForUpdate(String accessKey) {
+        Gathering gathering = gatheringRepository.findByAccessKeyForUpdate(accessKey)
+                .orElseThrow(() -> new CustomException(ErrorCode.GATHERING_NOT_FOUND));
+        gatheringValidator.validateGatheringNotDeleted(gathering);
+        return gathering;
+    }
+
     @Transactional(readOnly = true)
     public GatheringResult.ParticipantCount getGatheringParticipantStatus(String accessKey) {
         Gathering gathering = getGatheringByAccessKey(accessKey);

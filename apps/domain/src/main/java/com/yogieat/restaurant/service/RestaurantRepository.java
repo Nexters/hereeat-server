@@ -24,6 +24,14 @@ public interface RestaurantRepository {
             Collection<Long> categoryIds,
             TimeSlot gatheringTimeSlot
     );
+    default List<Restaurant> findRecommendationCandidates(
+            Region region,
+            Collection<Long> categoryIds,
+            TimeSlot gatheringTimeSlot,
+            Collection<Long> excludedRestaurantIds
+    ) {
+        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot);
+    }
     Optional<Restaurant> findById(Long id);
     List<Restaurant> findByIds(List<Long> ids);
     long countByRegion(Region region);  // 지역별 맛집 수 조회 (신규)

@@ -2,6 +2,9 @@ package com.yogieat.recommend.service;
 
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
+import com.yogieat.recommend.domain.RecommendResult;
+import com.yogieat.recommend.domain.value.RecommendStatus;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -9,6 +12,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class RecommendValidator {
+
+    private final RecommendRerollPolicy recommendRerollPolicy;
 
     /**
      * 과반수 인원 충족 여부 검증
@@ -32,6 +37,39 @@ public class RecommendValidator {
     public void validateNotAlreadyProceeded(boolean alreadyExists) {
         if (alreadyExists) {
             throw new CustomException(ErrorCode.RECOMMEND_ALREADY_PROCEEDED);
+        }
+    }
+
+    /**
+     * 재추천 가능 여부 검증
+     *
+     * @param recommendResults 모임의 추천 결과 목록
+     * @throws CustomException RECOMMEND_RESULT_NOT_FOUND - 추천 결과가 전혀 없는 경우
+     * @throws CustomException RECOMMEND_REROLL_NOT_AVAILABLE - 추천이 완료되지 않은 경우
+     */
+    public void validateRerollAvailable(List<RecommendResult> recommendResults) {
+        if (recommendResults == null || recommendResults.isEmpty()) {
+            throw new CustomException(ErrorCode.RECOMMEND_RESULT_NOT_FOUND);
+        }
+
+        RecommendStatus status = recommendResults.getFirst().status();
+        if (status != RecommendStatus.COMPLETED) {
+            throw new CustomException(ErrorCode.RECOMMEND_REROLL_NOT_AVAILABLE);
+        }
+    }
+
+    /**
+     * 재추천 횟수 제한 검증
+     *
+     * @param rerollCount 현재까지 재추천 이력 수
+     * @throws CustomException RECOMMEND_REROLL_LIMIT_EXCEEDED - 허용 횟수 초과 시
+     */
+    public void validateRerollLimit(long rerollCount) {
+        if (recommendRerollPolicy.isRerollLimitExceeded(rerollCount)) {
+            throw new CustomException(
+                    ErrorCode.RECOMMEND_REROLL_LIMIT_EXCEEDED,
+                    String.format("재추천은 최대 %d회까지 가능합니다", recommendRerollPolicy.maxRerollCount())
+            );
         }
     }
 }

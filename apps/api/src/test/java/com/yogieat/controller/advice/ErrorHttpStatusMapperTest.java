@@ -22,6 +22,8 @@ class ErrorHttpStatusMapperTest {
         assertThat(mapper.toHttpStatus(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH)).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(mapper.toHttpStatus(ErrorCode.METHOD_NOT_ALLOWED)).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
         assertThat(mapper.toHttpStatus(ErrorCode.USER_NOT_FOUND)).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(mapper.toHttpStatus(ErrorCode.RECOMMEND_RESULT_NOT_FOUND)).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(mapper.toHttpStatus(ErrorCode.RECOMMEND_REROLL_LIMIT_EXCEEDED)).isEqualTo(HttpStatus.CONFLICT);
         assertThat(mapper.toHttpStatus(ErrorCode.KAKAO_RATE_LIMIT_EXCEEDED)).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         assertThat(mapper.toHttpStatus(ErrorCode.INTERNAL_SERVER_ERROR)).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
     }

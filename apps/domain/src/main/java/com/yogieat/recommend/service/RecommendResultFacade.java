@@ -11,16 +11,21 @@ import com.yogieat.participant.domain.Participant;
 import com.yogieat.participant.domain.value.DistanceRange;
 import com.yogieat.participant.service.ParticipantAnalyzer;
 import com.yogieat.participant.service.ParticipantService;
+import com.yogieat.recommend.domain.RecommendRerollHistory;
 import com.yogieat.recommend.domain.RecommendResult;
+import com.yogieat.recommend.domain.command.RecommendCommand;
 import com.yogieat.recommend.domain.result.RecommendResultData;
 import com.yogieat.recommend.domain.value.CategoryAggregation;
 import com.yogieat.recommend.domain.value.RecommendStatus;
+import com.yogieat.recommend.domain.value.ScoredRestaurant;
 import com.yogieat.recommend.event.RecommendResultCreatedEvent;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantService;
 import com.yogieat.util.LockManager;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +50,8 @@ public class RecommendResultFacade {
     private final LockManager lockManager;
     private final ApplicationEventPublisher eventPublisher;
     private final RecommendValidator recommendValidator;
+    private final RecommendationProcessor recommendationProcessor;
+    private final RecommendRerollHistoryService recommendRerollHistoryService;
 
     @Transactional(readOnly = true)
     public RecommendResultData.Get getRecommendResults(String accessKey) {
@@ -74,25 +81,31 @@ public class RecommendResultFacade {
         // 7-1. DistanceRange별 집계
         Map<String, Integer> distances = participantAnalyzer.aggregateDistanceRanges(participants);
 
+        Optional<RecommendRerollHistory> latestRerollHistory =
+                recommendRerollHistoryService.findLatestByGatheringId(gathering.id());
+        boolean hasRerollHistory = latestRerollHistory.isPresent();
+        List<RecommendRerollHistory.Result> rerolledResults = latestRerollHistory
+                .map(RecommendRerollHistory::rerolledResults)
+                .orElse(List.of());
+
         // 8. Restaurant 정보와 Category 정보 조회 및 캐싱
-        List<Long> restaurantIds = recommendResults.stream()
-                .map(RecommendResult::restaurantId)
-                .toList();
-        Map<Long, Restaurant> restaurantMap = restaurantService.findByIds(restaurantIds).stream()
-                .collect(Collectors.toMap(Restaurant::id, Function.identity()));
+        List<Long> restaurantIds = resolveRestaurantIds(recommendResults, rerolledResults, hasRerollHistory);
+        Map<Long, Restaurant> restaurantMap = restaurantIds.isEmpty()
+                ? Map.of()
+                : restaurantService.findByIds(restaurantIds).stream()
+                        .collect(Collectors.toMap(Restaurant::id, Function.identity()));
         Map<Long, Category> categoryMap = categoryService.findAll().stream()
                 .collect(Collectors.toMap(Category::id, Function.identity()));
 
         // 9. Result 생성
-        List<RecommendResultData.Ranking> rankings = recommendResults.stream()
-                .map(result -> buildRankingResult(result, restaurantMap, categoryMap, gathering.region()))
-                .toList();
+        List<RecommendResultData.Ranking> rankings = hasRerollHistory
+                ? buildRankingResultsFromRerollHistory(rerolledResults, restaurantMap, categoryMap, gathering.region())
+                : recommendResults.stream()
+                        .map(result -> buildRankingResult(result, restaurantMap, categoryMap, gathering.region()))
+                        .toList();
 
         // 10. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
-        double averageAgreementRate = Math.round(recommendResults.stream()
-                .mapToDouble(RecommendResult::agreementRate)
-                .average()
-                .orElse(0.0) * 100.0) / 100.0;
+        double averageAgreementRate = calculateAverageAgreementRate(recommendResults, rerolledResults, hasRerollHistory);
 
         return RecommendResultData.Get.of(
                 RecommendStatus.COMPLETED,
@@ -105,11 +118,47 @@ public class RecommendResultFacade {
         );
     }
 
+    private List<Long> resolveRestaurantIds(
+            List<RecommendResult> recommendResults,
+            List<RecommendRerollHistory.Result> rerolledResults,
+            boolean hasRerollHistory
+    ) {
+        if (hasRerollHistory) {
+            return rerolledResults.stream()
+                    .map(RecommendRerollHistory.Result::restaurantId)
+                    .toList();
+        }
+
+        return recommendResults.stream()
+                .map(RecommendResult::restaurantId)
+                .toList();
+    }
+
+    private double calculateAverageAgreementRate(
+            List<RecommendResult> recommendResults,
+            List<RecommendRerollHistory.Result> rerolledResults,
+            boolean hasRerollHistory
+    ) {
+        List<Double> agreementRates = hasRerollHistory
+                ? rerolledResults.stream()
+                        .map(RecommendRerollHistory.Result::agreementRate)
+                        .toList()
+                : recommendResults.stream()
+                        .map(RecommendResult::agreementRate)
+                        .toList();
+
+        return Math.round(agreementRates.stream()
+                .filter(rate -> rate != null)
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .orElse(0.0) * 100.0) / 100.0;
+    }
+
     @Transactional
-    public void proceedRecommendation(String accessKey) {
-        lockManager.executeWithLock(accessKey, () -> {
+    public void proceedRecommendation(RecommendCommand.Proceed command) {
+        lockManager.executeWithLock(command.accessKey(), () -> {
             // 1. Gathering 조회 (없음/삭제 시 예외 자동 발생)
-            Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
+            Gathering gathering = gatheringService.getGatheringByAccessKey(command.accessKey());
 
             // 2. 현재 참여자 수 조회
             long currentCount = participantService.countByGatheringId(gathering.id());
@@ -125,10 +174,96 @@ public class RecommendResultFacade {
             recommendResultService.createPendingStatus(gathering.id());
             log.info("Publishing RecommendResultCreatedEvent by majority for gathering: {}", gathering.id());
             eventPublisher.publishEvent(RecommendResultCreatedEvent.of(
-                    this, gathering.id(), gathering.region(), gathering.peopleCount(), accessKey, currentCount
+                    this, gathering.id(), gathering.region(), gathering.peopleCount(), command.accessKey(), currentCount
             ));
             return null;
         });
+    }
+
+    @Transactional
+    public RecommendResultData.Reroll rerollRecommendResults(RecommendCommand.Reroll command) {
+        Gathering gathering = gatheringService.getGatheringByAccessKeyForUpdate(command.accessKey());
+        List<RecommendResult> recommendResults = recommendResultService.findByGatheringId(gathering.id());
+
+        recommendValidator.validateRerollAvailable(recommendResults);
+        recommendValidator.validateRerollLimit(
+                recommendRerollHistoryService.countByGatheringId(gathering.id())
+        );
+
+        List<Long> excludedRestaurantIds = command.restaurantIds() == null
+                ? List.of()
+                : command.restaurantIds().stream()
+                        .filter(id -> id != null && id > 0)
+                        .distinct()
+                        .toList();
+
+        RecommendationCandidateResult candidateResult = recommendationProcessor.calculateRecommendations(
+                gathering.id(),
+                gathering.region(),
+                excludedRestaurantIds
+        );
+
+        RecommendResultData.Reroll rerollResult;
+
+        if (candidateResult.failed() || candidateResult.restaurants().isEmpty()) {
+            rerollResult = RecommendResultData.Reroll.of(List.of());
+        } else {
+            List<Long> restaurantIdsByRank = candidateResult.restaurants().stream()
+                    .map(ScoredRestaurant::restaurant)
+                    .map(Restaurant::id)
+                    .toList();
+            Map<Long, Restaurant> restaurantMap = restaurantService.findByIds(restaurantIdsByRank).stream()
+                    .collect(Collectors.toMap(Restaurant::id, Function.identity()));
+            Map<Long, Category> categoryMap = categoryService.findAll().stream()
+                    .collect(Collectors.toMap(Category::id, Function.identity()));
+
+            rerollResult = RecommendResultData.Reroll.of(
+                    buildRankingResults(candidateResult.restaurants(), restaurantMap, categoryMap, gathering.region())
+            );
+        }
+
+        recommendRerollHistoryService.create(
+                gathering.id(),
+                excludedRestaurantIds,
+                toRerollHistoryResults(candidateResult.restaurants())
+        );
+        return rerollResult;
+    }
+
+    private List<RecommendRerollHistory.Result> toRerollHistoryResults(List<ScoredRestaurant> scoredRestaurants) {
+        if (scoredRestaurants == null || scoredRestaurants.isEmpty()) {
+            return List.of();
+        }
+
+        List<RecommendRerollHistory.Result> results = new ArrayList<>();
+        for (int i = 0; i < scoredRestaurants.size(); i++) {
+            ScoredRestaurant scoredRestaurant = scoredRestaurants.get(i);
+            results.add(RecommendRerollHistory.Result.of(
+                    i + 1,
+                    scoredRestaurant.restaurant().id(),
+                    scoredRestaurant.agreementRate(),
+                    scoredRestaurant.reasonText()
+            ));
+        }
+
+        return List.copyOf(results);
+    }
+
+    private List<RecommendResultData.Ranking> buildRankingResultsFromRerollHistory(
+            List<RecommendRerollHistory.Result> rerolledResults,
+            Map<Long, Restaurant> restaurantMap,
+            Map<Long, Category> categoryMap,
+            Region region
+    ) {
+        return rerolledResults.stream()
+                .map(result -> buildRankingResult(
+                        result.rank(),
+                        result.reasonText(),
+                        restaurantMap.get(result.restaurantId()),
+                        categoryMap,
+                        region
+                ))
+                .toList();
     }
 
     private RecommendResultData.Ranking buildRankingResult(
@@ -137,6 +272,37 @@ public class RecommendResultFacade {
             Map<Long, Category> categoryMap,
             Region region) {
         Restaurant restaurant = restaurantMap.get(result.restaurantId());
+        return buildRankingResult(result.rank(), result.reasonText(), restaurant, categoryMap, region);
+    }
+
+    private List<RecommendResultData.Ranking> buildRankingResults(
+            List<ScoredRestaurant> scoredRestaurants,
+            Map<Long, Restaurant> restaurantMap,
+            Map<Long, Category> categoryMap,
+            Region region
+    ) {
+        List<RecommendResultData.Ranking> rankings = new ArrayList<>();
+        for (int i = 0; i < scoredRestaurants.size(); i++) {
+            ScoredRestaurant scoredRestaurant = scoredRestaurants.get(i);
+            Restaurant restaurant = restaurantMap.get(scoredRestaurant.restaurant().id());
+            rankings.add(buildRankingResult(
+                    i + 1,
+                    scoredRestaurant.reasonText(),
+                    restaurant,
+                    categoryMap,
+                    region
+            ));
+        }
+        return List.copyOf(rankings);
+    }
+
+    private RecommendResultData.Ranking buildRankingResult(
+            Integer rank,
+            String reasonText,
+            Restaurant restaurant,
+            Map<Long, Category> categoryMap,
+            Region region
+    ) {
         if (restaurant == null) {
             throw new CustomException(ErrorCode.RESTAURANT_NOT_FOUND);
         }
@@ -150,7 +316,7 @@ public class RecommendResultFacade {
                 participantAnalyzer.determineMajorityDistanceRange(restaurant.location(), region);
 
         return RecommendResultData.Ranking.of(
-                result.rank(),
+                rank,
                 restaurant.id(),
                 restaurant.name(),
                 restaurant.address(),
@@ -173,7 +339,7 @@ public class RecommendResultFacade {
                 restaurant.aiMateSummaryTitle(),
                 restaurant.aiMateSummaryContents(),
                 // 추천 근거 텍스트
-                result.reasonText()
+                reasonText
         );
     }
 }

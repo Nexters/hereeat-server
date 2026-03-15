@@ -86,6 +86,17 @@ public record RecommendResultData() {
     }
 
     /**
+     * 재추천 결과 응답 Result
+     */
+    public record Reroll(
+            List<Ranking> list
+    ) {
+        public static Reroll of(List<Ranking> list) {
+            return new Reroll(list == null ? List.of() : List.copyOf(list));
+        }
+    }
+
+    /**
      * 추천 결과 랭킹 정보
      */
     public record Ranking(
