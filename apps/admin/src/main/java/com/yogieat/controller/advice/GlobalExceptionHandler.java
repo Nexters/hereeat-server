@@ -131,7 +131,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ErrorCode errorCode = e.getErrorCode();
         HttpStatus status = errorHttpStatusMapper.toHttpStatus(errorCode);
         ErrorResponse errorResponse =
-                ErrorResponse.of(errorCode.getCode(), errorCode.getMessage());
+                ErrorResponse.of(errorCode.getCode(), e.getMessage());
         GlobalApiResponse response =
                 GlobalApiResponse.fail(status.value(), errorResponse);
 
@@ -153,7 +153,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 ErrorCode errorCode = customException.getErrorCode();
                 HttpStatus statusMapped = errorHttpStatusMapper.toHttpStatus(errorCode);
                 ErrorResponse errorResponse =
-                        ErrorResponse.of(errorCode.getCode(), errorCode.getMessage());
+                        ErrorResponse.of(errorCode.getCode(), customException.getMessage());
                 GlobalApiResponse response =
                         GlobalApiResponse.fail(statusMapped.value(), errorResponse);
                 return ResponseEntity.status(statusMapped).body(response);

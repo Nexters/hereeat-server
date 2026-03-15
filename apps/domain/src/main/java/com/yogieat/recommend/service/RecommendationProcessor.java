@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -77,63 +78,19 @@ public class RecommendationProcessor {
                 recommendResultRepository.deleteByGatheringId(gatheringId);
             }
 
-            // 2. Gathering 조회 (TimeSlot 필터링용)
-            Gathering gathering = gatheringRepository.findById(gatheringId).orElse(null);
-            TimeSlot gatheringTimeSlot = gathering != null ? gathering.timeSlot() : null;
+            RecommendationCandidateResult candidateResult =
+                    calculateRecommendations(gatheringId, region, List.of());
 
-            // 3. 참여자 조회
-            List<Participant> participants = participantRepository.findByGatheringId(gatheringId);
-            if (participants.isEmpty()) {
-                saveFailedResult(gatheringId, FailureReason.NO_PARTICIPANTS, "No participants found");
+            if (candidateResult.failed()) {
+                saveFailedResult(
+                        gatheringId,
+                        candidateResult.failureReason(),
+                        candidateResult.failureMessage()
+                );
                 return;
             }
 
-            // 4. 참여자 입력 기반 추천 컨텍스트 생성
-            RecommendationParticipantContext participantContext =
-                    recommendationContextFactory.create(participants, SCORING_POLICY);
-
-            // 5. Category 조회 및 캐싱 (Spring Cache 적용)
-            Map<Long, Category> categoryMap = categoryService.findAll().stream()
-                    .collect(Collectors.toMap(Category::id, category -> category));
-
-            // 6. 불호 우세 카테고리를 제외한 대상 카테고리 산출
-            Set<Long> candidateCategoryIds = buildCandidateCategoryIds(
-                    categoryMap,
-                    participantContext.categoryVoteSummary().excludedCategories()
-            );
-            if (candidateCategoryIds.isEmpty()) {
-                saveFailedResult(gatheringId, FailureReason.NO_RESTAURANTS,
-                                 "No candidate categories available after preference/dislike filtering");
-                return;
-            }
-
-            // 7. Restaurant 조회 (지역 + 카테고리 + TimeSlot 사전 필터링)
-            List<Restaurant> restaurants = restaurantRepository.findRecommendationCandidates(
-                    region,
-                    candidateCategoryIds,
-                    gatheringTimeSlot
-            );
-            if (restaurants.isEmpty()) {
-                saveFailedResult(gatheringId, FailureReason.NO_RESTAURANTS,
-                                 "No restaurants found in region: " + region);
-                return;
-            }
-
-            // 8. Region별 중심 좌표
-            GeoJson.Point centerPoint = region.getCoordinatesStandard();
-
-            // 9. 다단계 Fallback으로 Top 3 레스토랑 추천 (TimeSlot 필터링 포함)
-            List<ScoredRestaurant> top3 = findTopRestaurantsWithFallback(
-                restaurants, categoryMap, participantContext,
-                participants, centerPoint,
-                gatheringTimeSlot
-            );
-
-            if (top3.isEmpty()) {
-                saveFailedResult(gatheringId, FailureReason.NO_RESTAURANTS,
-                                 "No suitable restaurants found after filtering");
-                return;
-            }
+            List<ScoredRestaurant> top3 = candidateResult.restaurants();
 
             log.info("Top 3 restaurants: {}", top3.stream()
                     .map(sr -> String.format("%s(%.2f%%)", sr.restaurant().name(), sr.agreementRate()))
@@ -171,6 +128,95 @@ public class RecommendationProcessor {
         }
     }
 
+    @Transactional
+    public RecommendationCandidateResult calculateRecommendations(
+            Long gatheringId,
+            Region region,
+            List<Long> excludedRestaurantIds
+    ) {
+        Gathering gathering = gatheringRepository.findById(gatheringId).orElse(null);
+        TimeSlot gatheringTimeSlot = gathering != null ? gathering.timeSlot() : null;
+
+        List<Participant> participants = participantRepository.findByGatheringId(gatheringId);
+        if (participants.isEmpty()) {
+            return RecommendationCandidateResult.failure(
+                    FailureReason.NO_PARTICIPANTS,
+                    "No participants found"
+            );
+        }
+
+        RecommendationParticipantContext participantContext =
+                recommendationContextFactory.create(participants, SCORING_POLICY);
+
+        Map<Long, Category> categoryMap = categoryService.findAll().stream()
+                .collect(Collectors.toMap(Category::id, category -> category));
+
+        Set<Long> candidateCategoryIds = buildCandidateCategoryIds(
+                categoryMap,
+                participantContext.categoryVoteSummary().excludedCategories()
+        );
+        if (candidateCategoryIds.isEmpty()) {
+            return RecommendationCandidateResult.failure(
+                    FailureReason.NO_RESTAURANTS,
+                    "No candidate categories available after preference/dislike filtering"
+            );
+        }
+
+        List<Restaurant> restaurants = findRecommendationCandidates(
+                region,
+                candidateCategoryIds,
+                gatheringTimeSlot,
+                excludedRestaurantIds
+        );
+        if (restaurants.isEmpty()) {
+            return RecommendationCandidateResult.failure(
+                    FailureReason.NO_RESTAURANTS,
+                    "No restaurants found in region: " + region
+            );
+        }
+
+        GeoJson.Point centerPoint = region.getCoordinatesStandard();
+
+        List<ScoredRestaurant> top3 = findTopRestaurantsWithFallback(
+                restaurants,
+                categoryMap,
+                participantContext,
+                participants,
+                centerPoint,
+                gatheringTimeSlot
+        );
+        if (top3.isEmpty()) {
+            return RecommendationCandidateResult.failure(
+                    FailureReason.NO_RESTAURANTS,
+                    "No suitable restaurants found after filtering"
+            );
+        }
+
+        return RecommendationCandidateResult.success(top3);
+    }
+
+    private List<Restaurant> findRecommendationCandidates(
+            Region region,
+            Set<Long> candidateCategoryIds,
+            TimeSlot gatheringTimeSlot,
+            List<Long> excludedRestaurantIds
+    ) {
+        if (excludedRestaurantIds == null || excludedRestaurantIds.isEmpty()) {
+            return restaurantRepository.findRecommendationCandidates(
+                    region,
+                    candidateCategoryIds,
+                    gatheringTimeSlot
+            );
+        }
+
+        return restaurantRepository.findRecommendationCandidates(
+                region,
+                candidateCategoryIds,
+                gatheringTimeSlot,
+                excludedRestaurantIds
+        );
+    }
+
     private Set<Long> buildCandidateCategoryIds(
             Map<Long, Category> categoryMap,
             Set<String> excludedLargeCategories
@@ -182,7 +228,7 @@ public class RecommendationProcessor {
         if (excludedLargeCategories == null || excludedLargeCategories.isEmpty()) {
             return categoryMap.values().stream()
                     .map(Category::id)
-                    .filter(id -> id != null)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
         }
 

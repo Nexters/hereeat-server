@@ -1,10 +1,13 @@
 package com.yogieat.controller.v1.recommend;
 
 import com.yogieat.controller.v1.recommend.request.ProceedRecommendationRequest;
+import com.yogieat.controller.v1.recommend.request.RerollRecommendResultRequest;
 import com.yogieat.controller.v1.recommend.response.GetRecommendResultResponse;
+import com.yogieat.controller.v1.recommend.response.RerollRecommendResultResponse;
 import com.yogieat.recommend.service.RecommendResultFacade;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,6 +38,16 @@ public class RecommendResultController {
     public void proceedRecommendation(
             @RequestBody ProceedRecommendationRequest request
     ) {
-        recommendResultFacade.proceedRecommendation(request.accessKey());
+        recommendResultFacade.proceedRecommendation(request.toCommand());
+    }
+
+    @Operation(summary = "추천 결과 재추천", description = "제외할 맛집을 전달해 새로운 추천 후보를 조회합니다.")
+    @PostMapping("/reroll")
+    public RerollRecommendResultResponse rerollRecommendResults(
+            @RequestBody @Valid RerollRecommendResultRequest request
+    ) {
+        return RerollRecommendResultResponse.from(
+                recommendResultFacade.rerollRecommendResults(request.toCommand())
+        );
     }
 }

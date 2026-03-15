@@ -294,6 +294,74 @@ class RecommendationProcessorTest {
     }
 
     @Test
+    @DisplayName("재추천 계산 시 제외한 맛집 ID는 후보 조회 단계에서 제외한다")
+    @SuppressWarnings("unchecked")
+    void shouldExcludeRestaurantIdsWhenCalculatingRecommendations() {
+        // given
+        Long gatheringId = 22L;
+        Region region = Region.GANGNAM;
+        Gathering gathering = new Gathering(
+                gatheringId,
+                "access-key",
+                "저녁 모임",
+                null,
+                TimeSlot.DINNER,
+                region,
+                4,
+                null,
+                LocalDateTime.now(),
+                LocalDateTime.now()
+        );
+
+        List<Participant> participants = List.of(
+                participant(1L, gatheringId, DistanceRange.ANY, "한식", null),
+                participant(2L, gatheringId, DistanceRange.ANY, "한식", null),
+                participant(3L, gatheringId, DistanceRange.ANY, "한식", null),
+                participant(4L, gatheringId, DistanceRange.ANY, "한식", null)
+        );
+
+        List<Category> categories = List.of(
+                category(1L, LargeCategory.KOREAN)
+        );
+
+        List<Long> excludedRestaurantIds = List.of(101L, 102L);
+        List<Restaurant> rerollCandidates = List.of(
+                restaurant(103L, 1L, "한식C", 4.7, point(127.0276, 37.4979), 20),
+                restaurant(104L, 1L, "한식D", 4.6, point(127.0277, 37.4978), 18),
+                restaurant(105L, 1L, "한식E", 4.5, point(127.0278, 37.4977), 16)
+        );
+
+        when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.of(gathering));
+        when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
+        when(categoryService.findAll()).thenReturn(categories);
+        when(restaurantRepository.findRecommendationCandidates(
+                eq(region),
+                anyCollection(),
+                eq(TimeSlot.DINNER),
+                eq(excludedRestaurantIds)
+        )).thenReturn(rerollCandidates);
+
+        // when
+        RecommendationCandidateResult result = recommendationProcessor.calculateRecommendations(
+                gatheringId,
+                region,
+                excludedRestaurantIds
+        );
+
+        // then
+        assertThat(result.failed()).isFalse();
+        assertThat(result.restaurants())
+                .extracting(scored -> scored.restaurant().id())
+                .containsExactly(103L, 104L, 105L);
+        verify(restaurantRepository).findRecommendationCandidates(
+                eq(region),
+                anyCollection(),
+                eq(TimeSlot.DINNER),
+                eq(excludedRestaurantIds)
+        );
+    }
+
+    @Test
     @DisplayName("불호 0표 선호 카테고리 후보가 Top3 이상이면 해당 카테고리만 추천한다")
     @SuppressWarnings("unchecked")
     void shouldRecommendOnlyStrictCategoryWhenStrictCandidatesAreEnough() {

@@ -32,12 +32,15 @@ public class ErrorHttpStatusMapper {
                  CATEGORY_NOT_FOUND,
                  RESTAURANT_NOT_FOUND,
                  SYNC_JOB_NOT_FOUND,
-                 GATHERING_NOT_FOUND -> HttpStatus.NOT_FOUND;
+                 GATHERING_NOT_FOUND,
+                 RECOMMEND_RESULT_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case GEMINI_API_ERROR,
                  KAKAO_API_ERROR -> HttpStatus.SERVICE_UNAVAILABLE;
             case DUPLICATE_NICKNAME,
                  SYNC_JOB_CONFLICT,
-                 RECOMMEND_ALREADY_PROCEEDED -> HttpStatus.CONFLICT;
+                 RECOMMEND_ALREADY_PROCEEDED,
+                 RECOMMEND_REROLL_NOT_AVAILABLE,
+                 RECOMMEND_REROLL_LIMIT_EXCEEDED -> HttpStatus.CONFLICT;
             case KAKAO_RATE_LIMIT_EXCEEDED -> HttpStatus.TOO_MANY_REQUESTS;
             case LOCK_TIMEOUT -> HttpStatus.REQUEST_TIMEOUT;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
