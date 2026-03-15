@@ -1,31 +1,23 @@
 package com.yogieat.config.async;
 
 import com.yogieat.controller.advice.ErrorHttpStatusMapper;
-import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+/**
+ * 비동기 예외 처리 설정.
+ *
+ * <p>{@code spring.threads.virtual.enabled=true}에 의해 Virtual Thread가
+ * 자동 적용되므로, Executor 설정 없이 예외 핸들러만 등록합니다.</p>
+ */
 @Configuration
 @EnableAsync
 @RequiredArgsConstructor
 public class AsyncConfig implements AsyncConfigurer {
     private final ErrorHttpStatusMapper errorHttpStatusMapper;
-
-    @Override
-    public Executor getAsyncExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(20);
-        executor.setMaxPoolSize(50);
-        executor.setQueueCapacity(10000);
-        executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(10);
-        executor.initialize();
-        return executor;
-    }
 
     @Override
     public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {

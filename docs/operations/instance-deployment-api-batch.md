@@ -1,5 +1,7 @@
 # API + Admin + Batch 인스턴스 배포/운영 가이드
 
+> 최종 업데이트: 2026-03-09
+
 ## 1. 결론 요약
 - `batch:sync`는 API와 **별도 애플리케이션 프로세스**로 실행해야 한다.
 - 운영 배포는 `DEPLOY_SCOPE=app` 기준으로 **API/Admin/BATCH만 재배포**한다.

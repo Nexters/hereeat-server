@@ -63,6 +63,9 @@ class RecommendationProcessorTest {
     private GatheringRepository gatheringRepository;
 
     @Spy
+    private RecommendationScoringPolicy scoringPolicy = RecommendationScoringPolicy.defaults();
+
+    @Spy
     private RecommendationContextFactory recommendationContextFactory;
 
     @Spy

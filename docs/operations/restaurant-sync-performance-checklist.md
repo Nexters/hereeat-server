@@ -1,5 +1,7 @@
 # Restaurant Sync 성능 검증 체크리스트
 
+> 최종 업데이트: 2026-03-09
+
 ## 1. 목적
 - Restaurant Sync DB 최적화(`IN` 조회 + JDBC batch update) 적용 전/후 성능을 동일 조건으로 비교한다.
 - 목표:
