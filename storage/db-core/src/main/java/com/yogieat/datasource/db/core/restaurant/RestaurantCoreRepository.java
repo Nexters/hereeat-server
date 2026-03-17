@@ -86,6 +86,16 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             Collection<Long> categoryIds,
             TimeSlot gatheringTimeSlot
     ) {
+        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, List.of());
+    }
+
+    @Override
+    public List<Restaurant> findRecommendationCandidates(
+            Region region,
+            Collection<Long> categoryIds,
+            TimeSlot gatheringTimeSlot,
+            Collection<Long> excludedRestaurantIds
+    ) {
         if (categoryIds == null || categoryIds.isEmpty()) {
             return List.of();
         }
@@ -111,7 +121,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.deletedAt.isNull(),
                         restaurantEntity.region.eq(region),
                         restaurantEntity.categoryId.in(categoryIds),
-                        recommendationTimeSlotCondition(gatheringTimeSlot)
+                        recommendationTimeSlotCondition(gatheringTimeSlot),
+                        excludedRestaurantIdsCondition(excludedRestaurantIds)
                 )
                 .fetch()
                 .stream()
@@ -347,6 +358,14 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         return restaurantEntity.timeSlot.isNull()
                 .or(restaurantEntity.timeSlot.eq(TimeSlot.BOTH))
                 .or(restaurantEntity.timeSlot.eq(gatheringTimeSlot));
+    }
+
+    private BooleanExpression excludedRestaurantIdsCondition(Collection<Long> excludedRestaurantIds) {
+        if (excludedRestaurantIds == null || excludedRestaurantIds.isEmpty()) {
+            return null;
+        }
+
+        return restaurantEntity.id.notIn(excludedRestaurantIds);
     }
 
     private Restaurant toRecommendationCandidate(Tuple tuple) {

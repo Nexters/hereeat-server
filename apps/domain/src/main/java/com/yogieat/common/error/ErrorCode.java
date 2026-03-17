@@ -60,6 +60,9 @@ public enum ErrorCode {
     INVALID_CATEGORY_AGGREGATION("REC001", "카테고리 집계 데이터가 올바르지 않습니다"),
     INVALID_PREFERENCE_SCORE("REC002", "선호도 점수 상태가 올바르지 않습니다"),
     RECOMMEND_ALREADY_PROCEEDED("REC003", "이미 추천이 진행 중이거나 완료되었습니다"),
+    RECOMMEND_RESULT_NOT_FOUND("REC004", "해당 모임의 추천 결과를 찾을 수 없습니다"),
+    RECOMMEND_REROLL_NOT_AVAILABLE("REC005", "추천이 완료된 모임만 재추천할 수 있습니다"),
+    RECOMMEND_REROLL_LIMIT_EXCEEDED("REC006", "재추천 가능 횟수를 초과했습니다"),
 
     // Admin
     ADMIN_NOT_FOUND("A001", "해당 관리자를 찾을 수 없습니다"),

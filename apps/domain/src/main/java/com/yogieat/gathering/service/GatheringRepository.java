@@ -8,6 +8,7 @@ import java.util.Optional;
 public interface GatheringRepository {
     Optional<Gathering> findById(Long id);
     Optional<Gathering> findByAccessKey(String accessKey);
+    Optional<Gathering> findByAccessKeyForUpdate(String accessKey);
     Gathering save(Gathering gathering);
 
     List<Gathering> findAdminGatherings(

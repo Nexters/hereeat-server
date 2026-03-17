@@ -37,6 +37,12 @@ public class GatheringCoreRepository implements GatheringRepository {
     }
 
     @Override
+    public Optional<Gathering> findByAccessKeyForUpdate(String accessKey) {
+        return gatheringJpaRepository.findByAccessKeyForUpdate(accessKey)
+                .map(GatheringEntity::toDomain);
+    }
+
+    @Override
     public Gathering save(Gathering gathering) {
         GatheringEntity entity = GatheringEntity.from(gathering);
         GatheringEntity savedEntity = gatheringJpaRepository.save(entity);

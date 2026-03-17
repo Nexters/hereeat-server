@@ -19,6 +19,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -66,9 +72,7 @@ public class RestaurantCollectionProcessor {
         .collect(Collectors.toMap(Region::getName, Function.identity()));
 
     private static final int RESTAURANTS_PER_REQUEST = 10;
-    private static final long RATE_LIMIT_DELAY_MS = 5000; // Gemini API rate limit을 위한 지연 시간 (5초)
-    private static final int LOCATION_CATEGORY_BATCH_SIZE = 5; // 한 번에 처리할 location-category 조합 개수
-    private static final long BATCH_DELAY_MS = 15000; // 배치 간 휴식 시간 (15초)
+    private static final int KAKAO_COLLECTION_CONCURRENT_PERMITS = 3;
     private static final int MIN_REVIEW_COUNT = 30;
 
     /**
@@ -86,11 +90,13 @@ public class RestaurantCollectionProcessor {
         Region.JAMSIL, 50,
         Region.SAMGAKJI, 50
     );
-    private static final int DEFAULT_REGION_LIMIT = 50;  // 기본 제한
+    private static final int DEFAULT_REGION_LIMIT = 50;
+
+    private final Semaphore kakaoApiSemaphore = new Semaphore(KAKAO_COLLECTION_CONCURRENT_PERMITS);
 
     public void collectAllRegions() {
         try {
-            Map<Region, Long> regionCounts = loadRegionCounts();
+            ConcurrentHashMap<Region, Long> regionCounts = new ConcurrentHashMap<>(loadRegionCounts());
             List<String> locationsToCollect = filterLocationsNeedingCollection(regionCounts);
 
             if (locationsToCollect.isEmpty()) {
@@ -105,24 +111,17 @@ public class RestaurantCollectionProcessor {
             Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
                 geminiClient.generateRestaurantsBatch(locationsToCollect, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
 
-            int totalProcessed = 0;
-            int totalSuccess = 0;
-            int totalFailed = 0;
+            AtomicInteger totalProcessed = new AtomicInteger(0);
+            AtomicInteger totalSuccess = new AtomicInteger(0);
+            AtomicInteger totalFailed = new AtomicInteger(0);
 
-            List<Map.Entry<LocationCategoryKey, List<SuggestionRestaurant>>> entries =
-                new ArrayList<>(allSuggestions.entrySet());
+            log.info("Processing {} location-category combinations with virtual threads",
+                    allSuggestions.size());
 
-            for (int i = 0; i < entries.size(); i += LOCATION_CATEGORY_BATCH_SIZE) {
-                int endIndex = Math.min(i + LOCATION_CATEGORY_BATCH_SIZE, entries.size());
-                List<Map.Entry<LocationCategoryKey, List<SuggestionRestaurant>>> batch =
-                    entries.subList(i, endIndex);
+            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                List<Future<Void>> futures = new ArrayList<>();
 
-                log.info("Processing batch {}/{}: {} location-category combinations",
-                    (i / LOCATION_CATEGORY_BATCH_SIZE) + 1,
-                    (entries.size() + LOCATION_CATEGORY_BATCH_SIZE - 1) / LOCATION_CATEGORY_BATCH_SIZE,
-                    batch.size());
-
-                for (Map.Entry<LocationCategoryKey, List<SuggestionRestaurant>> entry : batch) {
+                for (Map.Entry<LocationCategoryKey, List<SuggestionRestaurant>> entry : allSuggestions.entrySet()) {
                     LocationCategoryKey key = entry.getKey();
                     List<SuggestionRestaurant> suggestions = entry.getValue();
 
@@ -131,31 +130,37 @@ public class RestaurantCollectionProcessor {
                         continue;
                     }
 
-                    try {
-                        int processed = processRestaurantsForLocation(key.location(), key.category(), suggestions);
-                        totalProcessed += processed;
-                        if (processed > 0) {
-                            regionCounts.compute(region, (r, count) -> count == null ? (long) processed : count + processed);
+                    futures.add(executor.submit(() -> {
+                        try {
+                            int processed = processRestaurantsForLocation(key.location(), key.category(), suggestions);
+                            totalProcessed.addAndGet(processed);
+                            if (processed > 0) {
+                                regionCounts.compute(region, (r, count) -> count == null ? (long) processed : count + processed);
+                            }
+                            totalSuccess.incrementAndGet();
+                        } catch (Exception e) {
+                            log.error("Failed: {} - {}", key.location(), key.category(), e);
+                            totalFailed.incrementAndGet();
                         }
-                        totalSuccess++;
-                    } catch (Exception e) {
-                        log.error("Failed: {} - {}", key.location(), key.category(), e);
-                        totalFailed++;
-                    }
+                        return null;
+                    }));
                 }
 
-                if (endIndex < entries.size()) {
+                for (Future<Void> future : futures) {
                     try {
-                        Thread.sleep(BATCH_DELAY_MS);
+                        future.get();
+                    } catch (ExecutionException e) {
+                        log.error("Unexpected error in collection task", e.getCause());
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
-                        log.warn("Thread interrupted during batch delay", e);
+                        log.warn("Collection interrupted");
+                        break;
                     }
                 }
             }
 
             log.info("Batch completed: {} saved, {} success, {} failed",
-                totalProcessed, totalSuccess, totalFailed);
+                totalProcessed.get(), totalSuccess.get(), totalFailed.get());
 
         } catch (Exception e) {
             log.error("Batch collection failed", e);
@@ -211,6 +216,12 @@ public class RestaurantCollectionProcessor {
         return processRestaurantsForLocation(location, category, suggestions);
     }
 
+    /**
+     * Virtual Thread + Semaphore 기반 병렬 맛집 수집.
+     *
+     * <p>각 suggestion을 별도 virtual thread에서 처리하되,
+     * Kakao API 호출은 Semaphore({@value KAKAO_COLLECTION_CONCURRENT_PERMITS} permits)로 동시성을 제어합니다.</p>
+     */
     public int processRestaurantsForLocation(
         String location,
         String category,
@@ -220,59 +231,92 @@ public class RestaurantCollectionProcessor {
         RestaurantValidator.ValidationContext validationContext =
                 restaurantCollectionWriteService.prepareValidationContext(region);
 
-        int savedCount = 0;
-        for (SuggestionRestaurant suggestion : suggestions) {
-            RestaurantEnrichedData enrichedData = enrichRestaurantData(suggestion, location);
-            if (enrichedData.isSkipped()) {
-                continue;
-            }
+        AtomicInteger savedCount = new AtomicInteger(0);
 
-            RestaurantCategoryResolver.CategoryResolution categoryResolution =
-                    RestaurantCategoryResolver.resolveForCollection(
-                            category,
-                            suggestion.largeCategory(),
-                            suggestion.mediumCategory(),
-                            enrichedData.apiLargeCategory(),
-                            enrichedData.apiMediumCategory(),
-                            enrichedData.apiCategoryName2(),
-                            enrichedData.apiCategoryName3()
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Future<Void>> futures = new ArrayList<>();
+
+            for (SuggestionRestaurant suggestion : suggestions) {
+                futures.add(executor.submit(() -> {
+                    processSingleSuggestion(
+                            suggestion, location, category, region, validationContext, savedCount
                     );
-
-            if (categoryResolution == null) {
-                log.info("Skipping restaurant due to unresolved category: {} (requested={}, kakaoName2={}, kakaoName3={})",
-                        suggestion.name(),
-                        category,
-                        enrichedData.apiCategoryName2(),
-                        enrichedData.apiCategoryName3());
-                continue;
+                    return null;
+                }));
             }
 
-            LargeCategory largeCategory = categoryResolution.largeCategory();
-            String mediumCategory = categoryResolution.mediumCategory();
-
-            boolean saved = restaurantCollectionWriteService.persistRestaurant(
-                    suggestion,
-                    region,
-                    largeCategory,
-                    mediumCategory,
-                    enrichedData,
-                    validationContext
-            );
-            if (saved) {
-                savedCount++;
-            }
-
-            try {
-                Thread.sleep(RATE_LIMIT_DELAY_MS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("Thread interrupted during rate limit delay", e);
+            for (Future<Void> future : futures) {
+                try {
+                    future.get();
+                } catch (ExecutionException e) {
+                    log.error("Failed to process suggestion", e.getCause());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
 
-        log.info("Saved {}/{} for {} - {}", savedCount, suggestions.size(), location, category);
+        log.info("Saved {}/{} for {} - {}", savedCount.get(), suggestions.size(), location, category);
+        return savedCount.get();
+    }
 
-        return savedCount;
+    private void processSingleSuggestion(
+            SuggestionRestaurant suggestion,
+            String location,
+            String category,
+            Region region,
+            RestaurantValidator.ValidationContext validationContext,
+            AtomicInteger savedCount
+    ) {
+        RestaurantEnrichedData enrichedData;
+        try {
+            kakaoApiSemaphore.acquire();
+            try {
+                enrichedData = enrichRestaurantData(suggestion, location);
+            } finally {
+                kakaoApiSemaphore.release();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+
+        if (enrichedData.isSkipped()) {
+            return;
+        }
+
+        RestaurantCategoryResolver.CategoryResolution categoryResolution =
+                RestaurantCategoryResolver.resolveForCollection(
+                        category,
+                        suggestion.largeCategory(),
+                        suggestion.mediumCategory(),
+                        enrichedData.apiLargeCategory(),
+                        enrichedData.apiMediumCategory(),
+                        enrichedData.apiCategoryName2(),
+                        enrichedData.apiCategoryName3()
+                );
+
+        if (categoryResolution == null) {
+            log.info("Skipping restaurant due to unresolved category: {} (requested={}, kakaoName2={}, kakaoName3={})",
+                    suggestion.name(),
+                    category,
+                    enrichedData.apiCategoryName2(),
+                    enrichedData.apiCategoryName3());
+            return;
+        }
+
+        boolean saved = restaurantCollectionWriteService.persistRestaurant(
+                suggestion,
+                region,
+                categoryResolution.largeCategory(),
+                categoryResolution.mediumCategory(),
+                enrichedData,
+                validationContext
+        );
+        if (saved) {
+            savedCount.incrementAndGet();
+        }
     }
 
     private Region getRegionFromLocationName(String locationName) {
