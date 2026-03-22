@@ -5,15 +5,11 @@ import com.yogieat.common.error.ErrorCode;
 import com.yogieat.recommend.domain.RecommendResult;
 import com.yogieat.recommend.domain.value.RecommendStatus;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /** 추천 관련 검증 컴포넌트 */
 @Component
-@RequiredArgsConstructor
 public class RecommendValidator {
-
-    private final RecommendRerollPolicy recommendRerollPolicy;
 
     /**
      * 과반수 인원 충족 여부 검증
@@ -55,21 +51,6 @@ public class RecommendValidator {
         RecommendStatus status = recommendResults.getFirst().status();
         if (status != RecommendStatus.COMPLETED) {
             throw new CustomException(ErrorCode.RECOMMEND_REROLL_NOT_AVAILABLE);
-        }
-    }
-
-    /**
-     * 재추천 횟수 제한 검증
-     *
-     * @param rerollCount 현재까지 재추천 이력 수
-     * @throws CustomException RECOMMEND_REROLL_LIMIT_EXCEEDED - 허용 횟수 초과 시
-     */
-    public void validateRerollLimit(long rerollCount) {
-        if (recommendRerollPolicy.isRerollLimitExceeded(rerollCount)) {
-            throw new CustomException(
-                    ErrorCode.RECOMMEND_REROLL_LIMIT_EXCEEDED,
-                    String.format("재추천은 최대 %d회까지 가능합니다", recommendRerollPolicy.maxRerollCount())
-            );
         }
     }
 }

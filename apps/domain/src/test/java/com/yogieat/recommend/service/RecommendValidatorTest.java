@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 class RecommendValidatorTest {
 
-    private final RecommendValidator recommendValidator = new RecommendValidator(new RecommendRerollPolicy());
+    private final RecommendValidator recommendValidator = new RecommendValidator();
 
     @Test
     @DisplayName("완료된 추천 결과가 있으면 재추천 검증을 통과한다")
@@ -44,20 +44,5 @@ class RecommendValidatorTest {
         assertThatThrownBy(() -> recommendValidator.validateRerollAvailable(recommendResults))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.RECOMMEND_REROLL_NOT_AVAILABLE);
-    }
-
-    @Test
-    @DisplayName("재추천 이력이 이미 1회 있으면 RECOMMEND_REROLL_LIMIT_EXCEEDED 예외가 발생한다")
-    void validateRerollLimit_WhenLimitExceeded_ShouldThrowConflict() {
-        assertThatThrownBy(() -> recommendValidator.validateRerollLimit(1L))
-                .isInstanceOf(CustomException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.RECOMMEND_REROLL_LIMIT_EXCEEDED);
-    }
-
-    @Test
-    @DisplayName("재추천 이력이 없으면 재추천 횟수 제한 검증을 통과한다")
-    void validateRerollLimit_WhenWithinLimit_ShouldPass() {
-        assertThatCode(() -> recommendValidator.validateRerollLimit(0L))
-                .doesNotThrowAnyException();
     }
 }
