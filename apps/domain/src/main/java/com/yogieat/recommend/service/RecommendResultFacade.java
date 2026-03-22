@@ -25,7 +25,6 @@ import com.yogieat.util.LockManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -81,31 +80,22 @@ public class RecommendResultFacade {
         // 7-1. DistanceRange별 집계
         Map<String, Integer> distances = participantAnalyzer.aggregateDistanceRanges(participants);
 
-        Optional<RecommendRerollHistory> latestRerollHistory =
-                recommendRerollHistoryService.findLatestByGatheringId(gathering.id());
-        boolean hasRerollHistory = latestRerollHistory.isPresent();
-        List<RecommendRerollHistory.Result> rerolledResults = latestRerollHistory
-                .map(RecommendRerollHistory::rerolledResults)
-                .orElse(List.of());
-
         // 8. Restaurant 정보와 Category 정보 조회 및 캐싱
-        List<Long> restaurantIds = resolveRestaurantIds(recommendResults, rerolledResults, hasRerollHistory);
-        Map<Long, Restaurant> restaurantMap = restaurantIds.isEmpty()
-                ? Map.of()
-                : restaurantService.findByIds(restaurantIds).stream()
-                        .collect(Collectors.toMap(Restaurant::id, Function.identity()));
+        List<Long> restaurantIds = recommendResults.stream()
+                .map(RecommendResult::restaurantId)
+                .toList();
+        Map<Long, Restaurant> restaurantMap = restaurantService.findByIds(restaurantIds).stream()
+                .collect(Collectors.toMap(Restaurant::id, Function.identity()));
         Map<Long, Category> categoryMap = categoryService.findAll().stream()
                 .collect(Collectors.toMap(Category::id, Function.identity()));
 
         // 9. Result 생성
-        List<RecommendResultData.Ranking> rankings = hasRerollHistory
-                ? buildRankingResultsFromRerollHistory(rerolledResults, restaurantMap, categoryMap, gathering.region())
-                : recommendResults.stream()
-                        .map(result -> buildRankingResult(result, restaurantMap, categoryMap, gathering.region()))
-                        .toList();
+        List<RecommendResultData.Ranking> rankings = recommendResults.stream()
+                .map(result -> buildRankingResult(result, restaurantMap, categoryMap, gathering.region()))
+                .toList();
 
         // 10. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
-        double averageAgreementRate = calculateAverageAgreementRate(recommendResults, rerolledResults, hasRerollHistory);
+        double averageAgreementRate = calculateAverageAgreementRate(recommendResults);
 
         return RecommendResultData.Get.of(
                 RecommendStatus.COMPLETED,
@@ -118,36 +108,9 @@ public class RecommendResultFacade {
         );
     }
 
-    private List<Long> resolveRestaurantIds(
-            List<RecommendResult> recommendResults,
-            List<RecommendRerollHistory.Result> rerolledResults,
-            boolean hasRerollHistory
-    ) {
-        if (hasRerollHistory) {
-            return rerolledResults.stream()
-                    .map(RecommendRerollHistory.Result::restaurantId)
-                    .toList();
-        }
-
-        return recommendResults.stream()
-                .map(RecommendResult::restaurantId)
-                .toList();
-    }
-
-    private double calculateAverageAgreementRate(
-            List<RecommendResult> recommendResults,
-            List<RecommendRerollHistory.Result> rerolledResults,
-            boolean hasRerollHistory
-    ) {
-        List<Double> agreementRates = hasRerollHistory
-                ? rerolledResults.stream()
-                        .map(RecommendRerollHistory.Result::agreementRate)
-                        .toList()
-                : recommendResults.stream()
-                        .map(RecommendResult::agreementRate)
-                        .toList();
-
-        return Math.round(agreementRates.stream()
+    private double calculateAverageAgreementRate(List<RecommendResult> recommendResults) {
+        return Math.round(recommendResults.stream()
+                .map(RecommendResult::agreementRate)
                 .filter(rate -> rate != null)
                 .mapToDouble(Double::doubleValue)
                 .average()
@@ -186,9 +149,6 @@ public class RecommendResultFacade {
         List<RecommendResult> recommendResults = recommendResultService.findByGatheringId(gathering.id());
 
         recommendValidator.validateRerollAvailable(recommendResults);
-        recommendValidator.validateRerollLimit(
-                recommendRerollHistoryService.countByGatheringId(gathering.id())
-        );
 
         List<Long> excludedRestaurantIds = command.restaurantIds() == null
                 ? List.of()
@@ -247,23 +207,6 @@ public class RecommendResultFacade {
         }
 
         return List.copyOf(results);
-    }
-
-    private List<RecommendResultData.Ranking> buildRankingResultsFromRerollHistory(
-            List<RecommendRerollHistory.Result> rerolledResults,
-            Map<Long, Restaurant> restaurantMap,
-            Map<Long, Category> categoryMap,
-            Region region
-    ) {
-        return rerolledResults.stream()
-                .map(result -> buildRankingResult(
-                        result.rank(),
-                        result.reasonText(),
-                        restaurantMap.get(result.restaurantId()),
-                        categoryMap,
-                        region
-                ))
-                .toList();
     }
 
     private RecommendResultData.Ranking buildRankingResult(
