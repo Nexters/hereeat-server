@@ -39,7 +39,6 @@ out/
 
 ### AI ###
 .serena
-.claude
 .claude-plugin
 .amazonq
 
