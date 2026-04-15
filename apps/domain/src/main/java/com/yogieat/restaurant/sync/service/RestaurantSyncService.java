@@ -35,11 +35,8 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Conditional(RestaurantSyncServiceCondition.class)
@@ -58,7 +55,6 @@ public class RestaurantSyncService {
     private static final double KAKAO_SYNC_RETRY_JITTER_RATE_DEFAULT = 0.25d;
     private static final long KAKAO_SYNC_CACHE_TTL_MS_DEFAULT = 30_000L;
 
-    private final ObjectProvider<RestaurantSyncService> selfProvider;
     private final RestaurantRepository restaurantRepository;
     private final CategoryService categoryService;
     private final KakaoPlaceClient kakaoPlaceClient;
@@ -80,14 +76,12 @@ public class RestaurantSyncService {
     private final LongAdder kakaoRetryCount = new LongAdder();
 
     public RestaurantSyncService(
-            ObjectProvider<RestaurantSyncService> selfProvider,
             RestaurantRepository restaurantRepository,
             CategoryService categoryService,
             KakaoPlaceClient kakaoPlaceClient,
             KakaoPlaceDetailClient kakaoPlaceDetailClient,
             KakaoPlaceMapper kakaoPlaceMapper
     ) {
-        this.selfProvider = selfProvider;
         this.restaurantRepository = restaurantRepository;
         this.categoryService = categoryService;
         this.kakaoPlaceClient = kakaoPlaceClient;
@@ -101,7 +95,7 @@ public class RestaurantSyncService {
     }
 
     public RestaurantSyncResult syncOne(Long restaurantId) {
-        RestaurantSyncChunkResult chunkResult = syncChunk(List.of(restaurantId), Runnable::run);
+        RestaurantSyncChunkResult chunkResult = syncChunk(List.of(restaurantId), Runnable::run, 1);
 
         if (chunkResult.successCount() == 1) {
             return RestaurantSyncResult.success(restaurantId);
@@ -114,9 +108,14 @@ public class RestaurantSyncService {
     }
 
     public RestaurantSyncChunkResult syncChunk(List<Long> ids, Executor executor) {
+        return syncChunk(ids, executor, ids.size());
+    }
+
+    public RestaurantSyncChunkResult syncChunk(List<Long> ids, Executor executor, int maxParallelism) {
         if (ids.isEmpty()) {
             return RestaurantSyncChunkResult.of(0, 0, 0, List.of());
         }
+        int effectiveParallelism = Math.max(1, maxParallelism);
         long searchCallCountStart = kakaoSearchCallCount.sum();
         long detailCallCountStart = kakaoDetailCallCount.sum();
         long retryCountStart = kakaoRetryCount.sum();
@@ -128,9 +127,13 @@ public class RestaurantSyncService {
         long chunkTargetsLookupMs = (System.nanoTime() - chunkStartAt) / 1_000_000L;
         Map<Long, RestaurantSyncTarget> targetMap = new HashMap<>();
         targets.forEach(target -> targetMap.put(target.id(), target));
+        Semaphore syncTargetSemaphore = new Semaphore(effectiveParallelism);
 
         List<CompletableFuture<SyncExecution>> futures = ids.stream()
-                    .map(id -> CompletableFuture.supplyAsync(() -> syncTarget(id, targetMap.get(id)), executor))
+                    .map(id -> CompletableFuture.supplyAsync(
+                            () -> syncTargetWithParallelismLimit(syncTargetSemaphore, id, targetMap.get(id)),
+                            executor
+                    ))
                     .toList();
 
         List<SyncExecution> executions = futures.stream()
@@ -155,11 +158,7 @@ public class RestaurantSyncService {
             }
         }
 
-        RestaurantSyncService self = this;
-        if (selfProvider != null) {
-            self = Optional.ofNullable(selfProvider.getIfAvailable()).orElse(this);
-        }
-        int persistedSuccessCount = self.persistChunkChanges(patchCommands, deleteIds, errorMessages);
+        int persistedSuccessCount = persistChunkChanges(patchCommands, deleteIds, errorMessages);
         int failedCount = ids.size() - persistedSuccessCount;
 
         long chunkDurationMs = (System.nanoTime() - chunkStartAt) / 1_000_000L;
@@ -194,7 +193,6 @@ public class RestaurantSyncService {
         );
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int persistChunkChanges(
             List<RestaurantSyncPatchCommand> patchCommands,
             List<Long> deleteIds,
@@ -241,6 +239,26 @@ public class RestaurantSyncService {
         }
 
         return successCount;
+    }
+
+    private SyncExecution syncTargetWithParallelismLimit(
+            Semaphore syncTargetSemaphore,
+            Long requestedId,
+            RestaurantSyncTarget target
+    ) {
+        boolean acquired = false;
+        try {
+            syncTargetSemaphore.acquire();
+            acquired = true;
+            return syncTarget(requestedId, target);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return SyncExecution.failed(requestedId, "sync target semaphore interrupted");
+        } finally {
+            if (acquired) {
+                syncTargetSemaphore.release();
+            }
+        }
     }
 
     private SyncExecution syncTarget(Long requestedId, RestaurantSyncTarget target) {
@@ -419,7 +437,10 @@ public class RestaurantSyncService {
                 long baseDelayMs = kakaoSyncRetryBaseDelayMs;
                 long exponentialDelay = baseDelayMs * (1L << (attempt - 1));
                 double jitterRatio = Math.max(0.0d, kakaoSyncRetryJitterRate);
-                double jitterDelta = 1.0d + (ThreadLocalRandom.current().nextDouble(-jitterRatio, jitterRatio));
+                double jitterDelta = 1.0d;
+                if (jitterRatio > 0.0d) {
+                    jitterDelta += ThreadLocalRandom.current().nextDouble(-jitterRatio, jitterRatio);
+                }
                 long delayMs = (long) Math.max(0, Math.round(exponentialDelay * jitterDelta));
 
                 log.warn(
@@ -437,8 +458,10 @@ public class RestaurantSyncService {
     }
 
     private <T> T executeWithSemaphore(Supplier<T> supplier, String operationName) {
+        boolean acquired = false;
         try {
             kakaoApiSemaphore.acquire();
+            acquired = true;
             return supplier.get();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -446,7 +469,9 @@ public class RestaurantSyncService {
         } catch (RuntimeException e) {
             throw e;
         } finally {
-            kakaoApiSemaphore.release();
+            if (acquired) {
+                kakaoApiSemaphore.release();
+            }
         }
     }
 

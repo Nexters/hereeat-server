@@ -8,8 +8,15 @@ import static org.mockito.Mockito.when;
 
 import com.yogieat.batch.sync.config.SyncJobProperties;
 import com.yogieat.restaurant.service.RestaurantRepository;
+import com.yogieat.restaurant.sync.domain.RestaurantSyncChunkResult;
+import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
+import com.yogieat.restaurant.sync.domain.value.RestaurantSyncJobStatus;
+import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
+import com.yogieat.restaurant.sync.domain.value.RestaurantSyncTriggerType;
 import com.yogieat.restaurant.sync.service.RestaurantSyncJobRepository;
 import com.yogieat.restaurant.sync.service.RestaurantSyncService;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import org.junit.jupiter.api.Test;
@@ -50,5 +57,41 @@ class RestaurantSyncJobWorkerTest {
         verify(syncJobRepository).failStaleRunningJobs(any(), eq("stale RUNNING job recovered by worker"));
         verify(syncJobRepository).claimNextPendingJob();
         verify(syncJobRepository, never()).markFailed(any(), any());
+    }
+
+    @Test
+    void pollPendingJob_shouldUseConfiguredParallelismForAllJob() {
+        RestaurantSyncJob job = new RestaurantSyncJob(
+                10L,
+                RestaurantSyncScope.ALL,
+                RestaurantSyncTriggerType.MANUAL,
+                null,
+                RestaurantSyncJobStatus.RUNNING,
+                50,
+                3,
+                null,
+                0L,
+                0L,
+                0L,
+                0L,
+                null,
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now(),
+                LocalDateTime.now()
+        );
+        when(syncJobProperties.resolvedStaleRunningThresholdMinutes()).thenReturn(60L);
+        when(syncJobProperties.resolvedChunkSize()).thenReturn(50);
+        when(syncJobRepository.claimNextPendingJob()).thenReturn(Optional.of(job));
+        when(restaurantRepository.countActiveRestaurants()).thenReturn(1L);
+        when(restaurantRepository.findActiveRestaurantIdsAfter(null, 50)).thenReturn(List.of(1L));
+        when(restaurantRepository.findActiveRestaurantIdsAfter(1L, 50)).thenReturn(List.of());
+        when(restaurantSyncService.syncChunk(eq(List.of(1L)), eq(syncJobExecutor), eq(3)))
+                .thenReturn(RestaurantSyncChunkResult.of(1, 1, 0, List.of()));
+
+        worker.pollPendingJob();
+
+        verify(restaurantSyncService).syncChunk(eq(List.of(1L)), eq(syncJobExecutor), eq(3));
+        verify(syncJobRepository).markSuccess(10L);
     }
 }
