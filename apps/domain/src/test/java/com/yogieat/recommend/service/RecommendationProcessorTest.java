@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.yogieat.category.domain.Category;
@@ -22,23 +22,22 @@ import com.yogieat.participant.domain.value.DistanceRange;
 import com.yogieat.participant.domain.value.Role;
 import com.yogieat.participant.service.ParticipantRepository;
 import com.yogieat.recommend.domain.RecommendResult;
+import com.yogieat.recommend.domain.RecommendResultFailed;
 import com.yogieat.recommend.service.strategy.CategoryQuotaSelectionStrategy;
-import com.yogieat.recommend.service.strategy.RecommendationSelectionStrategy;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantRepository;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,23 +61,44 @@ class RecommendationProcessorTest {
     @Mock
     private GatheringRepository gatheringRepository;
 
-    @Spy
-    private RecommendationScoringPolicy scoringPolicy = RecommendationScoringPolicy.defaults();
-
-    @Spy
-    private RecommendationContextFactory recommendationContextFactory;
-
-    @Spy
-    private RecommendationSelectionStrategy recommendationSelectionStrategy = new CategoryQuotaSelectionStrategy();
-
-    @InjectMocks
     private RecommendationProcessor recommendationProcessor;
+    private List<List<RecommendResult>> savedRecommendationBatches;
+    private Collection<Long> capturedCandidateCategoryIds;
+    private TimeSlot capturedCandidateTimeSlot;
+    private Collection<Long> capturedExcludedRestaurantIds;
+
+    @BeforeEach
+    void setUp() {
+        savedRecommendationBatches = new ArrayList<>();
+        capturedCandidateCategoryIds = List.of();
+        capturedCandidateTimeSlot = null;
+        capturedExcludedRestaurantIds = List.of();
+
+        lenient().when(recommendResultRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<RecommendResult> saved = List.copyOf(invocation.getArgument(0));
+            savedRecommendationBatches.add(saved);
+            return saved;
+        });
+        lenient().when(recommendResultFailedRepository.save(any())).thenAnswer(
+                invocation -> invocation.getArgument(0, RecommendResultFailed.class)
+        );
+
+        recommendationProcessor = new RecommendationProcessor(
+                RecommendationScoringPolicy.defaults(),
+                participantRepository,
+                restaurantRepository,
+                categoryService,
+                recommendResultRepository,
+                recommendResultFailedRepository,
+                gatheringRepository,
+                new RecommendationContextFactory(),
+                new CategoryQuotaSelectionStrategy()
+        );
+    }
 
     @Test
     @DisplayName("선호표 3:2는 Top3 슬롯을 2:1로 배분한다")
-    @SuppressWarnings("unchecked")
-    void shouldAllocateTop3ByPreferenceVoteRatio() {
-        // given
+    void returnsTwoJapaneseAndOneAsian_when_preferenceVotesAreThreeToTwo() {
         Long gatheringId = 1L;
         Region region = Region.GANGNAM;
 
@@ -110,23 +130,15 @@ class RecommendationProcessorTest {
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
-        // when
         recommendationProcessor.processRecommendation(gatheringId, region);
 
-        // then
-        ArgumentCaptor<List<RecommendResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
-        verify(recommendResultRepository).saveAll(resultCaptor.capture());
-
-        List<RecommendResult> saved = resultCaptor.getValue();
-        assertThat(saved).hasSize(3);
-        assertThat(restaurantIdsByRank(saved)).containsExactly(101L, 102L, 201L);
+        assertThat(savedRecommendationBatches).hasSize(1);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(101L, 102L, 201L);
     }
 
     @Test
     @DisplayName("불호가 선호보다 많은 카테고리는 추천 대상에서 제외된다")
-    @SuppressWarnings("unchecked")
-    void shouldExcludeCategoriesWhenDislikeVotesExceedPreferenceVotes() {
-        // given
+    void excludesCategoryFromRecommendations_when_dislikeVotesExceedPreferenceVotes() {
         Long gatheringId = 2L;
         Region region = Region.GANGNAM;
 
@@ -165,26 +177,18 @@ class RecommendationProcessorTest {
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
-        // when
         recommendationProcessor.processRecommendation(gatheringId, region);
 
-        // then
-        ArgumentCaptor<List<RecommendResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
-        verify(recommendResultRepository).saveAll(resultCaptor.capture());
+        assertThat(savedRecommendationBatches).hasSize(1);
 
-        List<RecommendResult> saved = resultCaptor.getValue();
-        assertThat(saved).hasSize(3);
-
-        List<Long> idsByRank = restaurantIdsByRank(saved);
+        List<Long> idsByRank = restaurantIdsByRank(savedRecommendationBatches.get(0));
         assertThat(idsByRank.getFirst()).isIn(301L, 302L, 303L);
         assertThat(idsByRank).doesNotContainAnyElementsOf(Set.of(101L, 201L, 401L, 501L));
     }
 
     @Test
     @DisplayName("ANY 비중이 높을수록 거리 보너스가 선형 축소된다")
-    @SuppressWarnings("unchecked")
-    void shouldScaleDistanceBonusLinearlyByAnyRatio() {
-        // given
+    void reducesDistanceBonusLinearly_when_anyDistanceRatioIncreases() {
         Region region = Region.GANGNAM;
         List<Category> categories = List.of(category(1L, LargeCategory.KOREAN));
         List<Restaurant> restaurants = List.of(
@@ -215,20 +219,15 @@ class RecommendationProcessorTest {
                 participant(2L, 13L, DistanceRange.ANY, "한식", null)
         ));
 
-        // when
         recommendationProcessor.processRecommendation(11L, region);
         recommendationProcessor.processRecommendation(12L, region);
         recommendationProcessor.processRecommendation(13L, region);
 
-        // then
-        ArgumentCaptor<List<RecommendResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
-        verify(recommendResultRepository, times(3)).saveAll(resultCaptor.capture());
+        assertThat(savedRecommendationBatches).hasSize(3);
 
-        List<List<RecommendResult>> allSaved = resultCaptor.getAllValues();
-
-        RecommendResult topAll500m = findRank(allSaved.get(0), 1);
-        RecommendResult topHalfAny = findRank(allSaved.get(1), 1);
-        RecommendResult topAllAny = findRank(allSaved.get(2), 1);
+        RecommendResult topAll500m = findRank(savedRecommendationBatches.get(0), 1);
+        RecommendResult topHalfAny = findRank(savedRecommendationBatches.get(1), 1);
+        RecommendResult topAllAny = findRank(savedRecommendationBatches.get(2), 1);
 
         assertThat(topAll500m.score() - topHalfAny.score()).isCloseTo(0.5, within(0.001));
         assertThat(topHalfAny.score() - topAllAny.score()).isCloseTo(0.5, within(0.001));
@@ -237,9 +236,7 @@ class RecommendationProcessorTest {
 
     @Test
     @DisplayName("추천 후보 조회 시 불호 우세 카테고리를 제외하고 TimeSlot을 전달한다")
-    @SuppressWarnings("unchecked")
-    void shouldFilterCandidateCategoriesAndPassTimeSlotToRepository() {
-        // given
+    void passesFilteredCategoriesAndGatheringTimeSlot_when_loadingRecommendationCandidates() {
         Long gatheringId = 21L;
         Region region = Region.GANGNAM;
         Gathering gathering = new Gathering(
@@ -276,31 +273,24 @@ class RecommendationProcessorTest {
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.of(gathering));
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
         when(categoryService.findAll()).thenReturn(categories);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
-                .thenReturn(restaurants);
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any())).thenAnswer(invocation -> {
+            Collection<Long> categoryIds = invocation.getArgument(1);
+            capturedCandidateCategoryIds = List.copyOf(categoryIds);
+            capturedCandidateTimeSlot = invocation.getArgument(2, TimeSlot.class);
+            return restaurants;
+        });
 
-        // when
         recommendationProcessor.processRecommendation(gatheringId, region);
 
-        // then
-        ArgumentCaptor<Collection<Long>> categoryIdsCaptor = ArgumentCaptor.forClass(Collection.class);
-        ArgumentCaptor<TimeSlot> timeSlotCaptor = ArgumentCaptor.forClass(TimeSlot.class);
-        verify(restaurantRepository).findRecommendationCandidates(
-                eq(region),
-                categoryIdsCaptor.capture(),
-                timeSlotCaptor.capture()
-        );
-
-        assertThat(categoryIdsCaptor.getValue()).containsExactlyInAnyOrder(1L, 3L);
-        assertThat(categoryIdsCaptor.getValue()).doesNotContain(2L);
-        assertThat(timeSlotCaptor.getValue()).isEqualTo(TimeSlot.LUNCH);
+        assertThat(savedRecommendationBatches).hasSize(1);
+        assertThat(capturedCandidateCategoryIds).containsExactlyInAnyOrder(1L, 3L);
+        assertThat(capturedCandidateCategoryIds).doesNotContain(2L);
+        assertThat(capturedCandidateTimeSlot).isEqualTo(TimeSlot.LUNCH);
     }
 
     @Test
     @DisplayName("재추천 계산 시 제외한 맛집 ID는 후보 조회 단계에서 제외한다")
-    @SuppressWarnings("unchecked")
-    void shouldExcludeRestaurantIdsWhenCalculatingRecommendations() {
-        // given
+    void returnsOnlyNonExcludedRestaurants_when_calculatingRerollRecommendations() {
         Long gatheringId = 22L;
         Region region = Region.GANGNAM;
         Gathering gathering = new Gathering(
@@ -323,9 +313,7 @@ class RecommendationProcessorTest {
                 participant(4L, gatheringId, DistanceRange.ANY, "한식", null)
         );
 
-        List<Category> categories = List.of(
-                category(1L, LargeCategory.KOREAN)
-        );
+        List<Category> categories = List.of(category(1L, LargeCategory.KOREAN));
 
         List<Long> excludedRestaurantIds = List.of(101L, 102L);
         List<Restaurant> rerollCandidates = List.of(
@@ -342,33 +330,33 @@ class RecommendationProcessorTest {
                 anyCollection(),
                 eq(TimeSlot.DINNER),
                 eq(excludedRestaurantIds)
-        )).thenReturn(rerollCandidates);
+        )).thenAnswer(invocation -> {
+            Collection<Long> categoryIds = invocation.getArgument(1);
+            Collection<Long> excludedIds = invocation.getArgument(3);
+            capturedCandidateCategoryIds = List.copyOf(categoryIds);
+            capturedCandidateTimeSlot = invocation.getArgument(2, TimeSlot.class);
+            capturedExcludedRestaurantIds = List.copyOf(excludedIds);
+            return rerollCandidates;
+        });
 
-        // when
         RecommendationCandidateResult result = recommendationProcessor.calculateRecommendations(
                 gatheringId,
                 region,
                 excludedRestaurantIds
         );
 
-        // then
         assertThat(result.failed()).isFalse();
         assertThat(result.restaurants())
                 .extracting(scored -> scored.restaurant().id())
                 .containsExactly(103L, 104L, 105L);
-        verify(restaurantRepository).findRecommendationCandidates(
-                eq(region),
-                anyCollection(),
-                eq(TimeSlot.DINNER),
-                eq(excludedRestaurantIds)
-        );
+        assertThat(capturedCandidateCategoryIds).containsExactly(1L);
+        assertThat(capturedCandidateTimeSlot).isEqualTo(TimeSlot.DINNER);
+        assertThat(capturedExcludedRestaurantIds).containsExactlyElementsOf(excludedRestaurantIds);
     }
 
     @Test
     @DisplayName("불호 0표 선호 카테고리 후보가 Top3 이상이면 해당 카테고리만 추천한다")
-    @SuppressWarnings("unchecked")
-    void shouldRecommendOnlyStrictCategoryWhenStrictCandidatesAreEnough() {
-        // given
+    void returnsOnlyStrictCategoryRestaurants_when_strictCandidatesFillTop3() {
         Long gatheringId = 31L;
         Region region = Region.GANGNAM;
 
@@ -406,23 +394,15 @@ class RecommendationProcessorTest {
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
-        // when
         recommendationProcessor.processRecommendation(gatheringId, region);
 
-        // then
-        ArgumentCaptor<List<RecommendResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
-        verify(recommendResultRepository).saveAll(resultCaptor.capture());
-
-        List<RecommendResult> saved = resultCaptor.getValue();
-        assertThat(saved).hasSize(3);
-        assertThat(restaurantIdsByRank(saved)).containsExactly(301L, 302L, 303L);
+        assertThat(savedRecommendationBatches).hasSize(1);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(301L, 302L, 303L);
     }
 
     @Test
     @DisplayName("Case 11: 한식 4표/양식 2표일 때 Top3를 한식 2개 + 양식 1개로 배분한다")
-    @SuppressWarnings("unchecked")
-    void shouldAllocateTwoKoreanAndOneWesternForCase11() {
-        // given
+    void returnsTwoKoreanAndOneWestern_when_case11PreferenceVotesApply() {
         Long gatheringId = 41L;
         Region region = Region.GANGNAM;
 
@@ -459,23 +439,15 @@ class RecommendationProcessorTest {
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
-        // when
         recommendationProcessor.processRecommendation(gatheringId, region);
 
-        // then
-        ArgumentCaptor<List<RecommendResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
-        verify(recommendResultRepository).saveAll(resultCaptor.capture());
-
-        List<RecommendResult> saved = resultCaptor.getValue();
-        assertThat(saved).hasSize(3);
-        assertThat(restaurantIdsByRank(saved)).containsExactly(101L, 102L, 201L);
+        assertThat(savedRecommendationBatches).hasSize(1);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(101L, 102L, 201L);
     }
 
     @Test
     @DisplayName("선호 입력이 모두 중립값이어도 후보 카테고리에서 Top3를 반환한다")
-    @SuppressWarnings("unchecked")
-    void shouldReturnRecommendationsWhenAllPreferencesAreNeutral() {
-        // given
+    void returnsTop3FromCandidateCategories_when_allPreferencesAreNeutral() {
         Long gatheringId = 51L;
         Region region = Region.GANGNAM;
 
@@ -507,23 +479,15 @@ class RecommendationProcessorTest {
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
-        // when
         recommendationProcessor.processRecommendation(gatheringId, region);
 
-        // then
-        ArgumentCaptor<List<RecommendResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
-        verify(recommendResultRepository).saveAll(resultCaptor.capture());
-
-        List<RecommendResult> saved = resultCaptor.getValue();
-        assertThat(saved).hasSize(3);
-        assertThat(restaurantIdsByRank(saved)).containsExactly(101L, 201L, 301L);
+        assertThat(savedRecommendationBatches).hasSize(1);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(101L, 201L, 301L);
     }
 
     @Test
     @DisplayName("동률 선호표에서는 불호 패널티를 반영한 가중 선호점수로 카테고리 우선순위를 결정한다")
-    @SuppressWarnings("unchecked")
-    void shouldPrioritizeCategoryByWeightedPreferenceWithDislikePenalty() {
-        // given
+    void prioritizesWeightedPreferredCategory_when_preferenceVotesAreTied() {
         Long gatheringId = 52L;
         Region region = Region.GANGNAM;
 
@@ -553,23 +517,15 @@ class RecommendationProcessorTest {
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
-        // when
         recommendationProcessor.processRecommendation(gatheringId, region);
 
-        // then
-        ArgumentCaptor<List<RecommendResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
-        verify(recommendResultRepository).saveAll(resultCaptor.capture());
-
-        List<RecommendResult> saved = resultCaptor.getValue();
-        assertThat(saved).hasSize(3);
-        assertThat(restaurantIdsByRank(saved)).containsExactly(101L, 102L, 201L);
+        assertThat(savedRecommendationBatches).hasSize(1);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(101L, 102L, 201L);
     }
 
     @Test
     @DisplayName("strict 후보가 2개뿐이면 전체 후보에서 보강해 Top3를 채운다")
-    @SuppressWarnings("unchecked")
-    void shouldBackfillToTop3WhenStrictCandidatesAreInsufficient() {
-        // given
+    void backfillsTop3FromRemainingCandidates_when_strictCandidatesAreInsufficient() {
         Long gatheringId = 53L;
         Region region = Region.GANGNAM;
 
@@ -599,16 +555,10 @@ class RecommendationProcessorTest {
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
-        // when
         recommendationProcessor.processRecommendation(gatheringId, region);
 
-        // then
-        ArgumentCaptor<List<RecommendResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
-        verify(recommendResultRepository).saveAll(resultCaptor.capture());
-
-        List<RecommendResult> saved = resultCaptor.getValue();
-        assertThat(saved).hasSize(3);
-        assertThat(restaurantIdsByRank(saved)).containsExactly(101L, 102L, 201L);
+        assertThat(savedRecommendationBatches).hasSize(1);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(101L, 102L, 201L);
     }
 
     private RecommendResult findRank(List<RecommendResult> results, int rank) {
