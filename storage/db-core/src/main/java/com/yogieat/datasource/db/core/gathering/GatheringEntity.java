@@ -2,12 +2,17 @@ package com.yogieat.datasource.db.core.gathering;
 
 import com.yogieat.common.Region;
 import com.yogieat.datasource.db.core.common.BaseEntity;
+import com.yogieat.datasource.db.core.region.RegionEntity;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import lombok.AccessLevel;
@@ -17,7 +22,13 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "t_gathering")
+@Table(
+        name = "t_gathering",
+        indexes = {
+            @Index(name = "idx_gathering_region_id", columnList = "region_id"),
+            @Index(name = "idx_gathering_region_id_deleted_at", columnList = "region_id, deleted_at")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class GatheringEntity extends BaseEntity {
 
@@ -40,6 +51,10 @@ public class GatheringEntity extends BaseEntity {
 
     @Column(name = "region_id")
     private Long regionId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_id", insertable = false, updatable = false)
+    private RegionEntity regionReference;
 
     @Column(name = "people_count")
     private Integer peopleCount;
@@ -85,11 +100,22 @@ public class GatheringEntity extends BaseEntity {
                 entity.getTitle(),
                 entity.getScheduledDate(),
                 entity.getTimeSlot(),
-                entity.getRegion(),
+                entity.resolveRegion(),
                 entity.getPeopleCount(),
                 entity.getDeletedAt(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
+    }
+
+    public Region resolveRegion() {
+        if (regionReference != null) {
+            Region resolved = Region.fromString(regionReference.getCode());
+            if (resolved != null) {
+                return resolved;
+            }
+        }
+
+        return region;
     }
 }

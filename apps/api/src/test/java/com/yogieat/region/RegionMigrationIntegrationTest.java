@@ -12,20 +12,27 @@ import com.yogieat.datasource.db.core.restaurant.RestaurantEntity;
 import com.yogieat.datasource.db.core.restaurant.RestaurantJpaRepository;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.value.TimeSlot;
+import com.yogieat.gathering.service.GatheringAdminCriteria;
 import com.yogieat.gathering.service.GatheringRepository;
 import com.yogieat.region.domain.RegionMaster;
-import com.yogieat.region.service.RegionRepository;
 import com.yogieat.region.service.RegionService;
 import com.yogieat.restaurant.domain.CreateRestaurant;
+import com.yogieat.restaurant.domain.Restaurant;
+import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
+import com.yogieat.restaurant.service.RestaurantAdminListCriteria;
 import com.yogieat.restaurant.service.RestaurantCommand;
 import com.yogieat.restaurant.service.RestaurantRepository;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -35,9 +42,6 @@ class RegionMigrationIntegrationTest {
 
     @Autowired
     private RegionService regionService;
-
-    @Autowired
-    private RegionRepository regionRepository;
 
     @Autowired
     private RegionJpaRepository regionJpaRepository;
@@ -54,38 +58,20 @@ class RegionMigrationIntegrationTest {
     @Autowired
     private GatheringJpaRepository gatheringJpaRepository;
 
-    @Test
-    @DisplayName("기동 시 enum 기반 지역 마스터가 생성되고 재동기화 시 운영 필드는 보존된다")
-    void startupSync_ShouldSeedRegionsAndPreserveOperationalFieldsOnResync() {
-        assertThat(regionJpaRepository.findAll()).hasSize(Region.values().length);
+    @Autowired
+    private EntityManager entityManager;
 
-        RegionEntity gangnam = regionJpaRepository.findByCode(Region.GANGNAM.name()).orElseThrow();
-        gangnam.apply(new RegionMaster(
-                gangnam.getId(),
-                gangnam.getCode(),
-                "임시 지역명",
-                new GeoJson.Point(List.of(0.0, 0.0)),
-                false,
-                99,
-                gangnam.getCreatedAt(),
-                gangnam.getUpdatedAt()
-        ));
-        regionJpaRepository.save(gangnam);
-
-        regionService.syncRegionsFromEnumAndBackfillLegacyReferences();
-
-        RegionEntity reloaded = regionJpaRepository.findByCode(Region.GANGNAM.name()).orElseThrow();
-        assertThat(regionJpaRepository.findAll()).hasSize(Region.values().length);
-        assertThat(reloaded.getDisplayName()).isEqualTo(Region.GANGNAM.getName());
-        assertThat(reloaded.getLongitude()).isEqualTo(Region.GANGNAM.getCoordinatesStandard().getCoordinates().getFirst());
-        assertThat(reloaded.getLatitude()).isEqualTo(Region.GANGNAM.getCoordinatesStandard().getCoordinates().get(1));
-        assertThat(reloaded.isActive()).isFalse();
-        assertThat(reloaded.getSortOrder()).isEqualTo(99);
+    @BeforeEach
+    void setUp() {
+        regionJpaRepository.deleteAllInBatch();
+        regionJpaRepository.saveAllAndFlush(seedRegions());
     }
 
     @Test
     @DisplayName("admin 지역 목록은 active 이면서 enum 매핑 가능한 지역만 sort_order 순으로 반환한다")
     void findActiveRegionsForAdmin_ShouldReturnOnlyActiveMappableRegions() {
+        assertThat(regionJpaRepository.findAll()).hasSize(Region.values().length);
+
         RegionEntity hongdae = regionJpaRepository.findByCode(Region.HONGDAE.name()).orElseThrow();
         hongdae.apply(new RegionMaster(
                 hongdae.getId(),
@@ -99,7 +85,7 @@ class RegionMigrationIntegrationTest {
         ));
         regionJpaRepository.save(hongdae);
 
-        regionRepository.save(new RegionMaster(
+        regionJpaRepository.save(RegionEntity.of(new RegionMaster(
                 null,
                 "YEOKSAM",
                 "역삼역",
@@ -108,7 +94,7 @@ class RegionMigrationIntegrationTest {
                 -1,
                 null,
                 null
-        ));
+        )));
 
         List<RegionMaster> regions = regionService.findActiveRegions();
 
@@ -119,12 +105,10 @@ class RegionMigrationIntegrationTest {
     }
 
     @Test
-    @DisplayName("맛집과 모임은 region enum과 region_id를 함께 저장하고 legacy row는 backfill 된다")
-    void dualWriteAndBackfill_ShouldPopulateRegionIds() {
+    @DisplayName("맛집과 모임은 저장 시 region enum과 region_id를 함께 저장한다")
+    void dualWrite_ShouldPopulateRegionIdsOnWrite() {
         Long gangnamRegionId = regionJpaRepository.findIdByCode(Region.GANGNAM.name()).orElseThrow();
         Long hongdaeRegionId = regionJpaRepository.findIdByCode(Region.HONGDAE.name()).orElseThrow();
-        Long jamsilRegionId = regionJpaRepository.findIdByCode(Region.JAMSIL.name()).orElseThrow();
-        Long samgakjiRegionId = regionJpaRepository.findIdByCode(Region.SAMGAKJI.name()).orElseThrow();
 
         restaurantRepository.save(createRestaurant("ext-dual-write", Region.GANGNAM));
         RestaurantEntity dualWrittenRestaurant = restaurantJpaRepository.findByExternalIdAndDeletedAtIsNull("ext-dual-write").orElseThrow();
@@ -151,12 +135,52 @@ class RegionMigrationIntegrationTest {
         GatheringEntity dualWrittenGathering = gatheringJpaRepository.findByAccessKey("dual-write-access").orElseThrow();
         assertThat(dualWrittenGathering.getRegion()).isEqualTo(Region.GANGNAM);
         assertThat(dualWrittenGathering.getRegionId()).isEqualTo(gangnamRegionId);
+    }
 
-        restaurantJpaRepository.save(RestaurantEntity.from(createRestaurant("ext-legacy", Region.JAMSIL)));
-        gatheringJpaRepository.save(GatheringEntity.from(new Gathering(
+    @Test
+    @DisplayName("region 기반 조회는 region_id를 우선 사용하고 legacy 컬럼은 fallback 으로만 사용한다")
+    void regionReads_ShouldPreferRegionIdAndFallbackToLegacyColumn() {
+        Long gangnamRegionId = regionJpaRepository.findIdByCode(Region.GANGNAM.name()).orElseThrow();
+
+        RestaurantEntity regionIdOnlyRestaurant = restaurantJpaRepository.save(
+                RestaurantEntity.from(createRestaurant("ext-region-id-only", Region.GANGNAM), gangnamRegionId)
+        );
+        ReflectionTestUtils.setField(regionIdOnlyRestaurant, "region", null);
+        restaurantJpaRepository.save(regionIdOnlyRestaurant);
+        Long regionIdOnlyRestaurantId = regionIdOnlyRestaurant.getId();
+
+        RestaurantEntity legacyFallbackRestaurant = restaurantJpaRepository.save(
+                RestaurantEntity.from(createRestaurant("ext-legacy-fallback", Region.HONGDAE))
+        );
+        ReflectionTestUtils.setField(legacyFallbackRestaurant, "regionId", null);
+        restaurantJpaRepository.save(legacyFallbackRestaurant);
+
+        RestaurantEntity staleLegacyRestaurant = restaurantJpaRepository.save(
+                RestaurantEntity.from(createRestaurant("ext-stale-legacy", Region.GANGNAM), gangnamRegionId)
+        );
+        ReflectionTestUtils.setField(staleLegacyRestaurant, "region", Region.HONGDAE);
+        restaurantJpaRepository.save(staleLegacyRestaurant);
+        Long staleLegacyRestaurantId = staleLegacyRestaurant.getId();
+
+        GatheringEntity regionIdOnlyGathering = gatheringJpaRepository.save(GatheringEntity.from(new Gathering(
                 null,
-                "legacy-access",
-                "legacy-gathering",
+                "region-id-only-access",
+                "region-id-only-gathering",
+                LocalDate.of(2026, 4, 17),
+                TimeSlot.DINNER,
+                Region.GANGNAM,
+                4,
+                null,
+                null,
+                null
+        ), gangnamRegionId));
+        ReflectionTestUtils.setField(regionIdOnlyGathering, "region", null);
+        gatheringJpaRepository.save(regionIdOnlyGathering);
+
+        GatheringEntity legacyFallbackGathering = gatheringJpaRepository.save(GatheringEntity.from(new Gathering(
+                null,
+                "legacy-fallback-access",
+                "legacy-fallback-gathering",
                 LocalDate.of(2026, 4, 17),
                 TimeSlot.LUNCH,
                 Region.SAMGAKJI,
@@ -165,18 +189,90 @@ class RegionMigrationIntegrationTest {
                 null,
                 null
         )));
+        ReflectionTestUtils.setField(legacyFallbackGathering, "regionId", null);
+        gatheringJpaRepository.save(legacyFallbackGathering);
 
-        RestaurantEntity legacyRestaurant = restaurantJpaRepository.findByExternalIdAndDeletedAtIsNull("ext-legacy").orElseThrow();
-        GatheringEntity legacyGathering = gatheringJpaRepository.findByAccessKey("legacy-access").orElseThrow();
-        assertThat(legacyRestaurant.getRegionId()).isNull();
-        assertThat(legacyGathering.getRegionId()).isNull();
+        GatheringEntity staleLegacyGathering = gatheringJpaRepository.save(GatheringEntity.from(new Gathering(
+                null,
+                "stale-legacy-access",
+                "stale-legacy-gathering",
+                LocalDate.of(2026, 4, 17),
+                TimeSlot.DINNER,
+                Region.GANGNAM,
+                5,
+                null,
+                null,
+                null
+        ), gangnamRegionId));
+        ReflectionTestUtils.setField(staleLegacyGathering, "region", Region.HONGDAE);
+        gatheringJpaRepository.save(staleLegacyGathering);
 
-        regionService.syncRegionsFromEnumAndBackfillLegacyReferences();
+        entityManager.flush();
+        entityManager.clear();
 
-        RestaurantEntity backfilledRestaurant = restaurantJpaRepository.findByExternalIdAndDeletedAtIsNull("ext-legacy").orElseThrow();
-        GatheringEntity backfilledGathering = gatheringJpaRepository.findByAccessKey("legacy-access").orElseThrow();
-        assertThat(backfilledRestaurant.getRegionId()).isEqualTo(jamsilRegionId);
-        assertThat(backfilledGathering.getRegionId()).isEqualTo(samgakjiRegionId);
+        List<Restaurant> gangnamRestaurants = restaurantRepository.findByRegion(Region.GANGNAM);
+        assertThat(gangnamRestaurants)
+                .extracting(Restaurant::externalId)
+                .containsExactlyInAnyOrder("ext-region-id-only", "ext-stale-legacy");
+        assertThat(gangnamRestaurants)
+                .extracting(Restaurant::region)
+                .containsOnly(Region.GANGNAM);
+        assertThat(restaurantRepository.countByRegion(Region.GANGNAM)).isEqualTo(2L);
+
+        List<Restaurant> hongdaeRestaurants = restaurantRepository.findByRegion(Region.HONGDAE);
+        assertThat(hongdaeRestaurants)
+                .extracting(Restaurant::externalId)
+                .containsExactly("ext-legacy-fallback");
+        assertThat(hongdaeRestaurants)
+                .extracting(Restaurant::region)
+                .containsOnly(Region.HONGDAE);
+
+        List<Restaurant> gangnamRecommendationCandidates = restaurantRepository.findRecommendationCandidates(
+                Region.GANGNAM,
+                List.of(1L),
+                TimeSlot.LUNCH
+        );
+        assertThat(gangnamRecommendationCandidates)
+                .extracting(Restaurant::id)
+                .containsExactlyInAnyOrder(regionIdOnlyRestaurantId, staleLegacyRestaurantId);
+        assertThat(gangnamRecommendationCandidates)
+                .extracting(Restaurant::region)
+                .containsOnly(Region.GANGNAM);
+
+        List<RestaurantAdminListItemResult> gangnamAdminRestaurants = restaurantRepository.findPageRestaurants(
+                RestaurantAdminListCriteria.of(null, Region.GANGNAM, null, null),
+                0,
+                20
+        );
+        assertThat(gangnamAdminRestaurants)
+                .extracting(RestaurantAdminListItemResult::region)
+                .containsOnly(Region.GANGNAM);
+        assertThat(restaurantRepository.countAdminRestaurantList(
+                RestaurantAdminListCriteria.of(null, Region.GANGNAM, null, null)
+        )).isEqualTo(2L);
+
+        List<Gathering> gangnamGatherings = gatheringRepository.findAdminGatherings(
+                GatheringAdminCriteria.List.of(null, Region.GANGNAM, null, false)
+        );
+        assertThat(gangnamGatherings)
+                .extracting(Gathering::accessKey)
+                .containsExactlyInAnyOrder("region-id-only-access", "stale-legacy-access");
+        assertThat(gangnamGatherings)
+                .extracting(Gathering::region)
+                .containsOnly(Region.GANGNAM);
+
+        List<Gathering> samgakjiGatherings = gatheringRepository.findAdminGatherings(
+                GatheringAdminCriteria.List.of(null, Region.SAMGAKJI, null, false)
+        );
+        assertThat(samgakjiGatherings)
+                .extracting(Gathering::accessKey)
+                .containsExactly("legacy-fallback-access");
+        assertThat(samgakjiGatherings)
+                .extracting(Gathering::region)
+                .containsOnly(Region.SAMGAKJI);
+        assertThat(gatheringRepository.countAdminGatherings(
+                GatheringAdminCriteria.List.of(null, Region.GANGNAM, null, false)
+        )).isEqualTo(2L);
     }
 
     private static CreateRestaurant createRestaurant(String externalId, Region region) {
@@ -225,5 +321,24 @@ class RegionMigrationIntegrationTest {
                 null,
                 null
         );
+    }
+
+    private static List<RegionEntity> seedRegions() {
+        List<RegionEntity> seededRegions = new ArrayList<>();
+        Region[] regions = Region.values();
+        for (int index = 0; index < regions.length; index++) {
+            Region region = regions[index];
+            seededRegions.add(RegionEntity.of(new RegionMaster(
+                    null,
+                    region.name(),
+                    region.getName(),
+                    region.getCoordinatesStandard(),
+                    true,
+                    index,
+                    null,
+                    null
+            )));
+        }
+        return seededRegions;
     }
 }

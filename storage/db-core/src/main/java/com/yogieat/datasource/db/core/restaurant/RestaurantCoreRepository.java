@@ -13,6 +13,7 @@ import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
+import com.yogieat.datasource.db.core.region.QRegionEntity;
 import com.yogieat.datasource.db.core.region.RegionJpaRepository;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.CreateRestaurant;
@@ -45,6 +46,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
+    private static final QRegionEntity recommendationRegionEntity = new QRegionEntity("recommendationRegionEntity");
 
     private final RestaurantJpaRepository restaurantJpaRepository;
     private final RegionJpaRepository regionJpaRepository;
@@ -80,7 +82,13 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     public List<Restaurant> findByRegion(Region region) {
-        return restaurantJpaRepository.findByRegionAndDeletedAtIsNull(region).stream()
+        return jpaQueryFactory.selectFrom(restaurantEntity)
+                .where(
+                        restaurantEntity.deletedAt.isNull(),
+                        regionCondition(region)
+                )
+                .fetch()
+                .stream()
                 .map(RestaurantEntity::toDomain)
                 .toList();
     }
@@ -112,6 +120,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.name,
                         restaurantEntity.rating,
                         restaurantEntity.region,
+                        recommendationRegionEntity.code,
                         restaurantEntity.location,
                         restaurantEntity.reviewCount,
                         restaurantEntity.blogReviewCount,
@@ -122,9 +131,11 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.updatedAt
                 )
                 .from(restaurantEntity)
+                .leftJoin(recommendationRegionEntity)
+                .on(restaurantEntity.regionId.eq(recommendationRegionEntity.id))
                 .where(
                         restaurantEntity.deletedAt.isNull(),
-                        restaurantEntity.region.eq(region),
+                        regionCondition(region),
                         restaurantEntity.categoryId.in(categoryIds),
                         recommendationTimeSlotCondition(gatheringTimeSlot),
                         excludedRestaurantIdsCondition(excludedRestaurantIds)
@@ -176,7 +187,15 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     public long countByRegion(Region region) {
-        return restaurantJpaRepository.countByRegionAndDeletedAtIsNull(region);
+        Long count = jpaQueryFactory.select(restaurantEntity.count())
+                .from(restaurantEntity)
+                .where(
+                        restaurantEntity.deletedAt.isNull(),
+                        regionCondition(region)
+                )
+                .fetchOne();
+
+        return count == null ? 0L : count;
     }
 
     @Override
@@ -313,7 +332,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 tuple.get(categoryEntity.mediumCategory),
                 entity.getRating(),
                 entity.getImageUrl(),
-                entity.getRegion(),
+                entity.resolveRegion(),
                 entity.getUpdatedAt()
         );
     }
@@ -325,7 +344,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         conditions.add(restaurantEntity.deletedAt.isNull());
 
         if (criteria.region() != null) {
-            conditions.add(restaurantEntity.region.eq(criteria.region()));
+            conditions.add(regionCondition(criteria.region()));
         }
 
         if (criteria.categoryId() != null) {
@@ -385,6 +404,11 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     private Restaurant toRecommendationCandidate(Tuple tuple) {
         Point location = tuple.get(restaurantEntity.location);
+        String regionCode = tuple.get(recommendationRegionEntity.code);
+        Region resolvedRegion = Region.fromString(regionCode);
+        if (resolvedRegion == null) {
+            resolvedRegion = tuple.get(restaurantEntity.region);
+        }
 
         return new Restaurant(
                 tuple.get(restaurantEntity.id),
@@ -397,7 +421,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 null,
                 null,
                 null,
-                tuple.get(restaurantEntity.region),
+                resolvedRegion,
                 toGeoJsonPoint(location),
                 tuple.get(restaurantEntity.reviewCount),
                 tuple.get(restaurantEntity.blogReviewCount),
@@ -443,6 +467,23 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                                 : new GeoJson.Point(List.of(entity.getLocation().getX(), entity.getLocation().getY()))
                 ))
                 .toList();
+    }
+
+    private BooleanExpression regionCondition(Region region) {
+        if (region == null) {
+            return null;
+        }
+
+        Long regionId = resolveRegionId(region);
+        if (regionId == null) {
+            return restaurantEntity.region.eq(region);
+        }
+
+        return restaurantEntity.regionId.eq(regionId)
+                .or(
+                        restaurantEntity.regionId.isNull()
+                                .and(restaurantEntity.region.eq(region))
+                );
     }
 
     @Override

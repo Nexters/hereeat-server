@@ -137,7 +137,7 @@ public class GatheringCoreRepository implements GatheringRepository {
         }
 
         if (criteria.region() != null) {
-            conditions.add(gatheringEntity.region.eq(criteria.region()));
+            conditions.add(regionCondition(criteria.region()));
         }
 
         if (criteria.timeSlot() != null) {
@@ -178,5 +178,22 @@ public class GatheringCoreRepository implements GatheringRepository {
             return null;
         }
         return regionJpaRepository.findIdByCode(region.name()).orElse(null);
+    }
+
+    private BooleanExpression regionCondition(Region region) {
+        if (region == null) {
+            return null;
+        }
+
+        Long regionId = resolveRegionId(region);
+        if (regionId == null) {
+            return gatheringEntity.region.eq(region);
+        }
+
+        return gatheringEntity.regionId.eq(regionId)
+                .or(
+                        gatheringEntity.regionId.isNull()
+                                .and(gatheringEntity.region.eq(region))
+                );
     }
 }
