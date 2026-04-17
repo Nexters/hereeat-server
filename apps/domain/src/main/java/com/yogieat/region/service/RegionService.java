@@ -16,7 +16,7 @@ public class RegionService {
     private final RegionRepository regionRepository;
 
     @Transactional(readOnly = true)
-    public List<RegionMaster> findActiveRegionsForAdmin() {
+    public List<RegionMaster> findActiveRegions() {
         return regionRepository.findAllActiveOrderBySortOrder().stream()
                 .filter(regionMaster -> Region.fromString(regionMaster.code()) != null)
                 .toList();

@@ -110,7 +110,7 @@ class RegionMigrationIntegrationTest {
                 null
         ));
 
-        List<RegionMaster> regions = regionService.findActiveRegionsForAdmin();
+        List<RegionMaster> regions = regionService.findActiveRegions();
 
         assertThat(regions).extracting(RegionMaster::code)
                 .doesNotContain("YEOKSAM", Region.HONGDAE.name())

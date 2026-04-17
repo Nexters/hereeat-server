@@ -15,6 +15,6 @@ public class RegionAdminFacade {
     private final RegionService regionService;
 
     public List<RegionMaster> getRegions() {
-        return regionService.findActiveRegionsForAdmin();
+        return regionService.findActiveRegions();
     }
 }
