@@ -7,6 +7,8 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.yogieat.common.Region;
+import com.yogieat.datasource.db.core.region.RegionJpaRepository;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.result.GatheringAdminItemResult;
 import com.yogieat.gathering.service.GatheringAdminCriteria;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class GatheringCoreRepository implements GatheringRepository {
     private final GatheringJpaRepository gatheringJpaRepository;
+    private final RegionJpaRepository regionJpaRepository;
     private final JPAQueryFactory jpaQueryFactory;
 
     @Override
@@ -44,7 +47,10 @@ public class GatheringCoreRepository implements GatheringRepository {
 
     @Override
     public Gathering save(Gathering gathering) {
-        GatheringEntity entity = GatheringEntity.from(gathering);
+        GatheringEntity entity = GatheringEntity.from(
+                gathering,
+                resolveRegionId(gathering.region())
+        );
         GatheringEntity savedEntity = gatheringJpaRepository.save(entity);
         return GatheringEntity.toDomain(savedEntity);
     }
@@ -165,5 +171,12 @@ public class GatheringCoreRepository implements GatheringRepository {
         }
 
         return condition;
+    }
+
+    private Long resolveRegionId(Region region) {
+        if (region == null) {
+            return null;
+        }
+        return regionJpaRepository.findIdByCode(region.name()).orElse(null);
     }
 }

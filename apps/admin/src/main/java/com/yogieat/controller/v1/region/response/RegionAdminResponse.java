@@ -1,8 +1,7 @@
 package com.yogieat.controller.v1.region.response;
 
 import com.yogieat.common.GeoJson;
-import com.yogieat.common.Region;
-import java.util.Arrays;
+import com.yogieat.region.domain.RegionMaster;
 import java.util.List;
 
 public final class RegionAdminResponse {
@@ -11,9 +10,9 @@ public final class RegionAdminResponse {
     }
 
     public record ListResponse(List<RegionItemResponse> regions) {
-        public static ListResponse from(Region[] regions) {
+        public static ListResponse from(List<RegionMaster> regions) {
             return new ListResponse(
-                    Arrays.stream(regions)
+                    regions.stream()
                             .map(RegionItemResponse::from)
                             .toList()
             );
@@ -25,11 +24,11 @@ public final class RegionAdminResponse {
             String displayName,
             GeoJson.Point coordinatesStandard
     ) {
-        public static RegionItemResponse from(Region region) {
+        public static RegionItemResponse from(RegionMaster region) {
             return new RegionItemResponse(
-                    region.name(),
-                    region.getName(),
-                    region.getCoordinatesStandard()
+                    region.code(),
+                    region.displayName(),
+                    region.coordinatesStandard()
             );
         }
     }

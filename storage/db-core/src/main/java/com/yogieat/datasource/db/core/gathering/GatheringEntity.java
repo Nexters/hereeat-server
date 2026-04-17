@@ -38,6 +38,9 @@ public class GatheringEntity extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private Region region;
 
+    @Column(name = "region_id")
+    private Long regionId;
+
     @Column(name = "people_count")
     private Integer peopleCount;
 
@@ -48,22 +51,29 @@ public class GatheringEntity extends BaseEntity {
             LocalDate scheduledDate,
             TimeSlot timeSlot,
             Region region,
+            Long regionId,
             int peopleCount) {
         this.accessKey = accessKey;
         this.title = title;
         this.scheduledDate = scheduledDate;
         this.timeSlot = timeSlot;
         this.region = region;
+        this.regionId = regionId;
         this.peopleCount = peopleCount;
     }
 
     public static GatheringEntity from(Gathering gathering) {
+        return from(gathering, null);
+    }
+
+    public static GatheringEntity from(Gathering gathering, Long regionId) {
         return GatheringEntity.builder()
                 .accessKey(gathering.accessKey())
                 .title(gathering.title())
                 .scheduledDate(gathering.scheduledDate())
                 .timeSlot(gathering.timeSlot())
                 .region(gathering.region())
+                .regionId(regionId)
                 .peopleCount(gathering.peopleCount())
                 .build();
     }
