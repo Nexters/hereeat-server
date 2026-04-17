@@ -32,7 +32,13 @@ public class RestaurantSyncJobService {
         }
 
         try {
-            RestaurantSyncJob syncJob = RestaurantSyncJob.create(RestaurantSyncScope.ALL, triggerType, null, chunkSize, parallelism);
+            RestaurantSyncJob syncJob = RestaurantSyncJob.create(
+                    RestaurantSyncScope.ALL,
+                    triggerType,
+                    null,
+                    Math.max(1, chunkSize),
+                    Math.max(1, parallelism)
+            );
             return syncJobRepository.save(syncJob);
         } catch (DataIntegrityViolationException e) {
             throw new CustomException(ErrorCode.SYNC_JOB_CONFLICT);
@@ -50,7 +56,13 @@ public class RestaurantSyncJobService {
         }
 
         try {
-            RestaurantSyncJob syncJob = RestaurantSyncJob.create(RestaurantSyncScope.SINGLE, triggerType, restaurantId, chunkSize, parallelism);
+            RestaurantSyncJob syncJob = RestaurantSyncJob.create(
+                    RestaurantSyncScope.SINGLE,
+                    triggerType,
+                    restaurantId,
+                    Math.max(1, chunkSize),
+                    Math.max(1, parallelism)
+            );
             return syncJobRepository.save(syncJob);
         } catch (DataIntegrityViolationException e) {
             throw new CustomException(ErrorCode.SYNC_JOB_CONFLICT);

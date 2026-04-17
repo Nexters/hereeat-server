@@ -25,13 +25,14 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class RestaurantSyncServiceTest {
@@ -51,11 +52,22 @@ class RestaurantSyncServiceTest {
     @Mock
     private KakaoPlaceMapper kakaoPlaceMapper;
 
-    @InjectMocks
     private RestaurantSyncService restaurantSyncService;
 
     @Captor
     private ArgumentCaptor<List<RestaurantSyncPatchCommand>> patchCommandsCaptor;
+
+    @BeforeEach
+    void setUp() {
+        restaurantSyncService = new RestaurantSyncService(
+                new RestaurantSyncChunkPersistenceService(restaurantRepository),
+                restaurantRepository,
+                categoryService,
+                kakaoPlaceClient,
+                kakaoPlaceDetailClient,
+                kakaoPlaceMapper
+        );
+    }
 
     @Test
     void syncChunk_success_callsBatchApplyOnce() {
@@ -106,6 +118,24 @@ class RestaurantSyncServiceTest {
         verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
         RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
         assertThat(command.categoryId()).isEqualTo(88L);
+    }
+
+    @Test
+    void syncChunk_whenRetryJitterRateIsZero_retriesWithoutRandomBoundError() {
+        ReflectionTestUtils.setField(restaurantSyncService, "kakaoSyncRetryJitterRate", 0.0d);
+
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+                new GeoJson.Point(List.of(127.0280, 37.4980)));
+        when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
+        when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
+                .thenThrow(new IllegalStateException("temporary failure"))
+                .thenReturn(KakaoPlaceDetailFetchResult.success(detailDataWithCoordinate("맛집", 37.498, 127.0285)));
+
+        RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(List.of(1L), Runnable::run, 1);
+
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(result.failedCount()).isEqualTo(0);
+        verify(restaurantRepository).batchApplySyncPatch(anyList());
     }
 
     @Test

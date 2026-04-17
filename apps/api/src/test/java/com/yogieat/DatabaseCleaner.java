@@ -1,5 +1,6 @@
 package com.yogieat;
 
+import com.yogieat.testsupport.DatabaseResetHook;
 import java.util.List;
 import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,6 +21,10 @@ public class DatabaseCleaner {
                     deleteAll(jdbcTemplate);
                     return null;
                 });
+
+        applicationContext.getBeanProvider(DatabaseResetHook.class)
+                .orderedStream()
+                .forEach(DatabaseResetHook::reset);
     }
 
     private static void deleteAll(JdbcTemplate jdbcTemplate) {

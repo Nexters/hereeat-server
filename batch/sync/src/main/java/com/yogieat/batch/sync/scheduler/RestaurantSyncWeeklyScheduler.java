@@ -15,7 +15,8 @@ public class RestaurantSyncWeeklyScheduler {
     private final RestaurantSyncJobService syncJobService;
 
     @Scheduled(
-            cron = "${sync.job.weekly-cron:0 0 21 ? * SUN}",
+            // 매일 새벽 두시
+            cron = "0 0 2 * * ?",
             zone = "${sync.job.weekly-zone:Asia/Seoul}"
     )
     public void createWeeklyAllSyncJob() {

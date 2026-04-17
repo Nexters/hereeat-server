@@ -13,6 +13,7 @@ import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
+import com.yogieat.datasource.db.core.region.RegionJpaRepository;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
@@ -46,6 +47,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
 
     private final RestaurantJpaRepository restaurantJpaRepository;
+    private final RegionJpaRepository regionJpaRepository;
     private final JPAQueryFactory jpaQueryFactory;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
@@ -61,7 +63,10 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     public Restaurant save(CreateRestaurant createRestaurant) {
-        RestaurantEntity entity = RestaurantEntity.from(createRestaurant);
+        RestaurantEntity entity = RestaurantEntity.from(
+                createRestaurant,
+                resolveRegionId(createRestaurant.region())
+        );
         RestaurantEntity savedEntity = restaurantJpaRepository.save(entity);
         return RestaurantEntity.toDomain(savedEntity);
     }
@@ -148,7 +153,10 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     public Restaurant applyAdminPatch(Long restaurantId, RestaurantCommand.Patch command) {
         RestaurantEntity entity = restaurantJpaRepository.findByIdAndDeletedAtIsNull(restaurantId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
-        entity.applyAdminPatch(command);
+        entity.applyAdminPatch(
+                command,
+                command.region() != null ? resolveRegionId(command.region()) : null
+        );
         return RestaurantEntity.toDomain(entity);
     }
 
@@ -157,6 +165,13 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         RestaurantEntity entity = restaurantJpaRepository.findById(restaurantId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
         restaurantJpaRepository.delete(entity);
+    }
+
+    private Long resolveRegionId(Region region) {
+        if (region == null) {
+            return null;
+        }
+        return regionJpaRepository.findIdByCode(region.name()).orElse(null);
     }
 
     @Override

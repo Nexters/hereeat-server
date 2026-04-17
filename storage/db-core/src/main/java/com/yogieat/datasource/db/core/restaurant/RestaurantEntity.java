@@ -85,6 +85,8 @@ public class RestaurantEntity extends BaseEntity {
     @Column(columnDefinition = "VARCHAR(30)")
     @Enumerated(EnumType.STRING)
     private Region region;
+    @Column(name = "region_id")
+    private Long regionId;
     private Point location; // 위도, 경도
 
     @Column(unique = true, nullable = false)
@@ -121,6 +123,7 @@ public class RestaurantEntity extends BaseEntity {
             String representativeReview,
             String description,
             Region region,
+            Long regionId,
             Point location,
             // 추천 근거 데이터
             Integer reviewCount,
@@ -142,6 +145,7 @@ public class RestaurantEntity extends BaseEntity {
         this.representativeReview = representativeReview;
         this.description = description;
         this.region = region;
+        this.regionId = regionId;
         this.location = location;
         this.reviewCount = reviewCount;
         this.blogReviewCount = blogReviewCount;
@@ -161,6 +165,10 @@ public class RestaurantEntity extends BaseEntity {
      * @return RestaurantEntity instance
      */
     public static RestaurantEntity from(CreateRestaurant createRestaurant) {
+        return from(createRestaurant, null);
+    }
+
+    public static RestaurantEntity from(CreateRestaurant createRestaurant, Long regionId) {
         return builder()
                 .externalId(createRestaurant.externalId())
                 .categoryId(createRestaurant.categoryId())
@@ -172,6 +180,7 @@ public class RestaurantEntity extends BaseEntity {
                 .representativeReview(createRestaurant.representativeReview())
                 .description(createRestaurant.description())
                 .region(createRestaurant.region())
+                .regionId(regionId)
                 .location(
                         createRestaurant.location() != null
                                 ? toJtsPoint(createRestaurant.location())
@@ -289,7 +298,7 @@ public class RestaurantEntity extends BaseEntity {
         }
     }
 
-    public void applyAdminPatch(RestaurantCommand.Patch command) {
+    public void applyAdminPatch(RestaurantCommand.Patch command, Long regionId) {
         if (command == null) {
             return;
         }
@@ -307,6 +316,7 @@ public class RestaurantEntity extends BaseEntity {
         }
         if (command.region() != null) {
             this.region = command.region();
+            this.regionId = regionId;
         }
         if (command.location() != null) {
             this.location = toJtsPoint(command.location());

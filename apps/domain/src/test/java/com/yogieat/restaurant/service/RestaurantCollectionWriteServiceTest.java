@@ -72,14 +72,18 @@ class RestaurantCollectionWriteServiceTest {
     }
 
     @Test
-    @DisplayName("지역 기준점으로부터 1km를 벗어나면 저장하지 않고 false를 반환한다")
-    void persistRestaurant_ShouldReturnFalse_WhenLocationOutsideRegionRadius() {
+    @DisplayName("지역 기준점으로부터 멀어도 저장 검증만 통과하면 저장한다")
+    void persistRestaurant_ShouldSave_WhenLocationOutsideRegionRadius() {
         SuggestionRestaurant suggestion = suggestion();
         RestaurantValidator.ValidationContext context =
                 new RestaurantValidator.ValidationContext(new HashSet<>(), new HashSet<>());
 
         RestaurantEnrichedData data = enriched("ext-1");
         data.geoJsonLocation = new GeoJson.Point(List.of(127.0476, 37.4979));
+
+        when(categoryService.findOrCreateCategory(LargeCategory.KOREAN, suggestion.mediumCategory())).thenReturn(10L);
+        when(restaurantValidator.duplicateValidateWithCache(context, suggestion, "ext-1"))
+                .thenReturn(RestaurantValidator.ValidationResult.valid());
 
         boolean saved = writeService.persistRestaurant(
                 suggestion,
@@ -90,8 +94,8 @@ class RestaurantCollectionWriteServiceTest {
                 context
         );
 
-        assertThat(saved).isFalse();
-        verify(restaurantRepository, never()).save(any());
+        assertThat(saved).isTrue();
+        verify(restaurantRepository).save(any());
     }
 
     private SuggestionRestaurant suggestion() {

@@ -100,7 +100,8 @@ public class RestaurantSyncJobWorker {
 
         RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(
                 List.of(job.targetRestaurantId()),
-                syncJobExecutor
+                syncJobExecutor,
+                Math.max(1, job.parallelism() == null ? 1 : job.parallelism())
         );
         syncJobRepository.updateProgress(
                 job.id(),
@@ -148,7 +149,10 @@ public class RestaurantSyncJobWorker {
                 break;
             }
 
-            RestaurantSyncChunkResult chunkResult = syncChunkWithRetry(ids);
+            RestaurantSyncChunkResult chunkResult = syncChunkWithRetry(
+                    ids,
+                    Math.max(1, job.parallelism() == null ? syncJobProperties.resolvedParallelism() : job.parallelism())
+            );
             long chunkDurationMs = (System.nanoTime() - chunkStartAt) / 1_000_000L;
             long successCount = chunkResult.successCount();
             long failedCount = chunkResult.failedCount();
@@ -253,18 +257,23 @@ public class RestaurantSyncJobWorker {
         }
     }
 
-    private RestaurantSyncChunkResult syncChunkWithRetry(List<Long> ids) {
+    private RestaurantSyncChunkResult syncChunkWithRetry(List<Long> ids, int parallelism) {
         RuntimeException lastError = null;
         for (int attempt = 1; attempt <= CHUNK_MAX_RETRY_ATTEMPTS + 1; attempt++) {
             try {
-                return restaurantSyncService.syncChunk(ids, syncJobExecutor);
+                return restaurantSyncService.syncChunk(
+                        ids,
+                        syncJobExecutor,
+                        Math.max(1, parallelism)
+                );
             } catch (RuntimeException e) {
                 lastError = e;
                 if (attempt > CHUNK_MAX_RETRY_ATTEMPTS) {
                     break;
                 }
                 long delay = CHUNK_RETRY_BASE_DELAY_MS * (1L << (attempt - 1));
-                long jitter = ThreadLocalRandom.current().nextLong(delay / 4);
+                long jitterUpperBound = delay / 4;
+                long jitter = jitterUpperBound > 0 ? ThreadLocalRandom.current().nextLong(jitterUpperBound) : 0L;
                 log.warn("[chunk-retry] attempt={}/{} failed: {}, retrying in {}ms",
                         attempt, CHUNK_MAX_RETRY_ATTEMPTS + 1, e.getMessage(), delay + jitter);
                 try {

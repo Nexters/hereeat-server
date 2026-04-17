@@ -135,6 +135,20 @@ class RestaurantSyncJobServiceTest {
     }
 
     @Test
+    void createAllJob_whenInvalidConfig_sanitizesChunkSizeAndParallelism() {
+        ReflectionTestUtils.setField(syncJobService, "chunkSize", 0);
+        ReflectionTestUtils.setField(syncJobService, "parallelism", -1);
+        when(syncJobRepository.existsByScopeAndStatus(RestaurantSyncScope.ALL, RestaurantSyncJobStatus.RUNNING)).thenReturn(false);
+        when(syncJobRepository.existsByScopeAndStatus(RestaurantSyncScope.ALL, RestaurantSyncJobStatus.PENDING)).thenReturn(false);
+        when(syncJobRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RestaurantSyncJob created = syncJobService.createAllJob(RestaurantSyncTriggerType.MANUAL);
+
+        assertThat(created.chunkSize()).isEqualTo(1);
+        assertThat(created.parallelism()).isEqualTo(1);
+    }
+
+    @Test
     void createSingleJob_whenUniqueConstraintViolation_throwsConflict() {
         setDefaults();
         when(restaurantRepository.findById(1L)).thenReturn(Optional.of(new Restaurant(
