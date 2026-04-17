@@ -2,8 +2,8 @@ package com.yogieat.domain.fixture;
 
 import com.yogieat.common.Region;
 import com.yogieat.datasource.db.core.gathering.GatheringEntity;
+import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.value.TimeSlot;
-import java.lang.reflect.Constructor;
 import java.time.LocalDate;
 
 /** Test fixture for creating GatheringEntity instances */
@@ -44,20 +44,19 @@ public class GatheringFixture {
             TimeSlot timeSlot,
             Region region,
             int peopleCount) {
-        try {
-            // Reflection을 사용하여 private 생성자 접근
-            Constructor<GatheringEntity> constructor =
-                    GatheringEntity.class.getDeclaredConstructor(
-                            String.class,
-                            String.class,
-                            LocalDate.class,
-                            TimeSlot.class,
-                            Region.class,
-                            int.class);
-            constructor.setAccessible(true);
-            return constructor.newInstance(accessKey, title, scheduledDate, timeSlot, region, peopleCount);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create GatheringEntity for testing", e);
-        }
+        return GatheringEntity.from(
+                new Gathering(
+                        null,
+                        accessKey,
+                        title,
+                        scheduledDate,
+                        timeSlot,
+                        region,
+                        peopleCount,
+                        null,
+                        null,
+                        null
+                )
+        );
     }
 }
