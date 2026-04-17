@@ -55,6 +55,7 @@ public class RestaurantSyncService {
     private static final double KAKAO_SYNC_RETRY_JITTER_RATE_DEFAULT = 0.25d;
     private static final long KAKAO_SYNC_CACHE_TTL_MS_DEFAULT = 30_000L;
 
+    private final RestaurantSyncChunkPersistenceService chunkPersistenceService;
     private final RestaurantRepository restaurantRepository;
     private final CategoryService categoryService;
     private final KakaoPlaceClient kakaoPlaceClient;
@@ -76,12 +77,14 @@ public class RestaurantSyncService {
     private final LongAdder kakaoRetryCount = new LongAdder();
 
     public RestaurantSyncService(
+            RestaurantSyncChunkPersistenceService chunkPersistenceService,
             RestaurantRepository restaurantRepository,
             CategoryService categoryService,
             KakaoPlaceClient kakaoPlaceClient,
             KakaoPlaceDetailClient kakaoPlaceDetailClient,
             KakaoPlaceMapper kakaoPlaceMapper
     ) {
+        this.chunkPersistenceService = chunkPersistenceService;
         this.restaurantRepository = restaurantRepository;
         this.categoryService = categoryService;
         this.kakaoPlaceClient = kakaoPlaceClient;
@@ -158,7 +161,11 @@ public class RestaurantSyncService {
             }
         }
 
-        int persistedSuccessCount = persistChunkChanges(patchCommands, deleteIds, errorMessages);
+        int persistedSuccessCount = chunkPersistenceService.persistChunkChanges(
+                patchCommands,
+                deleteIds,
+                errorMessages
+        );
         int failedCount = ids.size() - persistedSuccessCount;
 
         long chunkDurationMs = (System.nanoTime() - chunkStartAt) / 1_000_000L;
@@ -191,54 +198,6 @@ public class RestaurantSyncService {
                 failedCount,
                 errorMessages
         );
-    }
-
-    public int persistChunkChanges(
-            List<RestaurantSyncPatchCommand> patchCommands,
-            List<Long> deleteIds,
-            List<String> errorMessages
-    ) {
-        int successCount = 0;
-
-        if (!patchCommands.isEmpty()) {
-            for (int start = 0; start < patchCommands.size(); start += DB_BATCH_SIZE) {
-                int end = Math.min(start + DB_BATCH_SIZE, patchCommands.size());
-                List<RestaurantSyncPatchCommand> batch = patchCommands.subList(start, end);
-                try {
-                    long startedAt = System.nanoTime();
-                    restaurantRepository.batchApplySyncPatch(batch);
-                    successCount += batch.size();
-                    long dbMs = (System.nanoTime() - startedAt) / 1_000_000L;
-                    log.debug("batchApplySyncPatch completed. size={} tookMs={}", batch.size(), dbMs);
-                } catch (Exception e) {
-                    log.error("Batch sync patch failed for {} restaurants", batch.size(), e);
-                    if (errorMessages.size() < 10) {
-                        errorMessages.add("batch update failed: " + e.getMessage());
-                    }
-                }
-            }
-        }
-
-        if (!deleteIds.isEmpty()) {
-            for (int start = 0; start < deleteIds.size(); start += DB_BATCH_SIZE) {
-                int end = Math.min(start + DB_BATCH_SIZE, deleteIds.size());
-                List<Long> batch = deleteIds.subList(start, end);
-                try {
-                    long startedAt = System.nanoTime();
-                    restaurantRepository.batchDeleteByIds(batch);
-                    successCount += batch.size();
-                    long dbMs = (System.nanoTime() - startedAt) / 1_000_000L;
-                    log.debug("batchDeleteByIds completed. size={} tookMs={}", batch.size(), dbMs);
-                } catch (Exception e) {
-                    log.error("Batch delete failed for {} restaurants", batch.size(), e);
-                    if (errorMessages.size() < 10) {
-                        errorMessages.add("batch delete failed: " + e.getMessage());
-                    }
-                }
-            }
-        }
-
-        return successCount;
     }
 
     private SyncExecution syncTargetWithParallelismLimit(

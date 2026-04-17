@@ -25,11 +25,11 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -52,11 +52,22 @@ class RestaurantSyncServiceTest {
     @Mock
     private KakaoPlaceMapper kakaoPlaceMapper;
 
-    @InjectMocks
     private RestaurantSyncService restaurantSyncService;
 
     @Captor
     private ArgumentCaptor<List<RestaurantSyncPatchCommand>> patchCommandsCaptor;
+
+    @BeforeEach
+    void setUp() {
+        restaurantSyncService = new RestaurantSyncService(
+                new RestaurantSyncChunkPersistenceService(restaurantRepository),
+                restaurantRepository,
+                categoryService,
+                kakaoPlaceClient,
+                kakaoPlaceDetailClient,
+                kakaoPlaceMapper
+        );
+    }
 
     @Test
     void syncChunk_success_callsBatchApplyOnce() {
