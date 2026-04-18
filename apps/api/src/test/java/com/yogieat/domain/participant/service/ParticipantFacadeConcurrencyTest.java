@@ -6,8 +6,6 @@ import com.yogieat.DatabaseCleaner;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
-import com.yogieat.datasource.db.core.gathering.GatheringEntity;
-import com.yogieat.domain.fixture.GatheringFixture;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.gathering.service.GatheringRepository;
@@ -50,8 +48,20 @@ class ParticipantFacadeConcurrencyTest {
     @DisplayName("동시에 10명이 참여 시도 시 peopleCount(4)를 초과하지 않는다")
     void concurrentParticipation_shouldNotExceedPeopleCount() throws InterruptedException {
         // Given: peopleCount=4인 모임 생성
-        GatheringEntity gatheringEntity = GatheringFixture.create("Test Gathering", 4);
-        Gathering gathering = gatheringRepository.save(GatheringEntity.toDomain(gatheringEntity));
+        Gathering gathering = gatheringRepository.save(
+                new Gathering(
+                        null,
+                        "test-access-key",
+                        "Test Gathering",
+                        LocalDate.now().plusDays(7),
+                        TimeSlot.LUNCH,
+                        Region.GANGNAM,
+                        4,
+                        null,
+                        null,
+                        null
+                )
+        );
 
         int threadCount = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -160,14 +170,19 @@ class ParticipantFacadeConcurrencyTest {
     }
 
     private Gathering createGatheringWithAccessKey(String accessKey, String title) {
-        GatheringEntity gatheringEntity = GatheringFixture.create(
-                accessKey,
-                title,
-                LocalDate.now().plusDays(7),
-                TimeSlot.LUNCH,
-                Region.GANGNAM,
-                4
+        return gatheringRepository.save(
+                new Gathering(
+                        null,
+                        accessKey,
+                        title,
+                        LocalDate.now().plusDays(7),
+                        TimeSlot.LUNCH,
+                        Region.GANGNAM,
+                        4,
+                        null,
+                        null,
+                        null
+                )
         );
-        return gatheringRepository.save(GatheringEntity.toDomain(gatheringEntity));
     }
 }

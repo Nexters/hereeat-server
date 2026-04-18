@@ -2,17 +2,13 @@ package com.yogieat.datasource.db.core.gathering;
 
 import com.yogieat.common.Region;
 import com.yogieat.datasource.db.core.common.BaseEntity;
-import com.yogieat.datasource.db.core.region.RegionEntity;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import lombok.AccessLevel;
@@ -45,16 +41,8 @@ public class GatheringEntity extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private TimeSlot timeSlot;
 
-    @Column(name = "region")
-    @Enumerated(EnumType.STRING)
-    private Region region;
-
     @Column(name = "region_id")
     private Long regionId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "region_id", insertable = false, updatable = false)
-    private RegionEntity regionReference;
 
     @Column(name = "people_count")
     private Integer peopleCount;
@@ -65,14 +53,12 @@ public class GatheringEntity extends BaseEntity {
             String title,
             LocalDate scheduledDate,
             TimeSlot timeSlot,
-            Region region,
             Long regionId,
             int peopleCount) {
         this.accessKey = accessKey;
         this.title = title;
         this.scheduledDate = scheduledDate;
         this.timeSlot = timeSlot;
-        this.region = region;
         this.regionId = regionId;
         this.peopleCount = peopleCount;
     }
@@ -87,35 +73,23 @@ public class GatheringEntity extends BaseEntity {
                 .title(gathering.title())
                 .scheduledDate(gathering.scheduledDate())
                 .timeSlot(gathering.timeSlot())
-                .region(gathering.region())
                 .regionId(regionId)
                 .peopleCount(gathering.peopleCount())
                 .build();
     }
 
-    public static Gathering toDomain(GatheringEntity entity) {
+    public static Gathering toDomain(GatheringEntity entity, Region region) {
         return new Gathering(
                 entity.getId(),
                 entity.getAccessKey(),
                 entity.getTitle(),
                 entity.getScheduledDate(),
                 entity.getTimeSlot(),
-                entity.resolveRegion(),
+                region,
                 entity.getPeopleCount(),
                 entity.getDeletedAt(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
-    }
-
-    public Region resolveRegion() {
-        if (regionReference != null) {
-            Region resolved = Region.fromString(regionReference.getCode());
-            if (resolved != null) {
-                return resolved;
-            }
-        }
-
-        return region;
     }
 }

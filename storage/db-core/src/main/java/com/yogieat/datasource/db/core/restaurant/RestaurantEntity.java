@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.datasource.db.core.common.BaseEntity;
-import com.yogieat.datasource.db.core.region.RegionEntity;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
@@ -16,10 +15,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.Collections;
 import java.util.List;
@@ -40,11 +36,6 @@ import org.locationtech.jts.geom.PrecisionModel;
     name = "t_restaurant",
     indexes = {
         @Index(
-            name = "idx_restaurant_region",
-            columnList = "region",
-            unique = false
-        ),
-        @Index(
             name = "idx_restaurant_name_address",
             columnList = "name, address",
             unique = false
@@ -62,11 +53,6 @@ import org.locationtech.jts.geom.PrecisionModel;
         @Index(
             name = "idx_restaurant_deleted_at_id",
             columnList = "deleted_at, id",
-            unique = false
-        ),
-        @Index(
-            name = "idx_restaurant_region_deleted_at",
-            columnList = "region, deleted_at",
             unique = false
         ),
         @Index(
@@ -96,14 +82,8 @@ public class RestaurantEntity extends BaseEntity {
     private String representativeReview; // 대표 리뷰 1건
     @Column(columnDefinition = "TEXT")
     private String description;
-    @Column(columnDefinition = "VARCHAR(30)")
-    @Enumerated(EnumType.STRING)
-    private Region region;
     @Column(name = "region_id")
     private Long regionId;
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "region_id", insertable = false, updatable = false)
-    private RegionEntity regionReference;
     private Point location; // 위도, 경도
 
     @Column(unique = true, nullable = false)
@@ -139,7 +119,6 @@ public class RestaurantEntity extends BaseEntity {
             String mapUrl,
             String representativeReview,
             String description,
-            Region region,
             Long regionId,
             Point location,
             // 추천 근거 데이터
@@ -161,7 +140,6 @@ public class RestaurantEntity extends BaseEntity {
         this.categoryId = categoryId;
         this.representativeReview = representativeReview;
         this.description = description;
-        this.region = region;
         this.regionId = regionId;
         this.location = location;
         this.reviewCount = reviewCount;
@@ -196,7 +174,6 @@ public class RestaurantEntity extends BaseEntity {
                 .mapUrl(createRestaurant.mapUrl())
                 .representativeReview(createRestaurant.representativeReview())
                 .description(createRestaurant.description())
-                .region(createRestaurant.region())
                 .regionId(regionId)
                 .location(
                         createRestaurant.location() != null
@@ -215,7 +192,7 @@ public class RestaurantEntity extends BaseEntity {
                 .build();
     }
 
-    public static Restaurant toDomain(RestaurantEntity entity) {
+    public static Restaurant toDomain(RestaurantEntity entity, Region region) {
         return new Restaurant(
                 entity.getId(),
                 entity.getExternalId(),
@@ -227,7 +204,7 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getMapUrl(),
                 entity.getRepresentativeReview(),
                 entity.getDescription(),
-                entity.resolveRegion(),
+                region,
                 entity.location != null
                     ? new GeoJson.Point(List.of(entity.location.getX(), entity.location.getY()))
                     : null,
@@ -245,17 +222,6 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
-    }
-
-    public Region resolveRegion() {
-        if (regionReference != null) {
-            Region resolved = Region.fromString(regionReference.getCode());
-            if (resolved != null) {
-                return resolved;
-            }
-        }
-
-        return region;
     }
 
     private static Point toJtsPoint(GeoJson.Point point) {
@@ -343,7 +309,6 @@ public class RestaurantEntity extends BaseEntity {
             this.categoryId = command.categoryId();
         }
         if (command.region() != null) {
-            this.region = command.region();
             this.regionId = regionId;
         }
         if (command.location() != null) {
