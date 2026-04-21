@@ -26,6 +26,10 @@
 - Do not place feature business logic in `support:*`.
 - Do not introduce a shared abstraction until at least two real slices need it.
 - Mirror the nearest existing feature slice before inventing a new package pattern.
+- Prefer resource-oriented HTTP design in `apps:api` and `apps:admin`.
+- Avoid view-oriented endpoint names such as `dashboard`, `screen`, or `page` when the response is still a representation of an existing resource.
+- If admin or UI needs counts or summary fields for a resource collection, prefer enriching the collection or item representation before adding a separate view-specific endpoint.
+- When a `POST` creates a stable resource that has a canonical item URI, prefer `201 Created` plus a `Location` header that points to that item.
 
 ## Validator And Method Shape
 

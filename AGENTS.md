@@ -31,6 +31,9 @@
 - 임시 migration, bootstrap, initializer, backfill 코드는 제거 시점이 명확해야 한다.
 - 테스트는 startup side effect 나 전역 magic reset 보다 test-local fixture 또는 setup 을 우선한다.
 - 새로운 구조를 만들기 전에 가장 가까운 기존 feature slice 를 먼저 따른다.
+- HTTP API는 화면명이나 구현 목적보다 리소스 중심 URI를 우선한다. `dashboard`, `screen`, `page` 같은 view-oriented 경로는 지양한다.
+- 컬렉션 조회에 집계나 관리용 필드가 필요하면 별도 view endpoint보다 해당 리소스 표현이나 query parameter 확장을 먼저 검토한다.
+- 새 리소스 생성 후 안정적인 단건 조회 URI가 있다면 `POST` 응답은 `201 Created` 와 `Location` 헤더를 우선한다.
 
 ## Validation Defaults
 

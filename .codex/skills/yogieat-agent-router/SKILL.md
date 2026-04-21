@@ -27,6 +27,7 @@ Use this skill before substantial work when you need to decide whether the task 
 
 - Use `feature_mapper` for impact mapping before new feature implementation.
 - Use `architecture_guard` when the main ambiguity is service, facade, validator, processor, or transaction placement.
+- Also use `architecture_guard` when the ambiguity is resource-oriented URI design, response shape ownership, or `POST` creation semantics.
 - Use `validation_triager` when the main ambiguity is Java 25 Gradle validation scope or CI parity.
 - Use `yogieat-testing-guard` before writing, refactoring, or reviewing tests.
 - Use `harness_curator` when the task involves repeated prompts, repeated review comments, or harness rule promotion.

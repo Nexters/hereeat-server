@@ -32,6 +32,7 @@
   - repeated validation scope corrections
   - repeated transaction or test harness pitfalls
   - repeated testing feedback about mocking boundaries, `verify(...)`, or hidden seed behavior
+  - repeated API review feedback about resource-oriented URIs, `Location` headers, or view-specific endpoint drift
   - repeated prompt boilerplate that can be replaced by a skill or routing rule
 - Bad candidates:
   - one-off naming tastes

@@ -19,8 +19,12 @@ Use this skill when implementing a new feature or extending an existing flow in 
    - Service for single-domain logic
    - Validator for non-trivial domain validation
    - Processor or Creator for a named subflow that deserves its own role
-5. Keep adapters thin in `storage`, `external`, and `support`.
-6. Pick the smallest validation scope using the Java 25 validation skill.
+5. Decide the HTTP contract before implementation:
+   - prefer resource-oriented paths
+   - prefer extending a resource representation over introducing a view-specific endpoint
+   - if `POST` creates a stable item resource, plan for `201 Created` and a `Location` header
+6. Keep adapters thin in `storage`, `external`, and `support`.
+7. Pick the smallest validation scope using the Java 25 validation skill.
 
 ## Rules
 
@@ -31,6 +35,8 @@ Use this skill when implementing a new feature or extending an existing flow in 
 - External client implementations stay in `external:*`.
 - Do not put cross-domain orchestration into a service.
 - Do not add private helper chains when the logic should become a validator or processor.
+- Avoid endpoint names that describe a screen or dashboard when the API is still returning one resource or a collection of that resource.
+- Prefer `201 Created` plus `Location` for resource creation when the item URI is known.
 
 ## Output
 

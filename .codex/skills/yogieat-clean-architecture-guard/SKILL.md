@@ -27,6 +27,8 @@ Use this skill when the task is "where should this live?" or "does this still fi
 - Transactional self-invocation
 - Private helper sprawl that hides simple flow
 - Temporary migration or bootstrap code left in runtime after completion
+- View-oriented HTTP design such as `dashboard` endpoints for data that should still be a resource representation
+- Missing `Location` header or missing item endpoint after `POST` resource creation when a canonical URI exists
 
 ## Notes
 
