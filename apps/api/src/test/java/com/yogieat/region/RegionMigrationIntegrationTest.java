@@ -15,6 +15,8 @@ import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.gathering.service.GatheringAdminCriteria;
 import com.yogieat.gathering.service.GatheringRepository;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionSummary;
+import com.yogieat.region.service.RegionCommand;
 import com.yogieat.region.service.RegionService;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
@@ -101,6 +103,41 @@ class RegionMigrationIntegrationTest {
                 .doesNotContain("YEOKSAM", Region.HONGDAE.name())
                 .contains(Region.GANGNAM.name());
         assertThat(regions.getFirst().code()).isEqualTo(Region.GANGNAM.name());
+    }
+
+    @Test
+    @DisplayName("admin region 생성과 dashboard 조회는 DB 전용 region과 맛집 수를 반영한다")
+    void createRegionAndDashboard_ShouldSupportDbOnlyRegion() {
+        RegionMaster yeoksam = regionService.createRegion(new RegionCommand.Create(
+                "YEOKSAM",
+                "역삼역",
+                new GeoJson.Point(List.of(127.033, 37.5006)),
+                true,
+                null
+        ));
+
+        restaurantRepository.save(createRestaurant("ext-yeoksam", null), yeoksam.id());
+
+        List<RegionMaster> adminRegions = regionService.findAllRegions();
+        assertThat(adminRegions)
+                .extracting(RegionMaster::code)
+                .contains("YEOKSAM");
+
+        List<RegionSummary> activeSummaries = regionService.findActiveRegionSummaries();
+        assertThat(activeSummaries)
+                .extracting(summary -> summary.region().code())
+                .contains("YEOKSAM");
+
+        assertThat(regionService.findActiveRegions())
+                .extracting(RegionMaster::code)
+                .doesNotContain("YEOKSAM");
+
+        RegionSummary yeoksamSummary = regionService.findRegionDashboard().stream()
+                .filter(summary -> "YEOKSAM".equals(summary.region().code()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(yeoksamSummary.region().displayName()).isEqualTo("역삼역");
+        assertThat(yeoksamSummary.restaurantCount()).isEqualTo(1L);
     }
 
     @Test

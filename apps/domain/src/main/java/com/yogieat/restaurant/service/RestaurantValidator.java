@@ -1,6 +1,5 @@
 package com.yogieat.restaurant.service;
 
-import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
@@ -39,12 +38,13 @@ public class RestaurantValidator {
      * 주어진 장소에 대한 기존 맛집 데이터를 로드하여 배치 검증을 준비
      * DB 쿼리 횟수를 장소당 N번에서 1번으로 감소
      *
-     * @param region 맛집 데이터를 로드할 장소
+     * @param regionId 맛집 데이터를 로드할 지역 ID
+     * @param regionDisplayName 맛집 데이터를 로드할 지역명
      */
-    public ValidationContext prepareForBatchValidation(Region region) {
-        log.info("Preparing batch validation cache for place: {}", region.getName());
+    public ValidationContext prepareForBatchValidation(Long regionId, String regionDisplayName) {
+        log.info("Preparing batch validation cache for place: {}", regionDisplayName);
 
-        List<Restaurant> existingRestaurants = restaurantRepository.findByRegion(region);
+        List<Restaurant> existingRestaurants = restaurantRepository.findByRegionId(regionId);
 
         Set<String> cachedExternalIds = ConcurrentHashMap.newKeySet();
         Set<String> cachedNameAddressPairs = ConcurrentHashMap.newKeySet();

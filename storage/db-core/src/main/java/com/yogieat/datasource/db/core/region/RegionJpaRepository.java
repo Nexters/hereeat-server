@@ -8,9 +8,16 @@ import org.springframework.data.repository.query.Param;
 
 public interface RegionJpaRepository extends JpaRepository<RegionEntity, Long> {
     Optional<RegionEntity> findByCode(String code);
+    Optional<RegionEntity> findByDisplayNameAndActiveTrue(String displayName);
 
+    List<RegionEntity> findAllByOrderBySortOrderAsc();
     List<RegionEntity> findAllByActiveTrueOrderBySortOrderAsc();
+    boolean existsByCode(String code);
+    boolean existsByDisplayName(String displayName);
 
     @Query("select r.id from RegionEntity r where r.code = :code")
     Optional<Long> findIdByCode(@Param("code") String code);
+
+    @Query("select coalesce(max(r.sortOrder), -1) + 1 from RegionEntity r")
+    Integer findNextSortOrder();
 }
