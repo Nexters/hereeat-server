@@ -22,9 +22,13 @@ Use this skill when implementing a new feature or extending an existing flow in 
 5. Decide the HTTP contract before implementation:
    - prefer resource-oriented paths
    - prefer extending a resource representation over introducing a view-specific endpoint
-   - if `POST` creates a stable item resource, plan for `201 Created` and a `Location` header
-6. Keep adapters thin in `storage`, `external`, and `support`.
-7. Pick the smallest validation scope using the Java 25 validation skill.
+   - use `201 Created` for stable resource creation and add `Location` only when the feature explicitly needs it
+6. Decide transaction semantics with the same care as layer placement:
+   - facade or service query methods should use `@Transactional(readOnly = true)`
+   - mutating methods should use write transactions
+   - do not let write flows accidentally inherit `readOnly = true` from class-level defaults
+7. Keep adapters thin in `storage`, `external`, and `support`.
+8. Pick the smallest validation scope using the Java 25 validation skill.
 
 ## Rules
 
@@ -36,7 +40,7 @@ Use this skill when implementing a new feature or extending an existing flow in 
 - Do not put cross-domain orchestration into a service.
 - Do not add private helper chains when the logic should become a validator or processor.
 - Avoid endpoint names that describe a screen or dashboard when the API is still returning one resource or a collection of that resource.
-- Prefer `201 Created` plus `Location` for resource creation when the item URI is known.
+- Prefer `201 Created` for resource creation and add `Location` only when the current feature explicitly benefits from it.
 
 ## Output
 

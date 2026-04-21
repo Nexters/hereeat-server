@@ -29,7 +29,7 @@
 - Prefer resource-oriented HTTP design in `apps:api` and `apps:admin`.
 - Avoid view-oriented endpoint names such as `dashboard`, `screen`, or `page` when the response is still a representation of an existing resource.
 - If admin or UI needs counts or summary fields for a resource collection, prefer enriching the collection or item representation before adding a separate view-specific endpoint.
-- When a `POST` creates a stable resource that has a canonical item URI, prefer `201 Created` plus a `Location` header that points to that item.
+- Use `201 Created` for stable resource creation, but treat the `Location` header as optional unless the current feature explicitly needs it.
 
 ## Validator And Method Shape
 
@@ -46,6 +46,9 @@
 
 ## Transaction And Migration Rules
 
+- Facade and Service methods must choose transaction semantics intentionally.
+- Read-only query paths should use `@Transactional(readOnly = true)`.
+- Mutating commands should use write transactions and must not accidentally inherit `readOnly = true`.
 - If transactional semantics depend on proxying, self-invocation is not allowed.
 - Use a dedicated bean for isolated transactional work such as `REQUIRES_NEW`.
 - Temporary initializer, bootstrap, migration, or backfill code must have an explicit removal condition.
