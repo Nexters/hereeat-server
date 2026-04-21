@@ -1,9 +1,12 @@
 package com.yogieat.region;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
+import com.yogieat.common.error.CustomException;
+import com.yogieat.common.error.ErrorCode;
 import com.yogieat.datasource.db.core.gathering.GatheringEntity;
 import com.yogieat.datasource.db.core.gathering.GatheringJpaRepository;
 import com.yogieat.datasource.db.core.region.RegionEntity;
@@ -73,7 +76,7 @@ class RegionMigrationIntegrationTest {
     void findActiveRegionsForAdmin_ShouldReturnOnlyActiveMappableRegions() {
         assertThat(regionJpaRepository.findAll()).hasSize(Region.values().length);
 
-        RegionEntity hongdae = regionJpaRepository.findByCode(Region.HONGDAE.name()).orElseThrow();
+        RegionEntity hongdae = regionJpaRepository.findByCodeAndDeletedAtIsNull(Region.HONGDAE.name()).orElseThrow();
         hongdae.apply(new RegionMaster(
                 hongdae.getId(),
                 hongdae.getCode(),
@@ -138,6 +141,55 @@ class RegionMigrationIntegrationTest {
                 .orElseThrow();
         assertThat(yeoksamSummary.region().displayName()).isEqualTo("역삼역");
         assertThat(yeoksamSummary.restaurantCount()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("admin region 부분 수정은 전달된 필드만 반영한다")
+    void updateRegion_ShouldApplyOnlyPatchedFields() {
+        RegionMaster yeoksam = regionService.createRegion(new RegionCommand.Create(
+                "YEOKSAM",
+                "역삼역",
+                new GeoJson.Point(List.of(127.033, 37.5006)),
+                true,
+                8
+        ));
+
+        regionService.updateRegion(yeoksam.id(), new RegionCommand.Patch(
+                null,
+                "역삼",
+                null,
+                false,
+                3
+        ));
+
+        RegionSummary updatedRegion = regionService.getRegionSummaryById(yeoksam.id());
+        assertThat(updatedRegion.region().code()).isEqualTo("YEOKSAM");
+        assertThat(updatedRegion.region().displayName()).isEqualTo("역삼");
+        assertThat(updatedRegion.region().coordinatesStandard().getCoordinates()).containsExactly(127.033, 37.5006);
+        assertThat(updatedRegion.region().active()).isFalse();
+        assertThat(updatedRegion.region().sortOrder()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("soft delete 된 region 은 region 조회 경로에서 제외된다")
+    void deleteRegion_ShouldExcludeDeletedRegionFromRegionReads() {
+        Long gangnamRegionId = regionJpaRepository.findIdByCode(Region.GANGNAM.name()).orElseThrow();
+        restaurantJpaRepository.save(RestaurantEntity.from(createRestaurant("ext-soft-delete", Region.GANGNAM), gangnamRegionId));
+
+        regionService.deleteRegionById(gangnamRegionId);
+
+        assertThatThrownBy(() -> regionService.getRegionById(gangnamRegionId))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_LOCATION_NAME);
+
+        assertThat(regionService.findAllRegions())
+                .extracting(RegionMaster::code)
+                .doesNotContain(Region.GANGNAM.name());
+        assertThat(regionService.findActiveRegionSummaries())
+                .extracting(summary -> summary.region().code())
+                .doesNotContain(Region.GANGNAM.name());
+        assertThat(restaurantRepository.findByRegion(Region.GANGNAM)).isEmpty();
     }
 
     @Test

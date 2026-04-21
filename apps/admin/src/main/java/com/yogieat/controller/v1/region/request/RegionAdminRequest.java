@@ -34,6 +34,28 @@ public final class RegionAdminRequest {
         }
     }
 
+    public record Patch(
+            String code,
+            String displayName,
+            CoordinatesRequest coordinatesStandard,
+            Boolean active,
+            Integer sortOrder
+    ) {
+        public static RegionCommand.Patch toCommand(Patch request) {
+            if (request == null) {
+                return RegionCommand.Patch.empty();
+            }
+
+            return new RegionCommand.Patch(
+                    normalizeCode(request.code()),
+                    trimOrNull(request.displayName()),
+                    parseOptionalCoordinates(request.coordinatesStandard()),
+                    request.active(),
+                    request.sortOrder()
+            );
+        }
+    }
+
     public record CoordinatesRequest(List<Double> coordinates) {
     }
 
@@ -68,5 +90,12 @@ public final class RegionAdminRequest {
         }
 
         return new GeoJson.Point(List.of(longitude, latitude));
+    }
+
+    private static GeoJson.Point parseOptionalCoordinates(CoordinatesRequest coordinatesRequest) {
+        if (coordinatesRequest == null) {
+            return null;
+        }
+        return parseCoordinates(coordinatesRequest);
     }
 }

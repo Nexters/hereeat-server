@@ -529,7 +529,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             return null;
         }
 
-        return regionJpaRepository.findById(regionId)
+        return regionJpaRepository.findByIdAndDeletedAtIsNull(regionId)
                 .map(regionEntity -> toRegion(regionEntity.getCode()))
                 .orElse(null);
     }
@@ -544,7 +544,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         }
 
         Map<Long, Region> regionMap = new HashMap<>();
-        regionJpaRepository.findAllById(distinctRegionIds)
+        regionJpaRepository.findByIdInAndDeletedAtIsNull(distinctRegionIds)
                 .forEach(regionEntity -> regionMap.put(regionEntity.getId(), toRegion(regionEntity.getCode())));
         return regionMap;
     }
@@ -559,7 +559,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         }
 
         Map<Long, RegionMaster> regionMap = new HashMap<>();
-        regionJpaRepository.findAllById(distinctRegionIds)
+        regionJpaRepository.findByIdInAndDeletedAtIsNull(distinctRegionIds)
                 .forEach(regionEntity -> regionMap.put(regionEntity.getId(), com.yogieat.datasource.db.core.region.RegionEntity.toDomain(regionEntity)));
         return regionMap;
     }

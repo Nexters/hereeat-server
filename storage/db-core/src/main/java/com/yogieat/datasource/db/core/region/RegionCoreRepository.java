@@ -26,13 +26,13 @@ public class RegionCoreRepository implements RegionRepository {
 
     @Override
     public Optional<RegionMaster> findById(Long id) {
-        return regionJpaRepository.findById(id)
+        return regionJpaRepository.findByIdAndDeletedAtIsNull(id)
                 .map(RegionEntity::toDomain);
     }
 
     @Override
     public Optional<RegionSummary> findRegionSummaryById(Long id) {
-        return regionJpaRepository.findById(id)
+        return regionJpaRepository.findByIdAndDeletedAtIsNull(id)
                 .map(regionEntity -> new RegionSummary(
                         RegionEntity.toDomain(regionEntity),
                         findRestaurantCountMap(List.of(regionEntity.getId())).getOrDefault(regionEntity.getId(), 0L)
@@ -41,31 +41,31 @@ public class RegionCoreRepository implements RegionRepository {
 
     @Override
     public List<RegionMaster> findAllOrderBySortOrder() {
-        return regionJpaRepository.findAllByOrderBySortOrderAsc().stream()
+        return regionJpaRepository.findAllByDeletedAtIsNullOrderBySortOrderAsc().stream()
                 .map(RegionEntity::toDomain)
                 .toList();
     }
 
     @Override
     public List<RegionMaster> findAllActiveOrderBySortOrder() {
-        return regionJpaRepository.findAllByActiveTrueOrderBySortOrderAsc().stream()
+        return regionJpaRepository.findAllByActiveTrueAndDeletedAtIsNullOrderBySortOrderAsc().stream()
                 .map(RegionEntity::toDomain)
                 .toList();
     }
 
     @Override
     public List<RegionSummary> findAllRegionSummariesOrderBySortOrder() {
-        return toRegionSummaries(regionJpaRepository.findAllByOrderBySortOrderAsc());
+        return toRegionSummaries(regionJpaRepository.findAllByDeletedAtIsNullOrderBySortOrderAsc());
     }
 
     @Override
     public List<RegionSummary> findAllActiveRegionSummariesOrderBySortOrder() {
-        return toRegionSummaries(regionJpaRepository.findAllByActiveTrueOrderBySortOrderAsc());
+        return toRegionSummaries(regionJpaRepository.findAllByActiveTrueAndDeletedAtIsNullOrderBySortOrderAsc());
     }
 
     @Override
     public Optional<RegionMaster> findActiveByDisplayName(String displayName) {
-        return regionJpaRepository.findByDisplayNameAndActiveTrue(displayName)
+        return regionJpaRepository.findByDisplayNameAndActiveTrueAndDeletedAtIsNull(displayName)
                 .map(RegionEntity::toDomain);
     }
 
@@ -76,7 +76,7 @@ public class RegionCoreRepository implements RegionRepository {
 
     @Override
     public boolean existsByDisplayName(String displayName) {
-        return regionJpaRepository.existsByDisplayName(displayName);
+        return regionJpaRepository.existsByDisplayNameAndDeletedAtIsNull(displayName);
     }
 
     @Override
@@ -88,6 +88,21 @@ public class RegionCoreRepository implements RegionRepository {
     public RegionMaster save(RegionMaster regionMaster) {
         RegionEntity savedEntity = regionJpaRepository.save(RegionEntity.of(regionMaster));
         return RegionEntity.toDomain(savedEntity);
+    }
+
+    @Override
+    public RegionMaster update(RegionMaster regionMaster) {
+        RegionEntity entity = regionJpaRepository.findByIdAndDeletedAtIsNull(regionMaster.id())
+                .orElseThrow();
+        entity.apply(regionMaster);
+        return RegionEntity.toDomain(entity);
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        RegionEntity entity = regionJpaRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow();
+        entity.softDelete();
     }
 
     private List<RegionSummary> toRegionSummaries(List<RegionEntity> regionEntities) {

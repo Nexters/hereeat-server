@@ -13,4 +13,16 @@ public final class RegionCommand {
             Integer sortOrder
     ) {
     }
+
+    public record Patch(
+            String code,
+            String displayName,
+            GeoJson.Point coordinatesStandard,
+            Boolean active,
+            Integer sortOrder
+    ) {
+        public static Patch empty() {
+            return new Patch(null, null, null, null, null);
+        }
+    }
 }

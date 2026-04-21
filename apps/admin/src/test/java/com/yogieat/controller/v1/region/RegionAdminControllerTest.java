@@ -1,7 +1,10 @@
 package com.yogieat.controller.v1.region;
 
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -164,11 +167,57 @@ class RegionAdminControllerTest {
                                     "coordinates": [127.033, 37.5006]
                                   },
                                   "active": true
-                                }
+                }
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.region.id").value(3))
                 .andExpect(jsonPath("$.data.region.name").value("YEOKSAM"))
                 .andExpect(jsonPath("$.data.region.displayName").value("역삼역"));
+    }
+
+    @Test
+    @DisplayName("region 부분 수정 응답이 200으로 반환된다")
+    void updateRegion_ShouldReturn200() throws Exception {
+        when(regionAdminFacade.updateRegion(Mockito.eq(3L), Mockito.any(RegionCommand.Patch.class))).thenReturn(
+                new RegionSummary(
+                        new RegionMaster(
+                                3L,
+                                "YEOKSAM",
+                                "역삼",
+                                new GeoJson.Point(List.of(127.033, 37.5006)),
+                                false,
+                                5,
+                                null,
+                                null
+                        ),
+                        2L
+                )
+        );
+
+        mockMvc.perform(patch(BASE_URL + "/3")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "displayName": "역삼",
+                                  "active": false,
+                                  "sortOrder": 5
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.region.id").value(3))
+                .andExpect(jsonPath("$.data.region.name").value("YEOKSAM"))
+                .andExpect(jsonPath("$.data.region.displayName").value("역삼"))
+                .andExpect(jsonPath("$.data.region.active").value(false))
+                .andExpect(jsonPath("$.data.region.sortOrder").value(5))
+                .andExpect(jsonPath("$.data.region.restaurantCount").value(2));
+    }
+
+    @Test
+    @DisplayName("region 삭제 응답이 204로 반환된다")
+    void deleteRegion_ShouldReturn204() throws Exception {
+        doNothing().when(regionAdminFacade).deleteRegionById(3L);
+
+        mockMvc.perform(delete(BASE_URL + "/3"))
+                .andExpect(status().isNoContent());
     }
 }

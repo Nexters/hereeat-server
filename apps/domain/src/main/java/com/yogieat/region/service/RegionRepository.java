@@ -17,4 +17,6 @@ public interface RegionRepository {
     boolean existsByDisplayName(String displayName);
     int nextSortOrder();
     RegionMaster save(RegionMaster regionMaster);
+    RegionMaster update(RegionMaster regionMaster);
+    void deleteById(Long id);
 }

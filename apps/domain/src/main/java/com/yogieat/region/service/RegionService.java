@@ -82,4 +82,29 @@ public class RegionService {
         );
         return regionRepository.save(region);
     }
+
+    @Transactional
+    public RegionMaster updateRegion(Long id, RegionCommand.Patch command) {
+        RegionMaster currentRegion = getRegionById(id);
+        regionValidator.validatePatch(currentRegion, command);
+
+        RegionMaster updatedRegion = new RegionMaster(
+                currentRegion.id(),
+                command.code() != null ? command.code() : currentRegion.code(),
+                command.displayName() != null ? command.displayName() : currentRegion.displayName(),
+                command.coordinatesStandard() != null ? command.coordinatesStandard() : currentRegion.coordinatesStandard(),
+                command.active() != null ? command.active() : currentRegion.active(),
+                command.sortOrder() != null ? command.sortOrder() : currentRegion.sortOrder(),
+                currentRegion.createdAt(),
+                currentRegion.updatedAt()
+        );
+
+        return regionRepository.update(updatedRegion);
+    }
+
+    @Transactional
+    public void deleteRegionById(Long id) {
+        getRegionById(id);
+        regionRepository.deleteById(id);
+    }
 }

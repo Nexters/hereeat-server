@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,5 +44,23 @@ public class RegionAdminController {
         var createdRegion = regionAdminFacade.createRegion(RegionAdminRequest.Create.toCommand(request));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(RegionAdminResponse.CreateResponse.from(createdRegion));
+    }
+
+    @PatchMapping("/{regionId}")
+    public RegionAdminResponse.DetailResponse updateRegion(
+            @PathVariable Long regionId,
+            @RequestBody RegionAdminRequest.Patch request
+    ) {
+        return RegionAdminResponse.DetailResponse.from(
+                regionAdminFacade.updateRegion(regionId, RegionAdminRequest.Patch.toCommand(request))
+        );
+    }
+
+    @DeleteMapping("/{regionId}")
+    public ResponseEntity<Void> deleteRegion(
+            @PathVariable Long regionId
+    ) {
+        regionAdminFacade.deleteRegionById(regionId);
+        return ResponseEntity.noContent().build();
     }
 }
