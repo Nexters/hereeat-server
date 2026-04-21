@@ -2,7 +2,7 @@ name: develop Build And Deploy
 
 on:
   push:
-    branches: [ "develop" ]
+    branches: [ "chore/jib" ]
 
 env:
   DOCKERHUB_USERNAME: yogieat
@@ -44,12 +44,6 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build --no-daemon
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Set image tags
         id: image-tags
         run: |
@@ -57,41 +51,14 @@ jobs:
           echo "admin_image=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_OUTPUT
           echo "batch_image=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_OUTPUT
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push API image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/Dockerfile
-          push: true
-          build-args: |
-            JAR_FILE=apps/api/build/libs/*.jar
-          tags: ${{ steps.image-tags.outputs.api_image }}
-          platforms: linux/amd64
-
-      - name: Build and push Admin image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/Dockerfile
-          push: true
-          build-args: |
-            JAR_FILE=apps/admin/build/libs/*.jar
-          tags: ${{ steps.image-tags.outputs.admin_image }}
-          platforms: linux/amd64
-
-      - name: Build and push Batch image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/Dockerfile
-          push: true
-          build-args: |
-            JAR_FILE=batch/sync/build/libs/*.jar
-          tags: ${{ steps.image-tags.outputs.batch_image }}
-          platforms: linux/amd64
+      - name: Build and push images with Jib
+        env:
+          API_IMAGE_FULL_URL: ${{ steps.image-tags.outputs.api_image }}
+          ADMIN_IMAGE_FULL_URL: ${{ steps.image-tags.outputs.admin_image }}
+          BATCH_IMAGE_FULL_URL: ${{ steps.image-tags.outputs.batch_image }}
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: ./gradlew jibPushAll --no-daemon
 
       # 서버로 docker 관련 파일 전송
       - name: Copy docker directory to Server

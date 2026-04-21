@@ -16,6 +16,10 @@ spring:
 
 server:
   port: 8081
+  tomcat:
+    threads:
+      max: ${ADMIN_TOMCAT_MAX_THREADS:32}
+      min-spare: ${ADMIN_TOMCAT_MIN_THREADS:4}
 
 jwt:
   secret: ${JWT_SECRET:your-256-bit-secret-key-here-must-be-at-least-32-characters}
