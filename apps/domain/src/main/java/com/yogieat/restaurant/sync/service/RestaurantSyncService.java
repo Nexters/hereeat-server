@@ -577,8 +577,11 @@ public class RestaurantSyncService {
     }
 
     private String offDaysToJson(List<LocalDate> offDays) {
-        if (offDays == null || offDays.isEmpty()) {
+        if (offDays == null) {
             return null;
+        }
+        if (offDays.isEmpty()) {
+            return "[]";
         }
         return toJson(offDays.stream().map(LocalDate::toString).toList());
     }
