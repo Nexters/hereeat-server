@@ -5,20 +5,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class KakaoPlaceDetailParserTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private final KakaoPlaceDetailParser parser = new KakaoPlaceDetailParser();
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    // 테스트 기준 날짜: 2026-04-21 (KST)
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-04-20T15:00:00Z"), KST); // UTC 15:00 = KST 00:00 (4/21)
+    private final KakaoPlaceDetailParser parser = new KakaoPlaceDetailParser(FIXED_CLOCK);
     private static final String PLACE_ID = "16053234";
+    private static final int YEAR = 2026;
 
     @Test
     @DisplayName("off_days_desc가 '휴무일'인 날짜만 off_days로 수집한다")
     void parse_collectsOffDays() throws Exception {
-        int year = LocalDate.now().getYear();
+        int year = YEAR;
         JsonNode panel = panel("""
                 {
                   "summary": {
@@ -117,7 +125,7 @@ class KakaoPlaceDetailParserTest {
     @Test
     @DisplayName("동일한 날짜가 여러 period에 중복 등장해도 한 번만 수집한다")
     void parse_deduplicatesOffDays() throws Exception {
-        int year = LocalDate.now().getYear();
+        int year = YEAR;
         JsonNode panel = panel("""
                 {
                   "summary": {

@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.gathering.domain.value.TimeSlot;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -17,6 +19,17 @@ import org.springframework.stereotype.Component;
 public class KakaoPlaceDetailParser {
 
     private static final int MAX_PHOTOS = 15;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    private final Clock clock;
+
+    public KakaoPlaceDetailParser() {
+        this(Clock.system(KST));
+    }
+
+    KakaoPlaceDetailParser(Clock clock) {
+        this.clock = clock;
+    }
 
     public KakaoPlaceDetailData parse(JsonNode panel, String requestedPlaceId) {
         try {
@@ -686,7 +699,7 @@ public class KakaoPlaceDetailParser {
             return List.of();
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         int currentYear = today.getYear();
         int currentMonth = today.getMonthValue();
 
