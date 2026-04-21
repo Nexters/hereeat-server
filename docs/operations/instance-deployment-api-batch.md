@@ -1,6 +1,6 @@
 # API + Admin + Batch 인스턴스 배포/운영 가이드
 
-> 최종 업데이트: 2026-03-09
+> 최종 업데이트: 2026-04-22
 
 ## 1. 결론 요약
 - `batch:sync`는 API와 **별도 애플리케이션 프로세스**로 실행해야 한다.
@@ -48,16 +48,32 @@ location /api/ {
 - Admin 이미지: `yogieat/yogieat-server-admin:<tag>`
 - Batch 이미지: `yogieat/yogieat-server-batch-sync:<tag>`
 
-Dockerfile은 동일하고 `JAR_FILE` build-arg만 다르게 사용한다.
-- API: `apps/api/build/libs/*.jar`
-- Admin: `apps/admin/build/libs/*.jar`
-- Batch: `batch/sync/build/libs/*.jar`
+### 이미지 빌드 표준
+- 표준 빌드 경로는 Gradle `Jib`이다.
+- Jib는 Gradle에서 직접 레이어드 이미지를 만들고 Docker daemon 없이 registry push를 수행한다.
+- 변경되지 않은 dependency layer를 재사용하므로 `Dockerfile + buildx` 대비 CI 빌드와 push 시간이 줄어든다.
+- 이미지 내부 GC/JVM 옵션은 하드코딩하지 않고, Compose의 `JAVA_TOOL_OPTIONS`로만 제어한다.
+
+### Jib 태스크
+- CI 표준 태스크: `./gradlew jibPushAll --no-daemon`
+- 로컬 Docker 검증 태스크: `./gradlew jibDockerBuildAll --no-daemon`
+- 공통 전제:
+  - API 대상 이미지 env: `API_IMAGE_FULL_URL`
+  - Admin 대상 이미지 env: `ADMIN_IMAGE_FULL_URL`
+  - Batch 대상 이미지 env: `BATCH_IMAGE_FULL_URL`
+  - Registry 인증 env: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`
+
+### Dockerfile fallback
+- `docker/Dockerfile`은 비상시 fallback 용도로만 유지한다.
+- 기본 CI/CD 경로에서는 사용하지 않는다.
+- fallback Dockerfile도 GC를 내장하지 않으며, `JAVA_TOOL_OPTIONS`에만 의존한다.
 
 ### CI/CD 동작
 1. Gradle build
-2. API/Admin/BATCH 이미지 각각 build & push
-3. 서버로 `docker/` 디렉터리 및 `scripts/deploy/` rsync
-4. 서버에서 `DEPLOY_SCOPE=app`, `DEPLOY_ENV=(dev|prod)`로 `scripts/deploy/compose-up.sh` 실행
+2. 이미지 태그 계산
+3. `./gradlew jibPushAll --no-daemon`으로 API/Admin/BATCH 이미지 push
+4. 서버로 `docker/` 디렉터리 및 `scripts/deploy/` rsync
+5. 서버에서 `DEPLOY_SCOPE=app`, `DEPLOY_ENV=(dev|prod)`로 `scripts/deploy/compose-up.sh` 실행
 
 ## 5. 인스턴스 실행 방법
 
@@ -104,16 +120,40 @@ ENV_FILE_PATH=~/.env \
 ### 5.2 환경별 리소스 제한
 - DEV (`docker/docker-compose.dev.yaml`)
   - 서버 스펙 목표: `2 vCPU / 4GB`
-  - `yogieat-api`: `cpus=0.90`, `mem_limit=1440m`, `mem_reservation=720m`
-  - `yogieat-admin`: `cpus=0.50`, `mem_limit=800m`, `mem_reservation=400m`
-  - `yogieat-batch-sync`: `cpus=0.20`, `mem_limit=320m`, `mem_reservation=160m`
-  - `yogieat-db`: `cpus=0.40`, `mem_limit=640m`, `mem_reservation=320m`
+  - `yogieat-api`: `cpus=1.00`, `mem_limit=1536m`, `mem_reservation=768m`
+  - `yogieat-api` env:
+    - `DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=18`
+    - `DATASOURCE_DB_CORE_MINIMUM_IDLE=4`
+    - `DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=1500`
+    - `API_TOMCAT_MAX_THREADS=128`
+    - `API_TOMCAT_MIN_THREADS=16`
+    - `JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=65.0 -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication`
+  - `yogieat-admin`: `cpus=0.25`, `mem_limit=512m`, `mem_reservation=256m`
+  - `yogieat-admin` env:
+    - `DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=6`
+    - `DATASOURCE_DB_CORE_MINIMUM_IDLE=2`
+    - `DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=2000`
+    - `ADMIN_TOMCAT_MAX_THREADS=32`
+    - `ADMIN_TOMCAT_MIN_THREADS=4`
+    - `JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=55.0 -XX:MaxGCPauseMillis=300`
+  - `yogieat-batch-sync`: `cpus=0.20`, `mem_limit=384m`, `mem_reservation=192m`
+  - `yogieat-batch-sync` env:
+    - `DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=4`
+    - `DATASOURCE_DB_CORE_MINIMUM_IDLE=1`
+    - `DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=2000`
+    - `SYNC_JOB_PARALLELISM=4`
+    - `JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=55.0 -XX:MaxGCPauseMillis=400`
+  - `yogieat-db`: `cpus=0.35`, `mem_limit=768m`, `mem_reservation=384m`
+  - `yogieat-db` env:
+    - `PG_SHARED_BUFFERS=256MB`
+    - `PG_WORK_MEM=8MB`
+    - `PG_MAINTENANCE_WORK_MEM=64MB`
+    - `PG_MAX_CONNECTIONS=48`
 - PROD (`docker/docker-compose.prod.yaml`)
   - 서버 스펙 목표: `2 vCPU / 4GB`
-  - `yogieat-api`: `cpus=0.90`, `mem_limit=1440m`, `mem_reservation=720m`
-  - `yogieat-admin`: `cpus=0.50`, `mem_limit=800m`, `mem_reservation=400m`
-  - `yogieat-batch-sync`: `cpus=0.20`, `mem_limit=320m`, `mem_reservation=160m`
-  - `yogieat-db`: `cpus=0.40`, `mem_limit=640m`, `mem_reservation=320m`
+  - `DEV`와 동일한 `2 vCPU / 4GB 처리량 우선` 프로파일을 사용한다.
+
+서비스 합산 자원 사용량은 `1.80 vCPU`, `3200MiB`로 맞춰 OS/nginx/docker 여유를 남긴다.
 
 `DEPLOY_SCOPE=app` 배포는 API/Admin/BATCH 중심으로 동작하며, DB는 필요 시 자동 복구(기동/재생성)된다.
 DB 설정을 강제로 재적용하려면 유지보수 창에 `DEPLOY_SCOPE=full` 배포를 사용한다.
@@ -186,3 +226,4 @@ docker logs -f yogieat-server-batch-sync
 ## 11. 주의사항
 - 이 저장소 변경은 배포 아티팩트를 준비한 것이며, 실제 서버 반영은 CI 실행 또는 서버에서 compose 명령 실행이 필요하다.
 - 운영은 nginx/letsencrypt 기준으로 관리한다. Caddy edge는 운영 기본 경로가 아니다.
+- Jib는 현재 Gradle 9.1.0 환경에서 실검증 대상이다. 배포 전 최소 `./gradlew jibDockerBuildAll --no-daemon`까지는 확인한다.
