@@ -20,7 +20,8 @@ public record RestaurantSyncPatchCommand(
         String aiMateSummaryTitle,
         String aiMateSummaryContents,
         TimeSlot timeSlot,
-        Long categoryId
+        Long categoryId,
+        String offDays
 ) {
     public static RestaurantSyncPatchCommand of(Long restaurantId, RestaurantSyncPatch patch) {
         Double longitude = null;
@@ -51,7 +52,8 @@ public record RestaurantSyncPatchCommand(
                 patch.aiMateSummaryTitle(),
                 patch.aiMateSummaryContents(),
                 patch.timeSlot(),
-                patch.categoryId()
+                patch.categoryId(),
+                patch.offDays()
         );
     }
 }
