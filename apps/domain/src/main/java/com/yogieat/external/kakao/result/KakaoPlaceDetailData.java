@@ -64,7 +64,7 @@ public record KakaoPlaceDetailData(
                 null,
                 null,
                 null,
-                List.of()
+                null
         );
     }
 }
