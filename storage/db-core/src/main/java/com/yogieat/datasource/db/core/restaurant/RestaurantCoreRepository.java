@@ -26,6 +26,7 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.sql.Types;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -122,7 +123,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.aiMateSummaryContents,
                         restaurantEntity.timeSlot,
                         restaurantEntity.createdAt,
-                        restaurantEntity.updatedAt
+                        restaurantEntity.updatedAt,
+                        restaurantEntity.offDays
                 )
                 .from(restaurantEntity)
                 .where(
@@ -425,7 +427,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 parseAiMateSummaryContents(tuple.get(restaurantEntity.aiMateSummaryContents)),
                 tuple.get(restaurantEntity.timeSlot),
                 tuple.get(restaurantEntity.createdAt),
-                tuple.get(restaurantEntity.updatedAt)
+                tuple.get(restaurantEntity.updatedAt),
+                parseOffDays(tuple.get(restaurantEntity.offDays))
         );
     }
 
@@ -442,6 +445,18 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         }
         try {
             return OBJECT_MAPPER.readValue(json, STRING_LIST_TYPE);
+        } catch (Exception ignored) {
+            return Collections.emptyList();
+        }
+    }
+
+    private List<LocalDate> parseOffDays(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            List<String> dateStrings = OBJECT_MAPPER.readValue(json, STRING_LIST_TYPE);
+            return dateStrings.stream().map(LocalDate::parse).toList();
         } catch (Exception ignored) {
             return Collections.emptyList();
         }

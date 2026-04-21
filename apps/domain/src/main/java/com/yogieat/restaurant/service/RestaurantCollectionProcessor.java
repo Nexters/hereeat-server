@@ -52,24 +52,24 @@ public class RestaurantCollectionProcessor {
      * Place enum을 지역 정보의 단일 진실 공급원(SSOT)으로 사용
      */
     private static final List<String> LOCATIONS = Arrays.stream(Region.values())
-        .map(Region::getName)
-        .toList();
+            .map(Region::getName)
+            .toList();
 
     /**
      * LargeCategory enum에서 ANY를 제외한 음식 카테고리 목록
      * displayName을 사용하여 Gemini 프롬프트에 활용
      */
     private static final List<String> FOOD_CATEGORIES = Arrays.stream(LargeCategory.values())
-        .filter(category -> category != LargeCategory.ANY)
-        .map(LargeCategory::getDisplayName)
-        .toList();
+            .filter(category -> category != LargeCategory.ANY)
+            .map(LargeCategory::getDisplayName)
+            .toList();
 
     /**
      * Enum 변환 캐시: Place name → Place enum
      * 매번 stream().filter()를 사용하지 않고 O(1) 조회
      */
     private static final Map<String, Region> PLACE_CACHE = Arrays.stream(Region.values())
-        .collect(Collectors.toMap(Region::getName, Function.identity()));
+            .collect(Collectors.toMap(Region::getName, Function.identity()));
 
     private static final int RESTAURANTS_PER_REQUEST = 10;
     private static final int KAKAO_COLLECTION_CONCURRENT_PERMITS = 3;
@@ -81,14 +81,14 @@ public class RestaurantCollectionProcessor {
      * 나머지 지역: 50개
      */
     private static final Map<Region, Integer> REGION_LIMITS = Map.of(
-        Region.GANGNAM, 100,
-        Region.HONGDAE, 100,
-        Region.GONGDEOK, 50,
-        Region.EULJIRO3GA, 50,
-        Region.SADANG, 50,
-        Region.JONGNO3GA, 50,
-        Region.JAMSIL, 50,
-        Region.SAMGAKJI, 50
+            Region.GANGNAM, 100,
+            Region.HONGDAE, 100,
+            Region.GONGDEOK, 50,
+            Region.EULJIRO3GA, 50,
+            Region.SADANG, 50,
+            Region.JONGNO3GA, 50,
+            Region.JAMSIL, 50,
+            Region.SAMGAKJI, 50
     );
     private static final int DEFAULT_REGION_LIMIT = 50;
 
@@ -105,11 +105,11 @@ public class RestaurantCollectionProcessor {
 
             List<Restaurant> restaurants = restaurantRepository.findAll();
             String restaurantNames = restaurants.stream()
-                .map(Restaurant::name)
-                .collect(Collectors.joining(", "));
+                    .map(Restaurant::name)
+                    .collect(Collectors.joining(", "));
 
             Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
-                geminiClient.generateRestaurantsBatch(locationsToCollect, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
+                    geminiClient.generateRestaurantsBatch(locationsToCollect, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
 
             AtomicInteger totalProcessed = new AtomicInteger(0);
             AtomicInteger totalSuccess = new AtomicInteger(0);
@@ -160,7 +160,7 @@ public class RestaurantCollectionProcessor {
             }
 
             log.info("Batch completed: {} saved, {} success, {} failed",
-                totalProcessed.get(), totalSuccess.get(), totalFailed.get());
+                    totalProcessed.get(), totalSuccess.get(), totalFailed.get());
 
         } catch (Exception e) {
             log.error("Batch collection failed", e);
@@ -186,10 +186,10 @@ public class RestaurantCollectionProcessor {
             if (currentCount < limit) {
                 locationsToCollect.add(region.getName());
                 log.info("Region {} needs collection: {}/{} restaurants",
-                    region.getName(), currentCount, limit);
+                        region.getName(), currentCount, limit);
             } else {
                 log.info("Region {} reached limit: {}/{} restaurants (skipping)",
-                    region.getName(), currentCount, limit);
+                        region.getName(), currentCount, limit);
             }
         }
 
@@ -210,7 +210,7 @@ public class RestaurantCollectionProcessor {
     @Deprecated
     public int collectRestaurantsForLocation(String location, String category) {
         List<SuggestionRestaurant> suggestions = geminiClient.generateRestaurants(
-            location, category, RESTAURANTS_PER_REQUEST
+                location, category, RESTAURANTS_PER_REQUEST
         );
 
         return processRestaurantsForLocation(location, category, suggestions);
@@ -223,9 +223,9 @@ public class RestaurantCollectionProcessor {
      * Kakao API 호출은 Semaphore({@value KAKAO_COLLECTION_CONCURRENT_PERMITS} permits)로 동시성을 제어합니다.</p>
      */
     public int processRestaurantsForLocation(
-        String location,
-        String category,
-        List<SuggestionRestaurant> suggestions
+            String location,
+            String category,
+            List<SuggestionRestaurant> suggestions
     ) {
         Region region = getRegionFromLocationName(location);
         RestaurantValidator.ValidationContext validationContext =
@@ -395,6 +395,7 @@ public class RestaurantCollectionProcessor {
         enrichedData.apiCategoryName3 = detail.apiCategoryName3();
         enrichedData.apiLargeCategory = detail.apiLargeCategory();
         enrichedData.apiMediumCategory = detail.apiMediumCategory();
+        enrichedData.offDays = detail.offDays();
 
         if (!hasText(enrichedData.aiMateSummaryTitle)) {
             log.info("Skipping restaurant due to missing ai_mate data: {}", suggestion.name());

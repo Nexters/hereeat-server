@@ -4,6 +4,7 @@ import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.common.GeoJson;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
+import java.time.LocalDate;
 import java.util.List;
 
 final class RestaurantEnrichedData {
@@ -27,6 +28,7 @@ final class RestaurantEnrichedData {
     String apiCategoryName3;
     LargeCategory apiLargeCategory;
     String apiMediumCategory;
+    List<LocalDate> offDays;
     boolean skip;
 
     private RestaurantEnrichedData() {
@@ -118,6 +120,10 @@ final class RestaurantEnrichedData {
 
     String apiMediumCategory() {
         return skip ? null : apiMediumCategory;
+    }
+
+    List<LocalDate> offDays() {
+        return skip ? null : offDays;
     }
 
     boolean isSkipped() {

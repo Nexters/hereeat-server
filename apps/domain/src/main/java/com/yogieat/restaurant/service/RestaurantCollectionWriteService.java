@@ -70,7 +70,8 @@ public class RestaurantCollectionWriteService {
                     enrichedData.priceLevel(),
                     enrichedData.aiMateSummaryTitle(),
                     enrichedData.aiMateSummaryContents(),
-                    enrichedData.timeSlot()
+                    enrichedData.timeSlot(),
+                    enrichedData.offDays()
             );
 
             restaurantRepository.save(createRestaurant);
