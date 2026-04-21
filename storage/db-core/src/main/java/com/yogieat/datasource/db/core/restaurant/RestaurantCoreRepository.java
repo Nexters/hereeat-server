@@ -96,7 +96,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             Collection<Long> categoryIds,
             TimeSlot gatheringTimeSlot
     ) {
-        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, List.of());
+        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, List.of(), null);
     }
 
     @Override
@@ -105,6 +105,17 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             Collection<Long> categoryIds,
             TimeSlot gatheringTimeSlot,
             Collection<Long> excludedRestaurantIds
+    ) {
+        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, excludedRestaurantIds, null);
+    }
+
+    @Override
+    public List<Restaurant> findRecommendationCandidates(
+            Region region,
+            Collection<Long> categoryIds,
+            TimeSlot gatheringTimeSlot,
+            Collection<Long> excludedRestaurantIds,
+            LocalDate scheduledDate
     ) {
         if (categoryIds == null || categoryIds.isEmpty()) {
             return List.of();
@@ -132,7 +143,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         regionCondition(region),
                         restaurantEntity.categoryId.in(categoryIds),
                         recommendationTimeSlotCondition(gatheringTimeSlot),
-                        excludedRestaurantIdsCondition(excludedRestaurantIds)
+                        excludedRestaurantIdsCondition(excludedRestaurantIds),
+                        offDaysNotContainsCondition(scheduledDate)
                 )
                 .fetch();
         Map<Long, Region> regionMap = resolveRegionMap(
@@ -398,6 +410,16 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         }
 
         return restaurantEntity.id.notIn(excludedRestaurantIds);
+    }
+
+    private BooleanExpression offDaysNotContainsCondition(LocalDate scheduledDate) {
+        if (scheduledDate == null) {
+            return null;
+        }
+        // off_days는 ["YYYY-MM-DD", ...] 형식의 JSON 텍스트이므로 quoted 날짜 문자열 포함 여부로 판단
+        String datePattern = "%\"" + scheduledDate + "\"%";
+        return restaurantEntity.offDays.isNull()
+                .or(restaurantEntity.offDays.notLike(datePattern));
     }
 
     private Restaurant toRecommendationCandidate(Tuple tuple, Map<Long, Region> regionMap) {

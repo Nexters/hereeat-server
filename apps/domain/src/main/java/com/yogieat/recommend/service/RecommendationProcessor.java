@@ -24,6 +24,7 @@ import com.yogieat.recommend.domain.value.ScoredRestaurant;
 import com.yogieat.recommend.service.strategy.RecommendationSelectionStrategy;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -162,20 +163,14 @@ public class RecommendationProcessor {
             );
         }
 
+        LocalDate scheduledDate = gathering != null ? gathering.scheduledDate() : null;
         List<Restaurant> restaurants = findRecommendationCandidates(
                 region,
                 candidateCategoryIds,
                 gatheringTimeSlot,
-                excludedRestaurantIds
+                excludedRestaurantIds,
+                scheduledDate
         );
-
-        restaurants = restaurants.stream()
-                .filter(r -> {
-                    if (r.offDays() == null || r.offDays().isEmpty()) return true;
-                    if (gathering == null) return true;
-                    return !r.offDays().contains(gathering.scheduledDate());
-                })
-                .toList();
 
         if (restaurants.isEmpty()) {
             return RecommendationCandidateResult.failure(
@@ -208,21 +203,15 @@ public class RecommendationProcessor {
             Region region,
             Set<Long> candidateCategoryIds,
             TimeSlot gatheringTimeSlot,
-            List<Long> excludedRestaurantIds
+            List<Long> excludedRestaurantIds,
+            LocalDate scheduledDate
     ) {
-        if (excludedRestaurantIds == null || excludedRestaurantIds.isEmpty()) {
-            return restaurantRepository.findRecommendationCandidates(
-                    region,
-                    candidateCategoryIds,
-                    gatheringTimeSlot
-            );
-        }
-
         return restaurantRepository.findRecommendationCandidates(
                 region,
                 candidateCategoryIds,
                 gatheringTimeSlot,
-                excludedRestaurantIds
+                excludedRestaurantIds == null ? List.of() : excludedRestaurantIds,
+                scheduledDate
         );
     }
 
