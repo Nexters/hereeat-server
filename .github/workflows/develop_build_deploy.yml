@@ -2,7 +2,7 @@ name: develop Build And Deploy
 
 on:
   push:
-    branches: [ "chore/jib" ]
+    branches: [ "develop" ]
 
 env:
   DOCKERHUB_USERNAME: yogieat
