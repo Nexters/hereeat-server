@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version "${springBootVersion}" apply false
     id 'io.spring.dependency-management' version "${springDependencyManagementVersion}" apply false
     id 'com.diffplug.spotless' version "${spotlessVersion}" apply false
+    id 'com.google.cloud.tools.jib' version '3.5.3' apply false
 }
 
 group = projectGroup
@@ -87,7 +88,7 @@ subprojects {
         }
     }
 
-    // Default: disable bootJar for all subprojects (enabled only in apps/api)
+    // Default: disable bootJar for all subprojects (enabled only in application modules)
     tasks.named('bootJar') {
         enabled = false
     }
@@ -116,4 +117,40 @@ allprojects {
     tasks.matching { it.name == 'build' }.configureEach {
         dependsOn rootProject.tasks.installGitHook
     }
+}
+
+def deployableModules = [
+        ':apps:api',
+        ':apps:admin',
+        ':batch:sync'
+]
+
+tasks.register('validateJibPushEnv') {
+    doLast {
+        def requiredEnvNames = [
+                'API_IMAGE_FULL_URL',
+                'ADMIN_IMAGE_FULL_URL',
+                'BATCH_IMAGE_FULL_URL',
+                'DOCKERHUB_USERNAME',
+                'DOCKERHUB_TOKEN'
+        ]
+        def missingEnvNames = requiredEnvNames.findAll { !System.getenv(it) }
+
+        if (!missingEnvNames.isEmpty()) {
+            throw new GradleException("Missing Jib push environment variables: ${missingEnvNames.join(', ')}")
+        }
+    }
+}
+
+tasks.register('jibPushAll') {
+    group = 'container'
+    description = 'Builds and pushes API, Admin, and Batch images with Jib.'
+    dependsOn tasks.named('validateJibPushEnv')
+    dependsOn deployableModules.collect { "${it}:jib" }
+}
+
+tasks.register('jibDockerBuildAll') {
+    group = 'container'
+    description = 'Builds API, Admin, and Batch images into the local Docker daemon with Jib.'
+    dependsOn deployableModules.collect { "${it}:jibDockerBuild" }
 }

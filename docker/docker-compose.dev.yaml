@@ -1,44 +1,47 @@
 # Dev 2vCore, 4GB RAM, 50GB Storage
 services:
   yogieat-api:
-    cpus: "0.90"
-    mem_limit: "1440m"
-    mem_reservation: "720m"
+    cpus: "1.00"
+    mem_limit: "1536m"
+    mem_reservation: "768m"
     environment:
-      - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=10
-      - DATASOURCE_DB_CORE_MINIMUM_IDLE=1
-      - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=3000
-      - API_TOMCAT_MAX_THREADS=300
-      - API_TOMCAT_MIN_THREADS=35
-      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70.0 -XX:MinRAMPercentage=35.0 -XX:MaxGCPauseMillis=400
+      - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=18
+      - DATASOURCE_DB_CORE_MINIMUM_IDLE=4
+      - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=1500
+      - API_TOMCAT_MAX_THREADS=128
+      - API_TOMCAT_MIN_THREADS=16
+      - JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=65.0 -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication
 
   yogieat-admin:
-    cpus: "0.50"
-    mem_limit: "800m"
-    mem_reservation: "400m"
+    cpus: "0.25"
+    mem_limit: "512m"
+    mem_reservation: "256m"
     environment:
-      - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=5
-      - DATASOURCE_DB_CORE_MINIMUM_IDLE=1
-      - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=3000
-      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60.0 -XX:MinRAMPercentage=30.0 -XX:MaxGCPauseMillis=600
+      - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=6
+      - DATASOURCE_DB_CORE_MINIMUM_IDLE=2
+      - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=2000
+      - ADMIN_TOMCAT_MAX_THREADS=32
+      - ADMIN_TOMCAT_MIN_THREADS=4
+      - JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=55.0 -XX:MaxGCPauseMillis=300
 
   yogieat-batch-sync:
     cpus: "0.20"
-    mem_limit: "320m"
-    mem_reservation: "160m"
+    mem_limit: "384m"
+    mem_reservation: "192m"
     environment:
       - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=4
       - DATASOURCE_DB_CORE_MINIMUM_IDLE=1
-      - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=3000
-      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60.0 -XX:MinRAMPercentage=30.0 -XX:MaxGCPauseMillis=800
+      - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=2000
+      - SYNC_JOB_PARALLELISM=4
+      - JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=55.0 -XX:MaxGCPauseMillis=400
 
   yogieat-db:
-    cpus: "0.40"
-    mem_limit: "640m"
-    mem_reservation: "320m"
+    cpus: "0.35"
+    mem_limit: "768m"
+    mem_reservation: "384m"
     environment:
       - PG_LOG_STATEMENT=none
       - PG_SHARED_BUFFERS=256MB
       - PG_WORK_MEM=8MB
       - PG_MAINTENANCE_WORK_MEM=64MB
-      - PG_MAX_CONNECTIONS=120
+      - PG_MAX_CONNECTIONS=48

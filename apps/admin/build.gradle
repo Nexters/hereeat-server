@@ -1,3 +1,5 @@
+apply plugin: 'com.google.cloud.tools.jib'
+
 dependencies {
     implementation project(":apps:domain")
     implementation project(":storage:db-core")
@@ -22,4 +24,27 @@ tasks.named("bootJar") {
 
 tasks.named("jar") {
     enabled = false
+}
+
+def dockerHubUsername = System.getenv('DOCKERHUB_USERNAME')
+def dockerHubToken = System.getenv('DOCKERHUB_TOKEN')
+
+jib {
+    from {
+        image = 'amazoncorretto:25-alpine-jdk'
+    }
+    to {
+        image = System.getenv('ADMIN_IMAGE_FULL_URL') ?: 'yogieat/yogieat-server-admin:local'
+        if (dockerHubUsername && dockerHubToken) {
+            auth {
+                username = dockerHubUsername
+                password = dockerHubToken
+            }
+        }
+    }
+    containerizingMode = 'exploded'
+    container {
+        mainClass = 'com.yogieat.AdminApplication'
+        environment = [TZ: 'Asia/Seoul']
+    }
 }
