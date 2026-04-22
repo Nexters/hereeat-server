@@ -3,6 +3,7 @@ package com.yogieat.restaurant.service;
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.category.service.CategoryService;
 import com.yogieat.common.Region;
+import com.yogieat.region.domain.RegionMaster;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
 import lombok.RequiredArgsConstructor;
@@ -22,14 +23,14 @@ public class RestaurantCollectionWriteService {
     private final RestaurantRepository restaurantRepository;
     private final RestaurantValidator restaurantValidator;
 
-    public RestaurantValidator.ValidationContext prepareValidationContext(Region region) {
-        return restaurantValidator.prepareForBatchValidation(region);
+    public RestaurantValidator.ValidationContext prepareValidationContext(RegionMaster region) {
+        return restaurantValidator.prepareForBatchValidation(region.id(), region.displayName());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean persistRestaurant(
             SuggestionRestaurant suggestion,
-            Region restaurantRegion,
+            RegionMaster restaurantRegion,
             LargeCategory largeCategory,
             String mediumCategory,
             RestaurantEnrichedData enrichedData,
@@ -62,7 +63,7 @@ public class RestaurantCollectionWriteService {
                     enrichedData.rating(),
                     enrichedData.imageUrl(),
                     enrichedData.representativeReview(),
-                    restaurantRegion,
+                    Region.fromString(restaurantRegion.code()),
                     enrichedData.reviewCount(),
                     enrichedData.blogReviewCount(),
                     enrichedData.representMenu(),
@@ -74,7 +75,7 @@ public class RestaurantCollectionWriteService {
                     enrichedData.offDays()
             );
 
-            restaurantRepository.save(createRestaurant);
+            restaurantRepository.save(createRestaurant, restaurantRegion.id());
             restaurantValidator.addToCache(
                     validationContext,
                     enrichedData.externalId(),

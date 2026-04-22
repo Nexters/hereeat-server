@@ -222,7 +222,7 @@ public class GatheringCoreRepository implements GatheringRepository {
             return null;
         }
 
-        return regionJpaRepository.findById(regionId)
+        return regionJpaRepository.findByIdAndDeletedAtIsNull(regionId)
                 .map(regionEntity -> toRegion(regionEntity.getCode()))
                 .orElse(null);
     }
@@ -237,7 +237,7 @@ public class GatheringCoreRepository implements GatheringRepository {
         }
 
         Map<Long, Region> regionMap = new HashMap<>();
-        regionJpaRepository.findAllById(distinctRegionIds)
+        regionJpaRepository.findByIdInAndDeletedAtIsNull(distinctRegionIds)
                 .forEach(regionEntity -> regionMap.put(regionEntity.getId(), toRegion(regionEntity.getCode())));
         return regionMap;
     }

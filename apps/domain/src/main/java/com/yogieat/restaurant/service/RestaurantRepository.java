@@ -18,8 +18,10 @@ public interface RestaurantRepository {
     boolean existsByExternalId(String externalId);
     boolean existsByNameAndAddress(String name, String address);
     Restaurant save(CreateRestaurant createRestaurant);
+    Restaurant save(CreateRestaurant createRestaurant, Long regionId);
     List<Restaurant> findAll();
     List<Restaurant> findByRegion(Region region);
+    List<Restaurant> findByRegionId(Long regionId);
     List<Restaurant> findRecommendationCandidates(
             Region region,
             Collection<Long> categoryIds,

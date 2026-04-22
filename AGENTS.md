@@ -28,9 +28,13 @@
 - private 메서드는 복잡도 감소가 분명할 때만 허용한다. 단순 흐름 분해용 helper 남용은 지양한다.
 - 의존성 주입은 최소화한다. collaborator가 늘어나면 책임 분리를 먼저 검토한다.
 - 선언형 트랜잭션 의미가 필요한 로직은 self-invocation 을 금지하고 별도 빈으로 분리한다.
+- Facade와 Service의 조회 경로는 `@Transactional(readOnly = true)` 여부를 먼저 검토하고, 변경 경로는 write transaction 경계를 명시한다.
 - 임시 migration, bootstrap, initializer, backfill 코드는 제거 시점이 명확해야 한다.
 - 테스트는 startup side effect 나 전역 magic reset 보다 test-local fixture 또는 setup 을 우선한다.
 - 새로운 구조를 만들기 전에 가장 가까운 기존 feature slice 를 먼저 따른다.
+- HTTP API는 화면명이나 구현 목적보다 리소스 중심 URI를 우선한다. `dashboard`, `screen`, `page` 같은 view-oriented 경로는 지양한다.
+- 컬렉션 조회에 집계나 관리용 필드가 필요하면 별도 view endpoint보다 해당 리소스 표현이나 query parameter 확장을 먼저 검토한다.
+- 새 리소스 생성은 기본적으로 `201 Created` 와 body 응답을 사용하고, `Location` 헤더는 명시적으로 필요할 때만 추가한다.
 
 ## Validation Defaults
 
