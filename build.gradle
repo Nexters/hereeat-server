@@ -78,6 +78,7 @@ subprojects {
 
         sql {
             target 'src/**/*.sql'
+            targetExclude 'src/main/resources/db/migration/**/*.sql'
             dbeaver()
         }
 
