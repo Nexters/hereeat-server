@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.gathering.domain.value.TimeSlot;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -16,6 +19,17 @@ import org.springframework.stereotype.Component;
 public class KakaoPlaceDetailParser {
 
     private static final int MAX_PHOTOS = 15;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    private final Clock clock;
+
+    public KakaoPlaceDetailParser() {
+        this(Clock.system(KST));
+    }
+
+    KakaoPlaceDetailParser(Clock clock) {
+        this.clock = clock;
+    }
 
     public KakaoPlaceDetailData parse(JsonNode panel, String requestedPlaceId) {
         try {
@@ -74,6 +88,9 @@ public class KakaoPlaceDetailParser {
             LargeCategory apiLargeCategory = extractApiLargeCategory(apiCategoryName2);
             String apiMediumCategory = extractApiMediumCategory(apiCategoryName3, apiLargeCategory);
 
+            // 휴무일 추출
+            List<LocalDate> offDays = extractOffDates(panel);
+
             log.debug("Successfully parsed place: placeId={}, rating={}, photos={}, review={}, reviewCount={}, blogReviewCount={}, timeSlot={}, apiLargeCategory={}, apiMediumCategory={}",
                     confirmId, rating, photoUrls.size(), representativeReview != null, reviewCount, blogReviewCount, timeSlot, apiLargeCategory, apiMediumCategory);
 
@@ -98,7 +115,8 @@ public class KakaoPlaceDetailParser {
                     apiCategoryName2,
                     apiCategoryName3,
                     apiLargeCategory,
-                    apiMediumCategory
+                    apiMediumCategory,
+                    offDays
             );
         } catch (Exception e) {
             log.error("Failed to parse panel3 response for placeId: {}", requestedPlaceId, e);
@@ -668,6 +686,74 @@ public class KakaoPlaceDetailParser {
             return TimeSlot.DINNER;
         }
         return TimeSlot.BOTH;
+    }
+
+    private List<LocalDate> extractOffDates(JsonNode panel) {
+        JsonNode openHours = panel.path("open_hours");
+        if (openHours.isMissingNode() || openHours.isNull()) {
+            return List.of();
+        }
+
+        JsonNode weekPeriods = openHours.path("week_from_today").path("week_periods");
+        if (!weekPeriods.isArray() || weekPeriods.isEmpty()) {
+            return List.of();
+        }
+
+        LocalDate today = LocalDate.now(clock);
+        int currentYear = today.getYear();
+        int currentMonth = today.getMonthValue();
+
+        Set<LocalDate> offDates = new HashSet<>();
+        for (JsonNode period : weekPeriods) {
+            JsonNode days = period.path("days");
+            if (!days.isArray()) {
+                continue;
+            }
+            for (JsonNode day : days) {
+                if (!isOffDay(day)) {
+                    continue;
+                }
+                String dayDesc = extractText(day, "day_of_the_week_desc");
+                if (dayDesc == null) {
+                    continue;
+                }
+                LocalDate date = parseOffDayDate(dayDesc, currentYear, currentMonth);
+                if (date != null) {
+                    offDates.add(date);
+                }
+            }
+        }
+        return new ArrayList<>(offDates);
+    }
+
+    private boolean isOffDay(JsonNode day) {
+        JsonNode offDaysDesc = day.get("off_days_desc");
+        if (offDaysDesc == null || offDaysDesc.isNull() || offDaysDesc.isMissingNode()) {
+            return false;
+        }
+        return "휴무일".equals(offDaysDesc.asText());
+    }
+
+    private LocalDate parseOffDayDate(String dayDesc, int year, int currentMonth) {
+        try {
+            int start = dayDesc.indexOf('(');
+            int end = dayDesc.indexOf(')');
+            if (start < 0 || end <= start) {
+                return null;
+            }
+            String[] parts = dayDesc.substring(start + 1, end).split("/");
+            if (parts.length != 2) {
+                return null;
+            }
+            int month = Integer.parseInt(parts[0].trim());
+            int day = Integer.parseInt(parts[1].trim());
+            // 12월 말 → 1월 초 경계 처리
+            int adjustedYear = (currentMonth == 12 && month == 1) ? year + 1 : year;
+            return LocalDate.of(adjustedYear, month, day);
+        } catch (Exception e) {
+            log.debug("Failed to parse off day date: {}", dayDesc);
+            return null;
+        }
     }
 
     /**

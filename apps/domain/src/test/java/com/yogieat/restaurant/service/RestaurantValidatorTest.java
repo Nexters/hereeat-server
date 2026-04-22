@@ -78,11 +78,11 @@ class RestaurantValidatorTest {
     @Test
     @DisplayName("prepareForBatchValidation이 컨텍스트를 만들고 addToCache로 갱신된다")
     void validationContext_ShouldBePreparedAndUpdated() {
-        when(restaurantRepository.findByRegion(Region.GANGNAM))
+        when(restaurantRepository.findByRegionId(1L))
                 .thenReturn(List.of(restaurant()));
 
         RestaurantValidator.ValidationContext context =
-                restaurantValidator.prepareForBatchValidation(Region.GANGNAM);
+                restaurantValidator.prepareForBatchValidation(1L, Region.GANGNAM.getName());
 
         assertThat(context.containsExternalId("ext-1")).isTrue();
         assertThat(context.containsNameAddress("식당1", "주소1")).isTrue();
@@ -110,6 +110,7 @@ class RestaurantValidatorTest {
                 null,
                 null,
                 Region.GANGNAM,
+                null,
                 null,
                 null,
                 null,

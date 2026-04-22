@@ -19,6 +19,7 @@ public record RestaurantSyncPatch(
         String aiMateSummaryTitle,
         String aiMateSummaryContents,
         TimeSlot timeSlot,
-        Long categoryId
+        Long categoryId,
+        String offDays
 ) {
 }

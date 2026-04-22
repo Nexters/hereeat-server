@@ -126,7 +126,7 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
@@ -173,7 +173,7 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
@@ -202,7 +202,7 @@ class RecommendationProcessorTest {
         when(gatheringRepository.findById(11L)).thenReturn(Optional.empty());
         when(gatheringRepository.findById(12L)).thenReturn(Optional.empty());
         when(gatheringRepository.findById(13L)).thenReturn(Optional.empty());
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
@@ -273,7 +273,7 @@ class RecommendationProcessorTest {
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.of(gathering));
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
         when(categoryService.findAll()).thenReturn(categories);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any())).thenAnswer(invocation -> {
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any())).thenAnswer(invocation -> {
             Collection<Long> categoryIds = invocation.getArgument(1);
             capturedCandidateCategoryIds = List.copyOf(categoryIds);
             capturedCandidateTimeSlot = invocation.getArgument(2, TimeSlot.class);
@@ -329,7 +329,8 @@ class RecommendationProcessorTest {
                 eq(region),
                 anyCollection(),
                 eq(TimeSlot.DINNER),
-                eq(excludedRestaurantIds)
+                eq(excludedRestaurantIds),
+                any()
         )).thenAnswer(invocation -> {
             Collection<Long> categoryIds = invocation.getArgument(1);
             Collection<Long> excludedIds = invocation.getArgument(3);
@@ -390,7 +391,7 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
@@ -435,7 +436,7 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
@@ -475,7 +476,7 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
@@ -513,7 +514,7 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
@@ -551,7 +552,7 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any()))
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
                 .thenReturn(restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
@@ -629,6 +630,7 @@ class RecommendationProcessorTest {
                 null,
                 null,
                 TimeSlot.BOTH,
+                null,
                 null,
                 null
         );

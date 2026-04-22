@@ -2,6 +2,7 @@ package com.yogieat.external.kakao.result;
 
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.gathering.domain.value.TimeSlot;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -33,7 +34,9 @@ public record KakaoPlaceDetailData(
         String apiCategoryName3,
         // 카카오 API에서 추출한 카테고리 정보
         LargeCategory apiLargeCategory,
-        String apiMediumCategory
+        String apiMediumCategory,
+        // 휴무일
+        List<LocalDate> offDays
 ) {
     /**
      * Create a minimal detail data when panel3 call fails
@@ -56,6 +59,7 @@ public record KakaoPlaceDetailData(
                 null,
                 null,
                 List.of(),
+                null,
                 null,
                 null,
                 null,
