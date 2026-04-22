@@ -25,8 +25,12 @@ Use this skill when the task is "where should this live?" or "does this still fi
 - Processor or Creator introduced without a real named responsibility
 - Constructor dependency bloat
 - Transactional self-invocation
+- Missing `@Transactional(readOnly = true)` on read-only facade or service methods
+- Write methods accidentally inheriting `readOnly = true` or missing a write transaction boundary
 - Private helper sprawl that hides simple flow
 - Temporary migration or bootstrap code left in runtime after completion
+- View-oriented HTTP design such as `dashboard` endpoints for data that should still be a resource representation
+- Missing item endpoint after `POST` resource creation when the feature needs canonical item access
 
 ## Notes
 

@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.category.service.CategoryService;
 import com.yogieat.common.GeoJson;
-import com.yogieat.common.Region;
+import com.yogieat.region.domain.RegionMaster;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +35,17 @@ class RestaurantCollectionWriteServiceTest {
     @InjectMocks
     private RestaurantCollectionWriteService writeService;
 
+    private static final RegionMaster GANGNAM = new RegionMaster(
+            1L,
+            "GANGNAM",
+            "강남역",
+            new GeoJson.Point(List.of(127.0276, 37.4979)),
+            true,
+            0,
+            null,
+            null
+    );
+
     @Test
     @DisplayName("유효한 데이터면 레스토랑을 저장한다")
     void persistRestaurant_ShouldSave_WhenValidationPasses() {
@@ -47,10 +58,10 @@ class RestaurantCollectionWriteServiceTest {
         when(restaurantValidator.duplicateValidateWithCache(context, suggestion, "ext-1"))
                 .thenReturn(RestaurantValidator.ValidationResult.valid());
 
-        boolean saved = writeService.persistRestaurant(suggestion, Region.GANGNAM, LargeCategory.KOREAN, suggestion.mediumCategory(), data, context);
+        boolean saved = writeService.persistRestaurant(suggestion, GANGNAM, LargeCategory.KOREAN, suggestion.mediumCategory(), data, context);
 
         assertThat(saved).isTrue();
-        verify(restaurantRepository).save(any());
+        verify(restaurantRepository).save(any(), org.mockito.ArgumentMatchers.eq(GANGNAM.id()));
     }
 
     @Test
@@ -65,10 +76,10 @@ class RestaurantCollectionWriteServiceTest {
         when(restaurantValidator.duplicateValidateWithCache(context, suggestion, "ext-1"))
                 .thenReturn(RestaurantValidator.ValidationResult.duplicate("dup"));
 
-        boolean saved = writeService.persistRestaurant(suggestion, Region.GANGNAM, LargeCategory.KOREAN, suggestion.mediumCategory(), data, context);
+        boolean saved = writeService.persistRestaurant(suggestion, GANGNAM, LargeCategory.KOREAN, suggestion.mediumCategory(), data, context);
 
         assertThat(saved).isFalse();
-        verify(restaurantRepository, never()).save(any());
+        verify(restaurantRepository, never()).save(any(), any());
     }
 
     @Test
@@ -87,7 +98,7 @@ class RestaurantCollectionWriteServiceTest {
 
         boolean saved = writeService.persistRestaurant(
                 suggestion,
-                Region.GANGNAM,
+                GANGNAM,
                 LargeCategory.KOREAN,
                 suggestion.mediumCategory(),
                 data,
@@ -95,7 +106,7 @@ class RestaurantCollectionWriteServiceTest {
         );
 
         assertThat(saved).isTrue();
-        verify(restaurantRepository).save(any());
+        verify(restaurantRepository).save(any(), org.mockito.ArgumentMatchers.eq(GANGNAM.id()));
     }
 
     private SuggestionRestaurant suggestion() {

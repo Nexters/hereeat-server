@@ -239,7 +239,7 @@ public class RestaurantSyncService {
                         "kakao source unavailable"
                                 + " (restaurantId=" + target.id()
                                 + ", name=" + target.name()
-                                + ", region=" + (target.region() == null ? "null" : target.region().name())
+                                + ", region=" + (target.regionCode() == null ? "null" : target.regionCode())
                                 + ", externalId=" + target.externalId()
                                 + ")"
                 );
@@ -268,7 +268,7 @@ public class RestaurantSyncService {
             }
         }
 
-        Optional<KaKaoPlaceDocumentResult> placeOpt = searchPlace(target.name(), target.region() == null ? null : target.region().getName());
+        Optional<KaKaoPlaceDocumentResult> placeOpt = searchPlace(target.name(), target.regionDisplayName());
 
         if (placeOpt.isEmpty()) {
             return null;
@@ -594,11 +594,11 @@ public class RestaurantSyncService {
     }
 
     private boolean isWithinRegionRadius(RestaurantSyncTarget target, GeoJson.Point resolvedPoint) {
-        if (target == null || target.region() == null || target.region().getCoordinatesStandard() == null) {
+        if (target == null || target.regionCoordinatesStandard() == null) {
             return false;
         }
 
-        return isWithinDistance(target.region().getCoordinatesStandard(), resolvedPoint);
+        return isWithinDistance(target.regionCoordinatesStandard(), resolvedPoint);
     }
 
     private boolean isWithinDistance(GeoJson.Point centerPoint, GeoJson.Point restaurantPoint) {
