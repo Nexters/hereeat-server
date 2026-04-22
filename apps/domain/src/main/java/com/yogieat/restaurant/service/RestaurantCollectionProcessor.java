@@ -55,9 +55,9 @@ public class RestaurantCollectionProcessor {
      * displayName을 사용하여 Gemini 프롬프트에 활용
      */
     private static final List<String> FOOD_CATEGORIES = Arrays.stream(LargeCategory.values())
-        .filter(category -> category != LargeCategory.ANY)
-        .map(LargeCategory::getDisplayName)
-        .toList();
+            .filter(category -> category != LargeCategory.ANY)
+            .map(LargeCategory::getDisplayName)
+            .toList();
 
     private static final int RESTAURANTS_PER_REQUEST = 10;
     private static final int KAKAO_COLLECTION_CONCURRENT_PERMITS = 3;
@@ -92,11 +92,11 @@ public class RestaurantCollectionProcessor {
                     ));
 
             String restaurantNames = restaurantRepository.findAll().stream()
-                .map(com.yogieat.restaurant.domain.Restaurant::name)
-                .collect(Collectors.joining(", "));
+                    .map(com.yogieat.restaurant.domain.Restaurant::name)
+                    .collect(Collectors.joining(", "));
 
             Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
-                geminiClient.generateRestaurantsBatch(locationsToCollect, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
+                    geminiClient.generateRestaurantsBatch(locationsToCollect, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
 
             AtomicInteger totalProcessed = new AtomicInteger(0);
             AtomicInteger totalSuccess = new AtomicInteger(0);
@@ -150,7 +150,7 @@ public class RestaurantCollectionProcessor {
             }
 
             log.info("Batch completed: {} saved, {} success, {} failed",
-                totalProcessed.get(), totalSuccess.get(), totalFailed.get());
+                    totalProcessed.get(), totalSuccess.get(), totalFailed.get());
 
         } catch (Exception e) {
             log.error("Batch collection failed", e);
@@ -180,10 +180,10 @@ public class RestaurantCollectionProcessor {
             if (currentCount < limit) {
                 regionsToCollect.add(summary);
                 log.info("Region {} needs collection: {}/{} restaurants",
-                    region.displayName(), currentCount, limit);
+                        region.displayName(), currentCount, limit);
             } else {
                 log.info("Region {} reached limit: {}/{} restaurants (skipping)",
-                    region.displayName(), currentCount, limit);
+                        region.displayName(), currentCount, limit);
             }
         }
 
@@ -204,7 +204,7 @@ public class RestaurantCollectionProcessor {
     @Deprecated
     public int collectRestaurantsForLocation(String location, String category) {
         List<SuggestionRestaurant> suggestions = geminiClient.generateRestaurants(
-            location, category, RESTAURANTS_PER_REQUEST
+                location, category, RESTAURANTS_PER_REQUEST
         );
 
         return processRestaurantsForRegion(regionService.getActiveRegionByDisplayName(location), category, suggestions);
@@ -217,9 +217,9 @@ public class RestaurantCollectionProcessor {
      * Kakao API 호출은 Semaphore({@value KAKAO_COLLECTION_CONCURRENT_PERMITS} permits)로 동시성을 제어합니다.</p>
      */
     public int processRestaurantsForRegion(
-        RegionMaster region,
-        String category,
-        List<SuggestionRestaurant> suggestions
+            RegionMaster region,
+            String category,
+            List<SuggestionRestaurant> suggestions
     ) {
         RestaurantValidator.ValidationContext validationContext =
                 restaurantCollectionWriteService.prepareValidationContext(region);
@@ -311,6 +311,17 @@ public class RestaurantCollectionProcessor {
         }
     }
 
+    private int getRegionLimit(RegionMaster region) {
+        if (region != null && HIGH_VOLUME_REGION_CODES.contains(region.code())) {
+            return 100;
+        }
+        return DEFAULT_REGION_LIMIT;
+    }
+
+    private BinaryOperator<RegionSummary> keepExistingRegion() {
+        return (existing, ignored) -> existing;
+    }
+
     private RestaurantEnrichedData enrichRestaurantData(SuggestionRestaurant suggestion, String locationName) {
         RestaurantEnrichedData enrichedData = RestaurantEnrichedData.fromSuggestion(suggestion);
         Optional<KaKaoPlaceDocumentResult> placeOpt = kakaoPlaceClient.searchPlace(suggestion.name(), locationName);
@@ -378,6 +389,7 @@ public class RestaurantCollectionProcessor {
         enrichedData.apiCategoryName3 = detail.apiCategoryName3();
         enrichedData.apiLargeCategory = detail.apiLargeCategory();
         enrichedData.apiMediumCategory = detail.apiMediumCategory();
+        enrichedData.offDays = detail.offDays();
 
         if (!hasText(enrichedData.aiMateSummaryTitle)) {
             log.info("Skipping restaurant due to missing ai_mate data: {}", suggestion.name());
@@ -390,17 +402,6 @@ public class RestaurantCollectionProcessor {
                     suggestion.name(), enrichedData.reviewCount, enrichedData.blogReviewCount);
             enrichedData.skip = true;
         }
-    }
-
-    private int getRegionLimit(RegionMaster region) {
-        if (region != null && HIGH_VOLUME_REGION_CODES.contains(region.code())) {
-            return 100;
-        }
-        return DEFAULT_REGION_LIMIT;
-    }
-
-    private BinaryOperator<RegionSummary> keepExistingRegion() {
-        return (existing, ignored) -> existing;
     }
 
     private String normalizeMapUrl(String originalMapUrl) {

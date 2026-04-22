@@ -17,6 +17,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import lombok.AccessLevel;
@@ -33,39 +35,39 @@ import org.locationtech.jts.geom.PrecisionModel;
 @Getter
 @Entity
 @Table(
-    name = "t_restaurant",
-    indexes = {
-        @Index(
-            name = "idx_restaurant_name_address",
-            columnList = "name, address",
-            unique = false
-        ),
-        @Index(
-            name = "idx_restaurant_category_id",
-            columnList = "category_id",
-            unique = false
-        ),
-        @Index(
-            name = "idx_restaurant_deleted_at",
-            columnList = "deleted_at",
-            unique = false
-        ),
-        @Index(
-            name = "idx_restaurant_deleted_at_id",
-            columnList = "deleted_at, id",
-            unique = false
-        ),
-        @Index(
-            name = "idx_restaurant_region_id",
-            columnList = "region_id",
-            unique = false
-        ),
-        @Index(
-            name = "idx_restaurant_region_id_deleted_at",
-            columnList = "region_id, deleted_at",
-            unique = false
-        )
-    }
+        name = "t_restaurant",
+        indexes = {
+                @Index(
+                        name = "idx_restaurant_name_address",
+                        columnList = "name, address",
+                        unique = false
+                ),
+                @Index(
+                        name = "idx_restaurant_category_id",
+                        columnList = "category_id",
+                        unique = false
+                ),
+                @Index(
+                        name = "idx_restaurant_deleted_at",
+                        columnList = "deleted_at",
+                        unique = false
+                ),
+                @Index(
+                        name = "idx_restaurant_deleted_at_id",
+                        columnList = "deleted_at, id",
+                        unique = false
+                ),
+                @Index(
+                        name = "idx_restaurant_region_id",
+                        columnList = "region_id",
+                        unique = false
+                ),
+                @Index(
+                        name = "idx_restaurant_region_id_deleted_at",
+                        columnList = "region_id, deleted_at",
+                        unique = false
+                )
+        }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RestaurantEntity extends BaseEntity {
@@ -108,6 +110,13 @@ public class RestaurantEntity extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private TimeSlot timeSlot;
 
+    // 휴무일
+    @Column(name = "off_days", columnDefinition = "TEXT")
+    private String offDays;  // JSON 문자열
+
+    @Column(name = "off_days_updated_at")
+    private LocalDateTime offDaysUpdatedAt;
+
     @Builder(access = AccessLevel.PRIVATE)
     private RestaurantEntity(
             String externalId,
@@ -130,7 +139,9 @@ public class RestaurantEntity extends BaseEntity {
             String aiMateSummaryTitle,
             String aiMateSummaryContents,
             // 추천 시간대
-            TimeSlot timeSlot) {
+            TimeSlot timeSlot,
+            // 휴무일
+            String offDays) {
         this.externalId = externalId;
         this.name = name;
         this.address = address;
@@ -150,6 +161,7 @@ public class RestaurantEntity extends BaseEntity {
         this.aiMateSummaryTitle = aiMateSummaryTitle;
         this.aiMateSummaryContents = aiMateSummaryContents;
         this.timeSlot = timeSlot;
+        this.offDays = offDays;
     }
 
     /**
@@ -189,6 +201,8 @@ public class RestaurantEntity extends BaseEntity {
                 .aiMateSummaryContents(createRestaurant.aiMateSummaryContents())
                 // 추천 시간대
                 .timeSlot(createRestaurant.timeSlot())
+                // 휴무일
+                .offDays(createRestaurant.offDays())
                 .build();
     }
 
@@ -206,8 +220,8 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getDescription(),
                 region,
                 entity.location != null
-                    ? new GeoJson.Point(List.of(entity.location.getX(), entity.location.getY()))
-                    : null,
+                        ? new GeoJson.Point(List.of(entity.location.getX(), entity.location.getY()))
+                        : null,
                 // 추천 근거 데이터
                 entity.getReviewCount(),
                 entity.getBlogReviewCount(),
@@ -220,7 +234,9 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getTimeSlot(),
                 // 추천 알고리즘용 시간 데이터
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                // 휴무일
+                parseOffDays(entity.getOffDays())
         );
     }
 
@@ -237,6 +253,19 @@ public class RestaurantEntity extends BaseEntity {
             return OBJECT_MAPPER.readValue(json, new TypeReference<List<String>>() {});
         } catch (Exception e) {
             log.warn("Failed to parse aiMateSummaryContents: {}", json);
+            return Collections.emptyList();
+        }
+    }
+
+    private static List<LocalDate> parseOffDays(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            List<String> dateStrings = OBJECT_MAPPER.readValue(json, new TypeReference<List<String>>() {});
+            return dateStrings.stream().map(LocalDate::parse).toList();
+        } catch (Exception e) {
+            log.warn("Failed to parse offDays: {}", json);
             return Collections.emptyList();
         }
     }
@@ -289,6 +318,10 @@ public class RestaurantEntity extends BaseEntity {
         }
         if (patch.categoryId() != null) {
             this.categoryId = patch.categoryId();
+        }
+        if (patch.offDays() != null) {
+            this.offDays = patch.offDays();
+            this.offDaysUpdatedAt = LocalDateTime.now();
         }
     }
 

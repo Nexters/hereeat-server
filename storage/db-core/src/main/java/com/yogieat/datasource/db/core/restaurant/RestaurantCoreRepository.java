@@ -27,6 +27,7 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.sql.Types;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -116,7 +117,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             Collection<Long> categoryIds,
             TimeSlot gatheringTimeSlot
     ) {
-        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, List.of());
+        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, List.of(), null);
     }
 
     @Override
@@ -125,6 +126,17 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             Collection<Long> categoryIds,
             TimeSlot gatheringTimeSlot,
             Collection<Long> excludedRestaurantIds
+    ) {
+        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, excludedRestaurantIds, null);
+    }
+
+    @Override
+    public List<Restaurant> findRecommendationCandidates(
+            Region region,
+            Collection<Long> categoryIds,
+            TimeSlot gatheringTimeSlot,
+            Collection<Long> excludedRestaurantIds,
+            LocalDate scheduledDate
     ) {
         if (categoryIds == null || categoryIds.isEmpty()) {
             return List.of();
@@ -143,7 +155,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.aiMateSummaryContents,
                         restaurantEntity.timeSlot,
                         restaurantEntity.createdAt,
-                        restaurantEntity.updatedAt
+                        restaurantEntity.updatedAt,
+                        restaurantEntity.offDays
                 )
                 .from(restaurantEntity)
                 .where(
@@ -151,7 +164,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         regionCondition(region),
                         restaurantEntity.categoryId.in(categoryIds),
                         recommendationTimeSlotCondition(gatheringTimeSlot),
-                        excludedRestaurantIdsCondition(excludedRestaurantIds)
+                        excludedRestaurantIdsCondition(excludedRestaurantIds),
+                        offDaysNotContainsCondition(scheduledDate)
                 )
                 .fetch();
         Map<Long, Region> regionMap = resolveRegionMap(
@@ -419,6 +433,16 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         return restaurantEntity.id.notIn(excludedRestaurantIds);
     }
 
+    private BooleanExpression offDaysNotContainsCondition(LocalDate scheduledDate) {
+        if (scheduledDate == null) {
+            return null;
+        }
+        // off_days는 ["YYYY-MM-DD", ...] 형식의 JSON 텍스트이므로 quoted 날짜 문자열 포함 여부로 판단
+        String datePattern = "%\"" + scheduledDate + "\"%";
+        return restaurantEntity.offDays.isNull()
+                .or(restaurantEntity.offDays.notLike(datePattern));
+    }
+
     private Restaurant toRecommendationCandidate(Tuple tuple, Map<Long, Region> regionMap) {
         Point location = tuple.get(restaurantEntity.location);
         Long regionId = tuple.get(restaurantEntity.regionId);
@@ -446,7 +470,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 parseAiMateSummaryContents(tuple.get(restaurantEntity.aiMateSummaryContents)),
                 tuple.get(restaurantEntity.timeSlot),
                 tuple.get(restaurantEntity.createdAt),
-                tuple.get(restaurantEntity.updatedAt)
+                tuple.get(restaurantEntity.updatedAt),
+                parseOffDays(tuple.get(restaurantEntity.offDays))
         );
     }
 
@@ -463,6 +488,18 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         }
         try {
             return OBJECT_MAPPER.readValue(json, STRING_LIST_TYPE);
+        } catch (Exception ignored) {
+            return Collections.emptyList();
+        }
+    }
+
+    private List<LocalDate> parseOffDays(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            List<String> dateStrings = OBJECT_MAPPER.readValue(json, STRING_LIST_TYPE);
+            return dateStrings.stream().map(LocalDate::parse).toList();
         } catch (Exception ignored) {
             return Collections.emptyList();
         }
@@ -603,6 +640,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                     ai_mate_summary_contents = coalesce(:aiMateSummaryContents, ai_mate_summary_contents),
                     time_slot = coalesce(:timeSlot, time_slot),
                     category_id = coalesce(:categoryId, category_id),
+                    off_days = coalesce(:offDays, off_days),
+                    off_days_updated_at = case when :offDays is not null then now() else off_days_updated_at end,
                     updated_at = now()
                 where id = :restaurantId
                   and deleted_at is null
@@ -631,6 +670,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         .addValue("aiMateSummaryContents", command.aiMateSummaryContents())
                         .addValue("timeSlot", command.timeSlot() != null ? command.timeSlot().name() : null)
                         .addValue("categoryId", command.categoryId())
+                        .addValue("offDays", command.offDays())
                 )
                 .toArray(MapSqlParameterSource[]::new);
 

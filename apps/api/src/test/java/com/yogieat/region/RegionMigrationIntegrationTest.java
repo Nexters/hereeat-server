@@ -356,7 +356,8 @@ class RegionMigrationIntegrationTest {
                 "MEDIUM",
                 "요약 제목",
                 "[\"요약\"]",
-                TimeSlot.LUNCH
+                TimeSlot.LUNCH,
+                null
         );
     }
 

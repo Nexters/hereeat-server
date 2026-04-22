@@ -104,6 +104,7 @@ class CategoryQuotaSelectionStrategyTest {
                 null,
                 TimeSlot.BOTH,
                 null,
+                null,
                 null
         );
 

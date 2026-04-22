@@ -20,6 +20,7 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -133,11 +134,11 @@ public class RestaurantSyncService {
         Semaphore syncTargetSemaphore = new Semaphore(effectiveParallelism);
 
         List<CompletableFuture<SyncExecution>> futures = ids.stream()
-                    .map(id -> CompletableFuture.supplyAsync(
-                            () -> syncTargetWithParallelismLimit(syncTargetSemaphore, id, targetMap.get(id)),
-                            executor
-                    ))
-                    .toList();
+                .map(id -> CompletableFuture.supplyAsync(
+                        () -> syncTargetWithParallelismLimit(syncTargetSemaphore, id, targetMap.get(id)),
+                        executor
+                ))
+                .toList();
 
         List<SyncExecution> executions = futures.stream()
                 .map(CompletableFuture::join)
@@ -492,6 +493,7 @@ public class RestaurantSyncService {
         String aiMateSummaryTitle = detail != null ? detail.aiMateSummaryTitle() : null;
         String aiMateSummaryContents = detail != null ? toJson(detail.aiMateSummaryContents()) : null;
         Long categoryId = resolveCategoryId(detail);
+        String offDays = detail != null ? offDaysToJson(detail.offDays()) : null;
 
         return new RestaurantSyncPatch(
                 externalId,
@@ -509,7 +511,8 @@ public class RestaurantSyncService {
                 aiMateSummaryTitle,
                 aiMateSummaryContents,
                 detail != null ? detail.timeSlot() : null,
-                categoryId
+                categoryId,
+                offDays
         );
     }
 
@@ -571,6 +574,16 @@ public class RestaurantSyncService {
         } catch (JsonProcessingException e) {
             return null;
         }
+    }
+
+    private String offDaysToJson(List<LocalDate> offDays) {
+        if (offDays == null) {
+            return null;
+        }
+        if (offDays.isEmpty()) {
+            return "[]";
+        }
+        return toJson(offDays.stream().map(LocalDate::toString).toList());
     }
 
     private String normalizeMapUrl(String mapUrl) {

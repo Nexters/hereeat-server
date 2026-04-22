@@ -34,6 +34,7 @@ public final class RestaurantFixture {
                 List.of("before"),
                 TimeSlot.LUNCH,
                 null,
+                null,
                 null
         );
     }
@@ -61,7 +62,8 @@ public final class RestaurantFixture {
                 List.of("summary"),
                 TimeSlot.BOTH,
                 source.createdAt(),
-                source.updatedAt()
+                source.updatedAt(),
+                null
         );
     }
 
