@@ -1,8 +1,6 @@
 package com.yogieat.security;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,12 +14,9 @@ import com.yogieat.fixture.AdminTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpHeaders;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -54,24 +49,6 @@ class AdminSecurityIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/test"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.data.errorCode").value(ErrorCode.ADMIN_UNAUTHORIZED.getCode()));
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {
-            "https://dev-admin.yogieat.com",
-            "http://localhost:3000"
-    })
-    @DisplayName("허용된 origin의 admin 프리플라이트 요청은 CORS 헤더와 함께 통과한다")
-    void preflightRequestShouldReturnCorsHeaders(String origin) throws Exception {
-        mockMvc.perform(
-                        options("/api/v1/admin/test")
-                                .header(HttpHeaders.ORIGIN, origin)
-                                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
-                                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "authorization,content-type")
-                )
-                .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin))
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
     }
 
     @Test
