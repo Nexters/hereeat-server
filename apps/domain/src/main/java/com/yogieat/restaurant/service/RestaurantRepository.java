@@ -9,6 +9,7 @@ import com.yogieat.restaurant.result.RestaurantAdminResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -17,8 +18,10 @@ public interface RestaurantRepository {
     boolean existsByExternalId(String externalId);
     boolean existsByNameAndAddress(String name, String address);
     Restaurant save(CreateRestaurant createRestaurant);
+    Restaurant save(CreateRestaurant createRestaurant, Long regionId);
     List<Restaurant> findAll();
     List<Restaurant> findByRegion(Region region);
+    List<Restaurant> findByRegionId(Long regionId);
     List<Restaurant> findRecommendationCandidates(
             Region region,
             Collection<Long> categoryIds,
@@ -30,7 +33,17 @@ public interface RestaurantRepository {
             TimeSlot gatheringTimeSlot,
             Collection<Long> excludedRestaurantIds
     ) {
-        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot);
+        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, excludedRestaurantIds, null);
+    }
+
+    default List<Restaurant> findRecommendationCandidates(
+            Region region,
+            Collection<Long> categoryIds,
+            TimeSlot gatheringTimeSlot,
+            Collection<Long> excludedRestaurantIds,
+            LocalDate scheduledDate
+    ) {
+        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, excludedRestaurantIds);
     }
     Optional<Restaurant> findById(Long id);
     List<Restaurant> findByIds(List<Long> ids);

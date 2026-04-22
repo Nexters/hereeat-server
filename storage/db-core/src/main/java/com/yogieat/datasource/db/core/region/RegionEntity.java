@@ -92,6 +92,10 @@ public class RegionEntity extends BaseEntity {
         this.sortOrder = regionMaster.sortOrder();
     }
 
+    public void softDelete() {
+        super.softDelete();
+    }
+
     private static Double toLongitude(GeoJson.Point coordinatesStandard) {
         return coordinatesStandard.getCoordinates().getFirst();
     }

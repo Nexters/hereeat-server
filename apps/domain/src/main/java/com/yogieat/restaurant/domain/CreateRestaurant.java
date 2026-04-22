@@ -6,6 +6,7 @@ import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.external.kakao.result.KakaoPlaceDetailData;
 import com.yogieat.gathering.domain.value.TimeSlot;
+import java.time.LocalDate;
 import java.util.List;
 
 public record CreateRestaurant(
@@ -29,7 +30,9 @@ public record CreateRestaurant(
         String aiMateSummaryTitle,
         String aiMateSummaryContents,  // JSON 문자열로 저장
         // 추천 시간대 (신규 필드)
-        TimeSlot timeSlot
+        TimeSlot timeSlot,
+        // 휴무일
+        String offDays  // JSON 문자열로 저장
 ) {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -53,10 +56,10 @@ public record CreateRestaurant(
             String aiMateSummaryTitle,
             List<String> aiMateSummaryContents,
             // 추천 시간대 파라미터
-            TimeSlot timeSlot
+            TimeSlot timeSlot,
+            // 휴무일 파라미터
+            List<LocalDate> offDays
     ) {
-        String aiMateSummaryContentsJson = toJson(aiMateSummaryContents);
-
         return new CreateRestaurant(
                 externalId,
                 categoryId,
@@ -75,20 +78,31 @@ public record CreateRestaurant(
                 representMenuPrice,
                 priceLevel,
                 aiMateSummaryTitle,
-                aiMateSummaryContentsJson,
-                timeSlot
+                toJson(aiMateSummaryContents),
+                timeSlot,
+                offDaysToJson(offDays)
         );
     }
 
-    private static String toJson(List<String> aiMateSummaryContents) {
-        if (aiMateSummaryContents == null || aiMateSummaryContents.isEmpty()) {
+    private static String toJson(List<String> values) {
+        if (values == null || values.isEmpty()) {
             return null;
         }
         try {
-            return OBJECT_MAPPER.writeValueAsString(aiMateSummaryContents);
+            return OBJECT_MAPPER.writeValueAsString(values);
         } catch (JsonProcessingException e) {
             return null;
         }
+    }
+
+    private static String offDaysToJson(List<LocalDate> offDays) {
+        if (offDays == null) {
+            return null;
+        }
+        if (offDays.isEmpty()) {
+            return "[]";
+        }
+        return toJson(offDays.stream().map(LocalDate::toString).toList());
     }
 
     public static CreateRestaurant fromKakaoPlaceDetail(
@@ -124,7 +138,8 @@ public record CreateRestaurant(
                 detail == null ? null : detail.priceLevel(),
                 detail == null ? null : detail.aiMateSummaryTitle(),
                 toJson(detail == null ? null : detail.aiMateSummaryContents()),
-                detail == null ? null : detail.timeSlot()
+                detail == null ? null : detail.timeSlot(),
+                offDaysToJson(detail == null ? null : detail.offDays())
         );
     }
 

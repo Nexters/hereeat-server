@@ -24,6 +24,7 @@ import com.yogieat.recommend.domain.value.ScoredRestaurant;
 import com.yogieat.recommend.service.strategy.RecommendationSelectionStrategy;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -69,7 +70,7 @@ public class RecommendationProcessor {
                 // PENDING이 아닌 경우 (COMPLETED/FAILED) 재처리 방지
                 if (currentStatus != RecommendStatus.PENDING) {
                     log.info("Recommendation already processed for gathering: {} with status: {}",
-                             gatheringId, currentStatus);
+                            gatheringId, currentStatus);
                     return;
                 }
 
@@ -124,7 +125,7 @@ public class RecommendationProcessor {
             }
 
             saveFailedResult(gatheringId, FailureReason.PROCESSING_EXCEPTION,
-                             e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }
     }
 
@@ -162,12 +163,15 @@ public class RecommendationProcessor {
             );
         }
 
+        LocalDate scheduledDate = gathering != null ? gathering.scheduledDate() : null;
         List<Restaurant> restaurants = findRecommendationCandidates(
                 region,
                 candidateCategoryIds,
                 gatheringTimeSlot,
-                excludedRestaurantIds
+                excludedRestaurantIds,
+                scheduledDate
         );
+
         if (restaurants.isEmpty()) {
             return RecommendationCandidateResult.failure(
                     FailureReason.NO_RESTAURANTS,
@@ -199,21 +203,15 @@ public class RecommendationProcessor {
             Region region,
             Set<Long> candidateCategoryIds,
             TimeSlot gatheringTimeSlot,
-            List<Long> excludedRestaurantIds
+            List<Long> excludedRestaurantIds,
+            LocalDate scheduledDate
     ) {
-        if (excludedRestaurantIds == null || excludedRestaurantIds.isEmpty()) {
-            return restaurantRepository.findRecommendationCandidates(
-                    region,
-                    candidateCategoryIds,
-                    gatheringTimeSlot
-            );
-        }
-
         return restaurantRepository.findRecommendationCandidates(
                 region,
                 candidateCategoryIds,
                 gatheringTimeSlot,
-                excludedRestaurantIds
+                excludedRestaurantIds == null ? List.of() : excludedRestaurantIds,
+                scheduledDate
         );
     }
 
@@ -280,9 +278,9 @@ public class RecommendationProcessor {
 
         // 점수 계산은 1회만 수행하고, 필터 전략만 다르게 적용
         List<CategoryScoredRestaurant> scoredCandidates = scoreRestaurants(
-            restaurants, categoryMap, participantContext,
-            participants, centerPoint,
-            gatheringTimeSlot
+                restaurants, categoryMap, participantContext,
+                participants, centerPoint,
+                gatheringTimeSlot
         );
 
         // 1단계: 선호도 점수 > 0인 레스토랑만
@@ -354,8 +352,8 @@ public class RecommendationProcessor {
             }
 
             PreferenceScore preferenceScore = preferenceScoreMap.getOrDefault(
-                categoryName,
-                PreferenceScore.empty()
+                    categoryName,
+                    PreferenceScore.empty()
             );
 
             // 기본 점수 계산 (다양성 부스트 제외)
@@ -808,8 +806,8 @@ public class RecommendationProcessor {
         // 1. 참여자 선호 정보
         if (preferenceCount > 0 && totalParticipants > 1) {
             sb.append(totalParticipants).append("명 중 ")
-              .append(preferenceCount).append("명이 ")
-              .append(categoryName).append("을 골라서\n");
+                    .append(preferenceCount).append("명이 ")
+                    .append(categoryName).append("을 골라서\n");
         }
 
         // 2. AI 요약 타이틀 (있는 경우)

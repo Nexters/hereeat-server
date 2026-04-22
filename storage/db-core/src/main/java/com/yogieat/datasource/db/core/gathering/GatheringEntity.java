@@ -8,6 +8,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import lombok.AccessLevel;
@@ -17,7 +18,13 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "t_gathering")
+@Table(
+        name = "t_gathering",
+        indexes = {
+            @Index(name = "idx_gathering_region_id", columnList = "region_id"),
+            @Index(name = "idx_gathering_region_id_deleted_at", columnList = "region_id, deleted_at")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class GatheringEntity extends BaseEntity {
 
@@ -34,10 +41,6 @@ public class GatheringEntity extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private TimeSlot timeSlot;
 
-    @Column(name = "region")
-    @Enumerated(EnumType.STRING)
-    private Region region;
-
     @Column(name = "region_id")
     private Long regionId;
 
@@ -50,14 +53,12 @@ public class GatheringEntity extends BaseEntity {
             String title,
             LocalDate scheduledDate,
             TimeSlot timeSlot,
-            Region region,
             Long regionId,
             int peopleCount) {
         this.accessKey = accessKey;
         this.title = title;
         this.scheduledDate = scheduledDate;
         this.timeSlot = timeSlot;
-        this.region = region;
         this.regionId = regionId;
         this.peopleCount = peopleCount;
     }
@@ -72,20 +73,19 @@ public class GatheringEntity extends BaseEntity {
                 .title(gathering.title())
                 .scheduledDate(gathering.scheduledDate())
                 .timeSlot(gathering.timeSlot())
-                .region(gathering.region())
                 .regionId(regionId)
                 .peopleCount(gathering.peopleCount())
                 .build();
     }
 
-    public static Gathering toDomain(GatheringEntity entity) {
+    public static Gathering toDomain(GatheringEntity entity, Region region) {
         return new Gathering(
                 entity.getId(),
                 entity.getAccessKey(),
                 entity.getTitle(),
                 entity.getScheduledDate(),
                 entity.getTimeSlot(),
-                entity.getRegion(),
+                region,
                 entity.getPeopleCount(),
                 entity.getDeletedAt(),
                 entity.getCreatedAt(),

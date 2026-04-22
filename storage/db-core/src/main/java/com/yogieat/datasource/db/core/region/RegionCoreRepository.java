@@ -1,138 +1,153 @@
 package com.yogieat.datasource.db.core.region;
 
+import static com.yogieat.datasource.db.core.restaurant.QRestaurantEntity.restaurantEntity;
+
+import com.querydsl.core.Tuple;
+import com.querydsl.core.types.dsl.NumberExpression;
+import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionSummary;
 import com.yogieat.region.service.RegionRepository;
-import jakarta.persistence.EntityManager;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @RequiredArgsConstructor
-@Slf4j
 public class RegionCoreRepository implements RegionRepository {
 
-    private static final String BACKFILL_RESTAURANT_REGION_IDS_SQL = """
-            update t_restaurant restaurant
-               set region_id = (
-                   select region.id
-                     from t_region region
-                    where region.code = restaurant.region
-               )
-             where restaurant.region is not null
-               and restaurant.region_id is null
-               and exists (
-                   select 1
-                     from t_region region
-                    where region.code = restaurant.region
-               )
-            """;
-
-    private static final String BACKFILL_GATHERING_REGION_IDS_SQL = """
-            update t_gathering gathering
-               set region_id = (
-                   select region.id
-                     from t_region region
-                    where region.code = gathering.region
-               )
-             where gathering.region is not null
-               and gathering.region_id is null
-               and exists (
-                   select 1
-                     from t_region region
-                    where region.code = gathering.region
-               )
-            """;
-
-    private static final String FIND_UNMATCHED_RESTAURANT_REGIONS_SQL = """
-            select distinct restaurant.region
-              from t_restaurant restaurant
-             where restaurant.region is not null
-               and restaurant.region_id is null
-               and not exists (
-                   select 1
-                     from t_region region
-                    where region.code = restaurant.region
-               )
-            """;
-
-    private static final String FIND_UNMATCHED_GATHERING_REGIONS_SQL = """
-            select distinct gathering.region
-              from t_gathering gathering
-             where gathering.region is not null
-               and gathering.region_id is null
-               and not exists (
-                   select 1
-                     from t_region region
-                    where region.code = gathering.region
-               )
-            """;
-
     private final RegionJpaRepository regionJpaRepository;
-    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
-    private final EntityManager entityManager;
+    private final JPAQueryFactory jpaQueryFactory;
 
     @Override
-    public Optional<RegionMaster> findByCode(String code) {
-        return regionJpaRepository.findByCode(code)
+    public Optional<RegionMaster> findById(Long id) {
+        return regionJpaRepository.findByIdAndDeletedAtIsNull(id)
                 .map(RegionEntity::toDomain);
     }
 
     @Override
-    public List<RegionMaster> findAllActiveOrderBySortOrder() {
-        return regionJpaRepository.findAllByActiveTrueOrderBySortOrderAsc().stream()
+    public Optional<RegionSummary> findRegionSummaryById(Long id) {
+        return regionJpaRepository.findByIdAndDeletedAtIsNull(id)
+                .map(regionEntity -> new RegionSummary(
+                        RegionEntity.toDomain(regionEntity),
+                        findRestaurantCountMap(List.of(regionEntity.getId())).getOrDefault(regionEntity.getId(), 0L)
+                ));
+    }
+
+    @Override
+    public List<RegionMaster> findAllOrderBySortOrder() {
+        return regionJpaRepository.findAllByDeletedAtIsNullOrderBySortOrderAsc().stream()
                 .map(RegionEntity::toDomain)
                 .toList();
     }
 
     @Override
-    @Transactional
+    public List<RegionMaster> findAllActiveOrderBySortOrder() {
+        return regionJpaRepository.findAllByActiveTrueAndDeletedAtIsNullOrderBySortOrderAsc().stream()
+                .map(RegionEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<RegionSummary> findAllRegionSummariesOrderBySortOrder() {
+        return toRegionSummaries(regionJpaRepository.findAllByDeletedAtIsNullOrderBySortOrderAsc());
+    }
+
+    @Override
+    public List<RegionSummary> findAllActiveRegionSummariesOrderBySortOrder() {
+        return toRegionSummaries(regionJpaRepository.findAllByActiveTrueAndDeletedAtIsNullOrderBySortOrderAsc());
+    }
+
+    @Override
+    public Optional<RegionMaster> findActiveByDisplayName(String displayName) {
+        return regionJpaRepository.findByDisplayNameAndActiveTrueAndDeletedAtIsNull(displayName)
+                .map(RegionEntity::toDomain);
+    }
+
+    @Override
+    public boolean existsByCode(String code) {
+        return regionJpaRepository.existsByCode(code);
+    }
+
+    @Override
+    public boolean existsByDisplayName(String displayName) {
+        return regionJpaRepository.existsByDisplayNameAndDeletedAtIsNull(displayName);
+    }
+
+    @Override
+    public int nextSortOrder() {
+        return regionJpaRepository.findNextSortOrder();
+    }
+
+    @Override
     public RegionMaster save(RegionMaster regionMaster) {
-        RegionEntity entity = regionMaster.id() == null
-                ? regionJpaRepository.findByCode(regionMaster.code()).orElse(null)
-                : regionJpaRepository.findById(regionMaster.id())
-                        .orElseGet(() -> regionJpaRepository.findByCode(regionMaster.code()).orElse(null));
-
-        if (entity == null) {
-            return RegionEntity.toDomain(regionJpaRepository.save(RegionEntity.of(regionMaster)));
-        }
-
-        entity.apply(regionMaster);
-        RegionEntity savedEntity = regionJpaRepository.save(entity);
+        RegionEntity savedEntity = regionJpaRepository.save(RegionEntity.of(regionMaster));
         return RegionEntity.toDomain(savedEntity);
     }
 
     @Override
-    public int backfillRestaurantRegionIds() {
-        logUnmatchedLegacyRegions("restaurant", FIND_UNMATCHED_RESTAURANT_REGIONS_SQL);
-        entityManager.flush();
-        int updatedCount = namedParameterJdbcTemplate.getJdbcTemplate().update(BACKFILL_RESTAURANT_REGION_IDS_SQL);
-        entityManager.clear();
-        return updatedCount;
+    public RegionMaster update(RegionMaster regionMaster) {
+        RegionEntity entity = regionJpaRepository.findByIdAndDeletedAtIsNull(regionMaster.id())
+                .orElseThrow();
+        entity.apply(regionMaster);
+        return RegionEntity.toDomain(entity);
     }
 
     @Override
-    public int backfillGatheringRegionIds() {
-        logUnmatchedLegacyRegions("gathering", FIND_UNMATCHED_GATHERING_REGIONS_SQL);
-        entityManager.flush();
-        int updatedCount = namedParameterJdbcTemplate.getJdbcTemplate().update(BACKFILL_GATHERING_REGION_IDS_SQL);
-        entityManager.clear();
-        return updatedCount;
+    public void deleteById(Long id) {
+        RegionEntity entity = regionJpaRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow();
+        entity.softDelete();
     }
 
-    private void logUnmatchedLegacyRegions(String tableName, String sql) {
-        List<String> unmatchedRegionCodes = namedParameterJdbcTemplate.getJdbcTemplate().queryForList(sql, String.class);
-        for (String unmatchedRegionCode : unmatchedRegionCodes == null ? Collections.<String>emptyList() : unmatchedRegionCodes) {
-            log.warn(
-                    "Skipping {} legacy region backfill because no matching region master exists: {}",
-                    tableName,
-                    unmatchedRegionCode
-            );
+    private List<RegionSummary> toRegionSummaries(List<RegionEntity> regionEntities) {
+        Map<Long, Long> restaurantCountMap = findRestaurantCountMap(
+                regionEntities.stream()
+                        .map(RegionEntity::getId)
+                        .toList()
+        );
+
+        return regionEntities.stream()
+                .map(regionEntity -> new RegionSummary(
+                        RegionEntity.toDomain(regionEntity),
+                        restaurantCountMap.getOrDefault(regionEntity.getId(), 0L)
+                ))
+                .toList();
+    }
+
+    private Map<Long, Long> findRestaurantCountMap(Collection<Long> regionIds) {
+        List<Long> distinctRegionIds = regionIds.stream()
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+        if (distinctRegionIds.isEmpty()) {
+            return Collections.emptyMap();
         }
+
+        NumberExpression<Long> restaurantCount = restaurantEntity.id.count();
+        List<Tuple> tuples = jpaQueryFactory
+                .select(restaurantEntity.regionId, restaurantCount)
+                .from(restaurantEntity)
+                .where(
+                        restaurantEntity.deletedAt.isNull(),
+                        restaurantEntity.regionId.in(distinctRegionIds)
+                )
+                .groupBy(restaurantEntity.regionId)
+                .fetch();
+
+        Map<Long, Long> restaurantCountMap = new HashMap<>();
+        for (Tuple tuple : tuples) {
+            Long regionId = tuple.get(restaurantEntity.regionId);
+            Long count = tuple.get(restaurantCount);
+            if (regionId != null && count != null) {
+                restaurantCountMap.put(regionId, count);
+            }
+        }
+        return restaurantCountMap;
     }
 }

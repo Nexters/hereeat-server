@@ -15,6 +15,7 @@ import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.datasource.db.core.region.RegionJpaRepository;
 import com.yogieat.gathering.domain.value.TimeSlot;
+import com.yogieat.region.domain.RegionMaster;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
@@ -26,11 +27,14 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.sql.Types;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.locationtech.jts.geom.Point;
@@ -63,26 +67,48 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     public Restaurant save(CreateRestaurant createRestaurant) {
+        return save(createRestaurant, null);
+    }
+
+    @Override
+    public Restaurant save(CreateRestaurant createRestaurant, Long regionId) {
         RestaurantEntity entity = RestaurantEntity.from(
                 createRestaurant,
-                resolveRegionId(createRestaurant.region())
+                regionId != null ? regionId : resolveRegionId(createRestaurant.region())
         );
         RestaurantEntity savedEntity = restaurantJpaRepository.save(entity);
-        return RestaurantEntity.toDomain(savedEntity);
+        return toDomain(savedEntity);
     }
 
     @Override
     public List<Restaurant> findAll() {
-        return restaurantJpaRepository.findAllByDeletedAtIsNull().stream()
-                .map(RestaurantEntity::toDomain)
-                .toList();
+        return toDomainRestaurants(restaurantJpaRepository.findAllByDeletedAtIsNull());
     }
 
     @Override
     public List<Restaurant> findByRegion(Region region) {
-        return restaurantJpaRepository.findByRegionAndDeletedAtIsNull(region).stream()
-                .map(RestaurantEntity::toDomain)
-                .toList();
+        List<RestaurantEntity> entities = jpaQueryFactory.selectFrom(restaurantEntity)
+                .where(
+                        restaurantEntity.deletedAt.isNull(),
+                        regionCondition(region)
+                )
+                .fetch();
+        return toDomainRestaurants(entities);
+    }
+
+    @Override
+    public List<Restaurant> findByRegionId(Long regionId) {
+        if (regionId == null) {
+            return List.of();
+        }
+
+        List<RestaurantEntity> entities = jpaQueryFactory.selectFrom(restaurantEntity)
+                .where(
+                        restaurantEntity.deletedAt.isNull(),
+                        restaurantEntity.regionId.eq(regionId)
+                )
+                .fetch();
+        return toDomainRestaurants(entities);
     }
 
     @Override
@@ -91,7 +117,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             Collection<Long> categoryIds,
             TimeSlot gatheringTimeSlot
     ) {
-        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, List.of());
+        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, List.of(), null);
     }
 
     @Override
@@ -101,17 +127,27 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             TimeSlot gatheringTimeSlot,
             Collection<Long> excludedRestaurantIds
     ) {
+        return findRecommendationCandidates(region, categoryIds, gatheringTimeSlot, excludedRestaurantIds, null);
+    }
+
+    @Override
+    public List<Restaurant> findRecommendationCandidates(
+            Region region,
+            Collection<Long> categoryIds,
+            TimeSlot gatheringTimeSlot,
+            Collection<Long> excludedRestaurantIds,
+            LocalDate scheduledDate
+    ) {
         if (categoryIds == null || categoryIds.isEmpty()) {
             return List.of();
         }
-
-        return jpaQueryFactory
+        List<Tuple> tuples = jpaQueryFactory
                 .select(
                         restaurantEntity.id,
                         restaurantEntity.categoryId,
                         restaurantEntity.name,
                         restaurantEntity.rating,
-                        restaurantEntity.region,
+                        restaurantEntity.regionId,
                         restaurantEntity.location,
                         restaurantEntity.reviewCount,
                         restaurantEntity.blogReviewCount,
@@ -119,33 +155,40 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.aiMateSummaryContents,
                         restaurantEntity.timeSlot,
                         restaurantEntity.createdAt,
-                        restaurantEntity.updatedAt
+                        restaurantEntity.updatedAt,
+                        restaurantEntity.offDays
                 )
                 .from(restaurantEntity)
                 .where(
                         restaurantEntity.deletedAt.isNull(),
-                        restaurantEntity.region.eq(region),
+                        regionCondition(region),
                         restaurantEntity.categoryId.in(categoryIds),
                         recommendationTimeSlotCondition(gatheringTimeSlot),
-                        excludedRestaurantIdsCondition(excludedRestaurantIds)
+                        excludedRestaurantIdsCondition(excludedRestaurantIds),
+                        offDaysNotContainsCondition(scheduledDate)
                 )
-                .fetch()
+                .fetch();
+        Map<Long, Region> regionMap = resolveRegionMap(
+                tuples.stream()
+                        .map(tuple -> tuple.get(restaurantEntity.regionId))
+                        .toList()
+        );
+
+        return tuples
                 .stream()
-                .map(this::toRecommendationCandidate)
+                .map(tuple -> toRecommendationCandidate(tuple, regionMap))
                 .toList();
     }
 
     @Override
     public Optional<Restaurant> findById(Long id) {
         return restaurantJpaRepository.findByIdAndDeletedAtIsNull(id)
-                .map(RestaurantEntity::toDomain);
+                .map(this::toDomain);
     }
 
     @Override
     public List<Restaurant> findByIds(List<Long> ids) {
-        return restaurantJpaRepository.findByIdInAndDeletedAtIsNull(ids).stream()
-                .map(RestaurantEntity::toDomain)
-                .toList();
+        return toDomainRestaurants(restaurantJpaRepository.findByIdInAndDeletedAtIsNull(ids));
     }
 
     @Override
@@ -157,7 +200,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 command,
                 command.region() != null ? resolveRegionId(command.region()) : null
         );
-        return RestaurantEntity.toDomain(entity);
+        return toDomain(entity);
     }
 
     @Override
@@ -176,13 +219,21 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     public long countByRegion(Region region) {
-        return restaurantJpaRepository.countByRegionAndDeletedAtIsNull(region);
+        Long count = jpaQueryFactory.select(restaurantEntity.count())
+                .from(restaurantEntity)
+                .where(
+                        restaurantEntity.deletedAt.isNull(),
+                        regionCondition(region)
+                )
+                .fetchOne();
+
+        return count == null ? 0L : count;
     }
 
     @Override
     public Optional<Restaurant> findByExternalId(String externalId) {
         return restaurantJpaRepository.findByExternalIdAndDeletedAtIsNull(externalId)
-                .map(RestaurantEntity::toDomain);
+                .map(this::toDomain);
     }
 
     @Override
@@ -211,13 +262,21 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             int page,
             int size
     ) {
-        return createAdminRestaurantTupleQuery(criteria)
+        List<Tuple> tuples = createAdminRestaurantTupleQuery(criteria)
                 .orderBy(restaurantEntity.updatedAt.desc(), restaurantEntity.id.desc())
                 .offset((long) page * size)
                 .limit(size)
-                .fetch()
+                .fetch();
+        Map<Long, Region> regionMap = resolveRegionMap(
+                tuples.stream()
+                        .map(tuple -> tuple.get(restaurantEntity))
+                        .map(RestaurantEntity::getRegionId)
+                        .toList()
+        );
+
+        return tuples
                 .stream()
-                .map(this::toAdminListItem)
+                .map(tuple -> toAdminListItem(tuple, regionMap))
                 .toList();
     }
 
@@ -252,44 +311,35 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             return Optional.empty();
         }
 
-        Restaurant restaurant = RestaurantEntity.toDomain(entity);
+        Region resolvedRegion = resolveRegion(entity.getRegionId());
         return Optional.of(
                 RestaurantAdminResult.Detail.of(
-                        restaurant.id(),
-                        restaurant.externalId(),
-                        restaurant.categoryId(),
+                        entity.getId(),
+                        entity.getExternalId(),
+                        entity.getCategoryId(),
                         tuple.get(categoryEntity.largeCategory),
                         tuple.get(categoryEntity.mediumCategory),
-                        restaurant.name(),
-                        restaurant.address(),
-                        restaurant.rating(),
-                        restaurant.imageUrl(),
-                        restaurant.mapUrl(),
-                        restaurant.representativeReview(),
-                        restaurant.description(),
-                        restaurant.region(),
-                        restaurant.location(),
-                        restaurant.reviewCount(),
-                        restaurant.blogReviewCount(),
-                        restaurant.representMenu(),
-                        restaurant.representMenuPrice(),
-                        restaurant.priceLevel(),
-                        restaurant.aiMateSummaryTitle(),
-                        restaurant.aiMateSummaryContents(),
-                        restaurant.timeSlot(),
-                        restaurant.createdAt(),
-                        restaurant.updatedAt()
+                        entity.getName(),
+                        entity.getAddress(),
+                        entity.getRating(),
+                        entity.getImageUrl(),
+                        entity.getMapUrl(),
+                        entity.getRepresentativeReview(),
+                        entity.getDescription(),
+                        resolvedRegion,
+                        toGeoJsonPoint(entity.getLocation()),
+                        entity.getReviewCount(),
+                        entity.getBlogReviewCount(),
+                        entity.getRepresentMenu(),
+                        entity.getRepresentMenuPrice(),
+                        entity.getPriceLevel(),
+                        entity.getAiMateSummaryTitle(),
+                        parseAiMateSummaryContents(entity.getAiMateSummaryContents()),
+                        entity.getTimeSlot(),
+                        entity.getCreatedAt(),
+                        entity.getUpdatedAt()
                 )
         );
-    }
-
-    private JPAQuery<RestaurantEntity> createAdminRestaurantQuery(
-            RestaurantAdminListCriteria criteria
-    ) {
-        return jpaQueryFactory.selectFrom(restaurantEntity)
-                .leftJoin(categoryEntity)
-                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
-                .where(buildAdminRestaurantConditions(criteria));
     }
 
     private JPAQuery<Tuple> createAdminRestaurantTupleQuery(
@@ -303,7 +353,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .where(buildAdminRestaurantConditions(criteria));
     }
 
-    private RestaurantAdminListItemResult toAdminListItem(Tuple tuple) {
+    private RestaurantAdminListItemResult toAdminListItem(Tuple tuple, Map<Long, Region> regionMap) {
         RestaurantEntity entity = tuple.get(restaurantEntity);
         return new RestaurantAdminListItemResult(
                 entity.getId(),
@@ -313,7 +363,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 tuple.get(categoryEntity.mediumCategory),
                 entity.getRating(),
                 entity.getImageUrl(),
-                entity.getRegion(),
+                regionMap.get(entity.getRegionId()),
                 entity.getUpdatedAt()
         );
     }
@@ -325,7 +375,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         conditions.add(restaurantEntity.deletedAt.isNull());
 
         if (criteria.region() != null) {
-            conditions.add(restaurantEntity.region.eq(criteria.region()));
+            conditions.add(regionCondition(criteria.region()));
         }
 
         if (criteria.categoryId() != null) {
@@ -383,8 +433,20 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         return restaurantEntity.id.notIn(excludedRestaurantIds);
     }
 
-    private Restaurant toRecommendationCandidate(Tuple tuple) {
+    private BooleanExpression offDaysNotContainsCondition(LocalDate scheduledDate) {
+        if (scheduledDate == null) {
+            return null;
+        }
+        // off_days는 ["YYYY-MM-DD", ...] 형식의 JSON 텍스트이므로 quoted 날짜 문자열 포함 여부로 판단
+        String datePattern = "%\"" + scheduledDate + "\"%";
+        return restaurantEntity.offDays.isNull()
+                .or(restaurantEntity.offDays.notLike(datePattern));
+    }
+
+    private Restaurant toRecommendationCandidate(Tuple tuple, Map<Long, Region> regionMap) {
         Point location = tuple.get(restaurantEntity.location);
+        Long regionId = tuple.get(restaurantEntity.regionId);
+        Region resolvedRegion = regionMap.get(regionId);
 
         return new Restaurant(
                 tuple.get(restaurantEntity.id),
@@ -397,7 +459,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 null,
                 null,
                 null,
-                tuple.get(restaurantEntity.region),
+                resolvedRegion,
                 toGeoJsonPoint(location),
                 tuple.get(restaurantEntity.reviewCount),
                 tuple.get(restaurantEntity.blogReviewCount),
@@ -408,7 +470,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 parseAiMateSummaryContents(tuple.get(restaurantEntity.aiMateSummaryContents)),
                 tuple.get(restaurantEntity.timeSlot),
                 tuple.get(restaurantEntity.createdAt),
-                tuple.get(restaurantEntity.updatedAt)
+                tuple.get(restaurantEntity.updatedAt),
+                parseOffDays(tuple.get(restaurantEntity.offDays))
         );
     }
 
@@ -430,19 +493,116 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         }
     }
 
+    private List<LocalDate> parseOffDays(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            List<String> dateStrings = OBJECT_MAPPER.readValue(json, STRING_LIST_TYPE);
+            return dateStrings.stream().map(LocalDate::parse).toList();
+        } catch (Exception ignored) {
+            return Collections.emptyList();
+        }
+    }
+
     @Override
     public List<RestaurantSyncTarget> findSyncTargetsByIds(List<Long> ids) {
-        return restaurantJpaRepository.findByIdInAndDeletedAtIsNull(ids).stream()
-                .map(entity -> new RestaurantSyncTarget(
-                        entity.getId(),
-                        entity.getName(),
-                        entity.getRegion(),
-                        entity.getExternalId(),
-                        entity.getLocation() == null
-                                ? null
-                                : new GeoJson.Point(List.of(entity.getLocation().getX(), entity.getLocation().getY()))
-                ))
+        List<RestaurantEntity> entities = restaurantJpaRepository.findByIdInAndDeletedAtIsNull(ids);
+        Map<Long, RegionMaster> regionMap = resolveRegionMasterMap(
+                entities.stream()
+                        .map(RestaurantEntity::getRegionId)
+                        .toList()
+        );
+
+        return entities.stream()
+                .map(entity -> {
+                    RegionMaster region = regionMap.get(entity.getRegionId());
+                    return new RestaurantSyncTarget(
+                            entity.getId(),
+                            entity.getName(),
+                            region == null ? null : region.code(),
+                            region == null ? null : region.displayName(),
+                            region == null ? null : region.coordinatesStandard(),
+                            entity.getExternalId(),
+                            entity.getLocation() == null
+                                    ? null
+                                    : new GeoJson.Point(List.of(entity.getLocation().getX(), entity.getLocation().getY()))
+                    );
+                })
                 .toList();
+    }
+
+    private BooleanExpression regionCondition(Region region) {
+        if (region == null) {
+            return null;
+        }
+
+        Long regionId = resolveRegionId(region);
+        if (regionId == null) {
+            return restaurantEntity.regionId.isNull().and(restaurantEntity.regionId.isNotNull());
+        }
+
+        return restaurantEntity.regionId.eq(regionId);
+    }
+
+    private Restaurant toDomain(RestaurantEntity entity) {
+        return RestaurantEntity.toDomain(entity, resolveRegion(entity.getRegionId()));
+    }
+
+    private List<Restaurant> toDomainRestaurants(List<RestaurantEntity> entities) {
+        Map<Long, Region> regionMap = resolveRegionMap(
+                entities.stream()
+                        .map(RestaurantEntity::getRegionId)
+                        .toList()
+        );
+
+        return entities.stream()
+                .map(entity -> RestaurantEntity.toDomain(entity, regionMap.get(entity.getRegionId())))
+                .toList();
+    }
+
+    private Region resolveRegion(Long regionId) {
+        if (regionId == null) {
+            return null;
+        }
+
+        return regionJpaRepository.findByIdAndDeletedAtIsNull(regionId)
+                .map(regionEntity -> toRegion(regionEntity.getCode()))
+                .orElse(null);
+    }
+
+    private Map<Long, Region> resolveRegionMap(Collection<Long> regionIds) {
+        List<Long> distinctRegionIds = regionIds.stream()
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+        if (distinctRegionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<Long, Region> regionMap = new HashMap<>();
+        regionJpaRepository.findByIdInAndDeletedAtIsNull(distinctRegionIds)
+                .forEach(regionEntity -> regionMap.put(regionEntity.getId(), toRegion(regionEntity.getCode())));
+        return regionMap;
+    }
+
+    private Map<Long, RegionMaster> resolveRegionMasterMap(Collection<Long> regionIds) {
+        List<Long> distinctRegionIds = regionIds.stream()
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+        if (distinctRegionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<Long, RegionMaster> regionMap = new HashMap<>();
+        regionJpaRepository.findByIdInAndDeletedAtIsNull(distinctRegionIds)
+                .forEach(regionEntity -> regionMap.put(regionEntity.getId(), com.yogieat.datasource.db.core.region.RegionEntity.toDomain(regionEntity)));
+        return regionMap;
+    }
+
+    private Region toRegion(String regionCode) {
+        return Region.fromString(regionCode);
     }
 
     @Override
@@ -480,6 +640,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                     ai_mate_summary_contents = coalesce(:aiMateSummaryContents, ai_mate_summary_contents),
                     time_slot = coalesce(:timeSlot, time_slot),
                     category_id = coalesce(:categoryId, category_id),
+                    off_days = coalesce(:offDays, off_days),
+                    off_days_updated_at = case when :offDays is not null then now() else off_days_updated_at end,
                     updated_at = now()
                 where id = :restaurantId
                   and deleted_at is null
@@ -508,6 +670,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         .addValue("aiMateSummaryContents", command.aiMateSummaryContents())
                         .addValue("timeSlot", command.timeSlot() != null ? command.timeSlot().name() : null)
                         .addValue("categoryId", command.categoryId())
+                        .addValue("offDays", command.offDays())
                 )
                 .toArray(MapSqlParameterSource[]::new);
 

@@ -20,6 +20,7 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -133,11 +134,11 @@ public class RestaurantSyncService {
         Semaphore syncTargetSemaphore = new Semaphore(effectiveParallelism);
 
         List<CompletableFuture<SyncExecution>> futures = ids.stream()
-                    .map(id -> CompletableFuture.supplyAsync(
-                            () -> syncTargetWithParallelismLimit(syncTargetSemaphore, id, targetMap.get(id)),
-                            executor
-                    ))
-                    .toList();
+                .map(id -> CompletableFuture.supplyAsync(
+                        () -> syncTargetWithParallelismLimit(syncTargetSemaphore, id, targetMap.get(id)),
+                        executor
+                ))
+                .toList();
 
         List<SyncExecution> executions = futures.stream()
                 .map(CompletableFuture::join)
@@ -239,7 +240,7 @@ public class RestaurantSyncService {
                         "kakao source unavailable"
                                 + " (restaurantId=" + target.id()
                                 + ", name=" + target.name()
-                                + ", region=" + (target.region() == null ? "null" : target.region().name())
+                                + ", region=" + (target.regionCode() == null ? "null" : target.regionCode())
                                 + ", externalId=" + target.externalId()
                                 + ")"
                 );
@@ -268,7 +269,7 @@ public class RestaurantSyncService {
             }
         }
 
-        Optional<KaKaoPlaceDocumentResult> placeOpt = searchPlace(target.name(), target.region() == null ? null : target.region().getName());
+        Optional<KaKaoPlaceDocumentResult> placeOpt = searchPlace(target.name(), target.regionDisplayName());
 
         if (placeOpt.isEmpty()) {
             return null;
@@ -492,6 +493,7 @@ public class RestaurantSyncService {
         String aiMateSummaryTitle = detail != null ? detail.aiMateSummaryTitle() : null;
         String aiMateSummaryContents = detail != null ? toJson(detail.aiMateSummaryContents()) : null;
         Long categoryId = resolveCategoryId(detail);
+        String offDays = detail != null ? offDaysToJson(detail.offDays()) : null;
 
         return new RestaurantSyncPatch(
                 externalId,
@@ -509,7 +511,8 @@ public class RestaurantSyncService {
                 aiMateSummaryTitle,
                 aiMateSummaryContents,
                 detail != null ? detail.timeSlot() : null,
-                categoryId
+                categoryId,
+                offDays
         );
     }
 
@@ -573,6 +576,16 @@ public class RestaurantSyncService {
         }
     }
 
+    private String offDaysToJson(List<LocalDate> offDays) {
+        if (offDays == null) {
+            return null;
+        }
+        if (offDays.isEmpty()) {
+            return "[]";
+        }
+        return toJson(offDays.stream().map(LocalDate::toString).toList());
+    }
+
     private String normalizeMapUrl(String mapUrl) {
         if (mapUrl == null || mapUrl.isBlank()) {
             return null;
@@ -594,11 +607,11 @@ public class RestaurantSyncService {
     }
 
     private boolean isWithinRegionRadius(RestaurantSyncTarget target, GeoJson.Point resolvedPoint) {
-        if (target == null || target.region() == null || target.region().getCoordinatesStandard() == null) {
+        if (target == null || target.regionCoordinatesStandard() == null) {
             return false;
         }
 
-        return isWithinDistance(target.region().getCoordinatesStandard(), resolvedPoint);
+        return isWithinDistance(target.regionCoordinatesStandard(), resolvedPoint);
     }
 
     private boolean isWithinDistance(GeoJson.Point centerPoint, GeoJson.Point restaurantPoint) {

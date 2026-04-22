@@ -14,7 +14,11 @@ import com.yogieat.gathering.result.GatheringAdminItemResult;
 import com.yogieat.gathering.service.GatheringAdminCriteria;
 import com.yogieat.gathering.service.GatheringRepository;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -30,19 +34,19 @@ public class GatheringCoreRepository implements GatheringRepository {
     @Override
     public Optional<Gathering> findById(Long id) {
         return gatheringJpaRepository.findById(id)
-                .map(GatheringEntity::toDomain);
+                .map(this::toDomain);
     }
 
     @Override
     public Optional<Gathering> findByAccessKey(String accessKey) {
         return gatheringJpaRepository.findByAccessKey(accessKey)
-                .map(GatheringEntity::toDomain);
+                .map(this::toDomain);
     }
 
     @Override
     public Optional<Gathering> findByAccessKeyForUpdate(String accessKey) {
         return gatheringJpaRepository.findByAccessKeyForUpdate(accessKey)
-                .map(GatheringEntity::toDomain);
+                .map(this::toDomain);
     }
 
     @Override
@@ -52,7 +56,7 @@ public class GatheringCoreRepository implements GatheringRepository {
                 resolveRegionId(gathering.region())
         );
         GatheringEntity savedEntity = gatheringJpaRepository.save(entity);
-        return GatheringEntity.toDomain(savedEntity);
+        return toDomain(savedEntity);
     }
 
     @Override
@@ -61,14 +65,12 @@ public class GatheringCoreRepository implements GatheringRepository {
             int page,
             int size
     ) {
-        return createAdminGatheringQuery(criteria)
+        List<GatheringEntity> entities = createAdminGatheringQuery(criteria)
                 .orderBy(gatheringEntity.createdAt.desc(), gatheringEntity.id.desc())
                 .offset((long) page * size)
                 .limit(size)
-                .fetch()
-                .stream()
-                .map(GatheringEntity::toDomain)
-                .toList();
+                .fetch();
+        return toDomainGatherings(entities);
     }
 
     @Override
@@ -78,8 +80,7 @@ public class GatheringCoreRepository implements GatheringRepository {
             int size
     ) {
         NumberExpression<Long> participantCount = participantEntity.id.count();
-
-        return jpaQueryFactory
+        List<com.querydsl.core.Tuple> tuples = jpaQueryFactory
                 .select(gatheringEntity, participantCount)
                 .from(gatheringEntity)
                 .leftJoin(participantEntity)
@@ -89,12 +90,21 @@ public class GatheringCoreRepository implements GatheringRepository {
                 .orderBy(gatheringEntity.createdAt.desc(), gatheringEntity.id.desc())
                 .offset((long) page * size)
                 .limit(size)
-                .fetch()
+                .fetch();
+        Map<Long, Region> regionMap = resolveRegionMap(
+                tuples.stream()
+                        .map(tuple -> tuple.get(gatheringEntity))
+                        .map(GatheringEntity::getRegionId)
+                        .toList()
+        );
+
+        return tuples
                 .stream()
                 .map(tuple -> {
+                    GatheringEntity entity = tuple.get(gatheringEntity);
                     Long count = tuple.get(participantCount);
                     return new GatheringAdminItemResult(
-                            GatheringEntity.toDomain(tuple.get(gatheringEntity)),
+                            GatheringEntity.toDomain(entity, regionMap.get(entity.getRegionId())),
                             count == null ? 0L : count
                     );
                 })
@@ -103,12 +113,10 @@ public class GatheringCoreRepository implements GatheringRepository {
 
     @Override
     public List<Gathering> findAdminGatherings(GatheringAdminCriteria.List criteria) {
-        return createAdminGatheringQuery(criteria)
+        List<GatheringEntity> entities = createAdminGatheringQuery(criteria)
                 .orderBy(gatheringEntity.createdAt.desc(), gatheringEntity.id.desc())
-                .fetch()
-                .stream()
-                .map(GatheringEntity::toDomain)
-                .toList();
+                .fetch();
+        return toDomainGatherings(entities);
     }
 
     @Override
@@ -137,7 +145,7 @@ public class GatheringCoreRepository implements GatheringRepository {
         }
 
         if (criteria.region() != null) {
-            conditions.add(gatheringEntity.region.eq(criteria.region()));
+            conditions.add(regionCondition(criteria.region()));
         }
 
         if (criteria.timeSlot() != null) {
@@ -178,5 +186,63 @@ public class GatheringCoreRepository implements GatheringRepository {
             return null;
         }
         return regionJpaRepository.findIdByCode(region.name()).orElse(null);
+    }
+
+    private BooleanExpression regionCondition(Region region) {
+        if (region == null) {
+            return null;
+        }
+
+        Long regionId = resolveRegionId(region);
+        if (regionId == null) {
+            return gatheringEntity.regionId.isNull().and(gatheringEntity.regionId.isNotNull());
+        }
+
+        return gatheringEntity.regionId.eq(regionId);
+    }
+
+    private Gathering toDomain(GatheringEntity entity) {
+        return GatheringEntity.toDomain(entity, resolveRegion(entity.getRegionId()));
+    }
+
+    private List<Gathering> toDomainGatherings(List<GatheringEntity> entities) {
+        Map<Long, Region> regionMap = resolveRegionMap(
+                entities.stream()
+                        .map(GatheringEntity::getRegionId)
+                        .toList()
+        );
+
+        return entities.stream()
+                .map(entity -> GatheringEntity.toDomain(entity, regionMap.get(entity.getRegionId())))
+                .toList();
+    }
+
+    private Region resolveRegion(Long regionId) {
+        if (regionId == null) {
+            return null;
+        }
+
+        return regionJpaRepository.findByIdAndDeletedAtIsNull(regionId)
+                .map(regionEntity -> toRegion(regionEntity.getCode()))
+                .orElse(null);
+    }
+
+    private Map<Long, Region> resolveRegionMap(Collection<Long> regionIds) {
+        List<Long> distinctRegionIds = regionIds.stream()
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+        if (distinctRegionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<Long, Region> regionMap = new HashMap<>();
+        regionJpaRepository.findByIdInAndDeletedAtIsNull(distinctRegionIds)
+                .forEach(regionEntity -> regionMap.put(regionEntity.getId(), toRegion(regionEntity.getCode())));
+        return regionMap;
+    }
+
+    private Region toRegion(String regionCode) {
+        return Region.fromString(regionCode);
     }
 }
