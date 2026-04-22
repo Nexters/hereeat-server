@@ -77,19 +77,8 @@ public class RestaurantCollectionProcessor {
 
     /**
      * 지역별 맛집 수집 제한
-     * GANGNAM, HONGDAE: 100개
-     * 2025.04.22 나머지 지역도 100개 제한으로 통일 (추후 데이터 상황에 따라 조정 가능)
+     * 모든 지역을 100개 제한으로 통일한다. (추후 데이터 상황에 따라 조정 가능)
      */
-    private static final Map<Region, Integer> REGION_LIMITS = Map.of(
-        Region.GANGNAM, 100,
-        Region.HONGDAE, 100,
-        Region.GONGDEOK, 100,
-        Region.EULJIRO3GA, 100,
-        Region.SADANG, 100,
-        Region.JONGNO3GA, 100,
-        Region.JAMSIL, 100,
-        Region.SAMGAKJI, 100
-    );
     private static final int DEFAULT_REGION_LIMIT = 100;
 
     private final Semaphore kakaoApiSemaphore = new Semaphore(KAKAO_COLLECTION_CONCURRENT_PERMITS);
@@ -181,7 +170,7 @@ public class RestaurantCollectionProcessor {
 
         for (Region region : Region.values()) {
             long currentCount = regionCounts.getOrDefault(region, 0L);
-            int limit = REGION_LIMITS.getOrDefault(region, DEFAULT_REGION_LIMIT);
+            int limit = DEFAULT_REGION_LIMIT;
 
             if (currentCount < limit) {
                 locationsToCollect.add(region.getName());
@@ -198,7 +187,7 @@ public class RestaurantCollectionProcessor {
 
     private boolean isRegionLimitReached(Region region, Map<Region, Long> regionCounts) {
         long currentCount = regionCounts.getOrDefault(region, 0L);
-        int limit = REGION_LIMITS.getOrDefault(region, DEFAULT_REGION_LIMIT);
+        int limit = DEFAULT_REGION_LIMIT;
         return currentCount >= limit;
     }
 

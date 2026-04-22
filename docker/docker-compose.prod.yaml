@@ -7,7 +7,7 @@ services:
     environment:
       - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=18
       - DATASOURCE_DB_CORE_MINIMUM_IDLE=4
-      - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=1500
+      - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=3000
       - API_TOMCAT_MAX_THREADS=128
       - API_TOMCAT_MIN_THREADS=16
       - JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=65.0 -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication
@@ -26,14 +26,14 @@ services:
 
   yogieat-batch-sync:
     cpus: "0.20"
-    mem_limit: "384m"
-    mem_reservation: "192m"
+    mem_limit: "512m"
+    mem_reservation: "256m"
     environment:
       - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=4
       - DATASOURCE_DB_CORE_MINIMUM_IDLE=1
       - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=2000
       - SYNC_JOB_PARALLELISM=4
-      - JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=55.0 -XX:MaxGCPauseMillis=400
+      - JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=50.0 -XX:MaxGCPauseMillis=400
 
   yogieat-db:
     cpus: "0.35"
