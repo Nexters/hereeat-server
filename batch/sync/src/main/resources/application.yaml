@@ -21,6 +21,32 @@ sync:
     weekly-cron: "0 0 21 ? * SUN"
     weekly-zone: "Asia/Seoul"
 
+reservation:
+  search:
+    enabled: ${RESERVATION_SEARCH_ENABLED:false}
+    provider: ${RESERVATION_SEARCH_PROVIDER:naver-open-api}
+    base-url: ${RESERVATION_SEARCH_BASE_URL:https://html.duckduckgo.com}
+    user-agent: ${RESERVATION_SEARCH_USER_AGENT:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36}
+    min-match-score: ${RESERVATION_SEARCH_MIN_MATCH_SCORE:0.6}
+    max-results-per-query: ${RESERVATION_SEARCH_MAX_RESULTS_PER_QUERY:5}
+    max-queries-per-provider: ${RESERVATION_SEARCH_MAX_QUERIES_PER_PROVIDER:2}
+    blocked-cooldown-minutes: ${RESERVATION_SEARCH_BLOCKED_COOLDOWN_MINUTES:60}
+    request-delay-ms: ${RESERVATION_SEARCH_REQUEST_DELAY_MS:1000}
+    read-timeout-seconds: ${RESERVATION_SEARCH_READ_TIMEOUT_SECONDS:0}
+    naver-base-url: ${NAVER_SEARCH_BASE_URL:https://openapi.naver.com}
+    naver-client-id: ${NAVER_SEARCH_CLIENT_ID:}
+    naver-client-secret: ${NAVER_SEARCH_CLIENT_SECRET:}
+    naver-display: ${NAVER_SEARCH_DISPLAY:10}
+    browser-worker-base-url: ${RESERVATION_BROWSER_WORKER_BASE_URL:http://yogieat-reservation-browser-worker:8090}
+  backfill:
+    enabled: ${RESERVATION_BACKFILL_ENABLED:false}
+    schedule-enabled: ${RESERVATION_BACKFILL_SCHEDULE_ENABLED:false}
+    daily-cron: "${RESERVATION_BACKFILL_DAILY_CRON:0 */5 * * * ?}"
+    zone: ${RESERVATION_BACKFILL_ZONE:Asia/Seoul}
+    chunk-size: ${RESERVATION_BACKFILL_CHUNK_SIZE:100}
+    parallelism: ${RESERVATION_BACKFILL_PARALLELISM:4}
+    max-restaurants: ${RESERVATION_BACKFILL_MAX_RESTAURANTS:0}
+
 kakao:
   client:
     enabled: true
