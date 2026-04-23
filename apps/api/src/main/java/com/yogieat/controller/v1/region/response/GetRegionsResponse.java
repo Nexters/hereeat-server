@@ -21,6 +21,8 @@ public record GetRegionsResponse(
     public record RegionItemResponse(
             @Schema(description = "지역 코드", example = "GANGNAM")
             String code,
+            @Schema(description = "시도 구분", example = "서울")
+            String province,
             @Schema(description = "지역 표시명", example = "강남역")
             String displayName,
             @Schema(description = "지역 기준 좌표")
@@ -29,6 +31,7 @@ public record GetRegionsResponse(
         public static RegionItemResponse from(RegionMaster region) {
             return new RegionItemResponse(
                     region.code(),
+                    region.province(),
                     region.displayName(),
                     region.coordinatesStandard()
             );

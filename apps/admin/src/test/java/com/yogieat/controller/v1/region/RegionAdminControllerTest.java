@@ -79,6 +79,7 @@ class RegionAdminControllerTest {
                         new RegionMaster(
                                 1L,
                                 "GANGNAM",
+                                "서울",
                                 "강남역",
                                 new GeoJson.Point(List.of(127.0276, 37.4979)),
                                 true,
@@ -92,6 +93,7 @@ class RegionAdminControllerTest {
                         new RegionMaster(
                                 2L,
                                 "HONGDAE",
+                                "서울",
                                 "홍대입구역",
                                 new GeoJson.Point(List.of(126.92378, 37.55684)),
                                 true,
@@ -107,6 +109,7 @@ class RegionAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.regions[0].id").value(1))
                 .andExpect(jsonPath("$.data.regions[0].name").value("GANGNAM"))
+                .andExpect(jsonPath("$.data.regions[0].province").value("서울"))
                 .andExpect(jsonPath("$.data.regions[0].displayName").value("강남역"))
                 .andExpect(jsonPath("$.data.regions[0].active").value(true))
                 .andExpect(jsonPath("$.data.regions[0].sortOrder").value(1))
@@ -123,6 +126,7 @@ class RegionAdminControllerTest {
                         new RegionMaster(
                                 1L,
                                 "GANGNAM",
+                                "서울",
                                 "강남역",
                                 new GeoJson.Point(List.of(127.0276, 37.4979)),
                                 true,
@@ -148,6 +152,7 @@ class RegionAdminControllerTest {
                 new RegionMaster(
                         3L,
                         "YEOKSAM",
+                        "서울",
                         "역삼역",
                         new GeoJson.Point(List.of(127.033, 37.5006)),
                         true,
@@ -162,6 +167,7 @@ class RegionAdminControllerTest {
                         .content("""
                                 {
                                   "code": "yeoksam",
+                                  "province": "서울",
                                   "displayName": "역삼역",
                                   "coordinatesStandard": {
                                     "coordinates": [127.033, 37.5006]
@@ -172,6 +178,7 @@ class RegionAdminControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.region.id").value(3))
                 .andExpect(jsonPath("$.data.region.name").value("YEOKSAM"))
+                .andExpect(jsonPath("$.data.region.province").value("서울"))
                 .andExpect(jsonPath("$.data.region.displayName").value("역삼역"));
     }
 
@@ -183,6 +190,7 @@ class RegionAdminControllerTest {
                         new RegionMaster(
                                 3L,
                                 "YEOKSAM",
+                                "서울",
                                 "역삼",
                                 new GeoJson.Point(List.of(127.033, 37.5006)),
                                 false,

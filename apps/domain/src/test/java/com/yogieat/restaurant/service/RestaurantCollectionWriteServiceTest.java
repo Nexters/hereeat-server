@@ -38,6 +38,7 @@ class RestaurantCollectionWriteServiceTest {
     private static final RegionMaster GANGNAM = new RegionMaster(
             1L,
             "GANGNAM",
+            "서울",
             "강남역",
             new GeoJson.Point(List.of(127.0276, 37.4979)),
             true,

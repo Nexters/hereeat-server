@@ -73,6 +73,7 @@ public class RegionService {
         RegionMaster region = new RegionMaster(
                 null,
                 command.code(),
+                command.province(),
                 command.displayName(),
                 command.coordinatesStandard(),
                 command.active(),
@@ -91,6 +92,7 @@ public class RegionService {
         RegionMaster updatedRegion = new RegionMaster(
                 currentRegion.id(),
                 command.code() != null ? command.code() : currentRegion.code(),
+                command.province() != null ? command.province() : currentRegion.province(),
                 command.displayName() != null ? command.displayName() : currentRegion.displayName(),
                 command.coordinatesStandard() != null ? command.coordinatesStandard() : currentRegion.coordinatesStandard(),
                 command.active() != null ? command.active() : currentRegion.active(),

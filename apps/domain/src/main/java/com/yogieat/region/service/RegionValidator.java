@@ -13,11 +13,14 @@ import org.springframework.stereotype.Component;
 public class RegionValidator {
 
     private static final int MAX_CODE_LENGTH = 30;
+    private static final int MAX_PROVINCE_LENGTH = 50;
     private static final int MAX_DISPLAY_NAME_LENGTH = 255;
     private static final String CODE_PATTERN = "^[A-Z0-9_]+$";
     private static final String REQUIRED_CODE_REASON = "지역 코드는 필수입니다";
     private static final String INVALID_CODE_REASON = "지역 코드는 대문자, 숫자, 언더스코어만 사용할 수 있습니다";
     private static final String DUPLICATE_CODE_REASON = "이미 존재하는 지역 코드입니다";
+    private static final String REQUIRED_PROVINCE_REASON = "시도 구분은 필수입니다";
+    private static final String INVALID_PROVINCE_LENGTH_REASON = "시도 구분은 최대 " + MAX_PROVINCE_LENGTH + "자까지 가능합니다";
     private static final String REQUIRED_DISPLAY_NAME_REASON = "지역명은 필수입니다";
     private static final String INVALID_DISPLAY_NAME_LENGTH_REASON = "지역명은 최대 " + MAX_DISPLAY_NAME_LENGTH + "자까지 가능합니다";
     private static final String DUPLICATE_DISPLAY_NAME_REASON = "이미 존재하는 지역명입니다";
@@ -32,6 +35,7 @@ public class RegionValidator {
         }
 
         validateCode(command.code());
+        validateProvince(command.province());
         validateDisplayName(command.displayName());
         validateCoordinates(command.coordinatesStandard());
         validateSortOrder(command.sortOrder());
@@ -47,6 +51,10 @@ public class RegionValidator {
             if (!command.code().equals(currentRegion.code()) && regionRepository.existsByCode(command.code())) {
                 throw new CustomException(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH, DUPLICATE_CODE_REASON);
             }
+        }
+
+        if (command.province() != null) {
+            validateProvinceFormat(command.province());
         }
 
         if (command.displayName() != null) {
@@ -74,6 +82,13 @@ public class RegionValidator {
         }
     }
 
+    private void validateProvince(String province) {
+        if (province == null || province.isBlank()) {
+            throw new CustomException(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH, REQUIRED_PROVINCE_REASON);
+        }
+        validateProvinceFormat(province);
+    }
+
     private void validateDisplayName(String displayName) {
         if (displayName == null || displayName.isBlank()) {
             throw new CustomException(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH, REQUIRED_DISPLAY_NAME_REASON);
@@ -87,6 +102,12 @@ public class RegionValidator {
     private void validateCodeFormat(String code) {
         if (code.length() > MAX_CODE_LENGTH || !code.matches(CODE_PATTERN)) {
             throw new CustomException(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH, INVALID_CODE_REASON);
+        }
+    }
+
+    private void validateProvinceFormat(String province) {
+        if (province.length() > MAX_PROVINCE_LENGTH) {
+            throw new CustomException(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH, INVALID_PROVINCE_LENGTH_REASON);
         }
     }
 

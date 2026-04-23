@@ -42,6 +42,7 @@ class RegionControllerTest {
                 new RegionMaster(
                         1L,
                         "GANGNAM",
+                        "서울",
                         "강남역",
                         new GeoJson.Point(List.of(127.0276, 37.4979)),
                         true,
@@ -52,6 +53,7 @@ class RegionControllerTest {
                 new RegionMaster(
                         2L,
                         "HONGDAE",
+                        "서울",
                         "홍대입구역",
                         new GeoJson.Point(List.of(126.92378, 37.55684)),
                         true,
@@ -64,6 +66,7 @@ class RegionControllerTest {
         mockMvc.perform(get("/api/v1/regions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.regions[0].code").value("GANGNAM"))
+                .andExpect(jsonPath("$.data.regions[0].province").value("서울"))
                 .andExpect(jsonPath("$.data.regions[0].displayName").value("강남역"))
                 .andExpect(jsonPath("$.data.regions[0].coordinatesStandard.coordinates[0]").value(127.0276))
                 .andExpect(jsonPath("$.data.regions[1].code").value("HONGDAE"));
