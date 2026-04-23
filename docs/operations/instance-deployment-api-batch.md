@@ -84,9 +84,11 @@ location /api/ {
 export API_IMAGE_FULL_URL=yogieat/yogieat-server-api:<tag>
 export ADMIN_IMAGE_FULL_URL=yogieat/yogieat-server-admin:<tag>
 export BATCH_IMAGE_FULL_URL=yogieat/yogieat-server-batch-sync:<tag>
+export RESERVATION_BROWSER_WORKER_IMAGE_FULL_URL=yogieat/yogieat-reservation-browser-worker:<tag>
 export DOCKERHUB_API_IMAGE_NAME=yogieat-server-api
 export DOCKERHUB_ADMIN_IMAGE_NAME=yogieat-server-admin
 export DOCKERHUB_BATCH_IMAGE_NAME=yogieat-server-batch-sync
+export RESERVATION_BROWSER_WORKER_ENABLED=true
 export API_HOST_PORT=8080
 export ADMIN_HOST_PORT=8081
 export BATCH_SERVER_PORT=9090
@@ -95,9 +97,11 @@ cd ~/docker
 API_IMAGE_FULL_URL=yogieat/yogieat-server-api:<tag> \
 ADMIN_IMAGE_FULL_URL=yogieat/yogieat-server-admin:<tag> \
 BATCH_IMAGE_FULL_URL=yogieat/yogieat-server-batch-sync:<tag> \
+RESERVATION_BROWSER_WORKER_IMAGE_FULL_URL=yogieat/yogieat-reservation-browser-worker:<tag> \
 DOCKERHUB_API_IMAGE_NAME=yogieat-server-api \
 DOCKERHUB_ADMIN_IMAGE_NAME=yogieat-server-admin \
 DOCKERHUB_BATCH_IMAGE_NAME=yogieat-server-batch-sync \
+RESERVATION_BROWSER_WORKER_ENABLED=true \
 API_HOST_PORT=8080 \
 ADMIN_HOST_PORT=8081 \
 BATCH_SERVER_PORT=9090 \
@@ -109,7 +113,8 @@ ENV_FILE_PATH=~/.env \
 
 `DEPLOY_SCOPE=app`일 때는 내부적으로 아래와 같이 동작한다.
 - 기본값으로 배포 대상 이미지를 `docker compose pull`로 먼저 최신화한다 (`PULL_IMAGES_ON_DEPLOY=true`).
-- `docker compose ... up -d --no-deps yogieat-api yogieat-admin yogieat-batch-sync`
+- `RESERVATION_BROWSER_WORKER_ENABLED=true`이면 `yogieat-reservation-browser-worker`도 app-only 배포 대상에 포함된다.
+- `docker compose ... up -d --no-deps yogieat-api yogieat-admin yogieat-batch-sync [yogieat-reservation-browser-worker]`
 - 즉, DB 컨테이너는 배포에서 제외된다.
 - `yogieat-db`가 이미 running이면 스크립트는 DB를 건드리지 않고 그대로 진행한다.
 - 단, `yogieat-db`가 없으면 배포 스크립트가 `docker compose ... up -d yogieat-db`를 실행해 자동 복구한다.
@@ -120,7 +125,7 @@ ENV_FILE_PATH=~/.env \
 ### 5.2 환경별 리소스 제한
 - DEV (`docker/docker-compose.dev.yaml`)
   - 서버 스펙 목표: `2 vCPU / 4GB`
-  - `yogieat-api`: `cpus=1.00`, `mem_limit=1536m`, `mem_reservation=768m`
+  - `yogieat-api`: `cpus=0.85`, `mem_limit=1280m`, `mem_reservation=640m`
   - `yogieat-api` env:
     - `DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=18`
     - `DATASOURCE_DB_CORE_MINIMUM_IDLE=4`
@@ -128,7 +133,7 @@ ENV_FILE_PATH=~/.env \
     - `API_TOMCAT_MAX_THREADS=128`
     - `API_TOMCAT_MIN_THREADS=16`
     - `JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=65.0 -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication`
-  - `yogieat-admin`: `cpus=0.25`, `mem_limit=512m`, `mem_reservation=256m`
+  - `yogieat-admin`: `cpus=0.25`, `mem_limit=384m`, `mem_reservation=256m`
   - `yogieat-admin` env:
     - `DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=6`
     - `DATASOURCE_DB_CORE_MINIMUM_IDLE=2`
@@ -143,6 +148,11 @@ ENV_FILE_PATH=~/.env \
     - `DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=2000`
     - `SYNC_JOB_PARALLELISM=4`
     - `JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=55.0 -XX:MaxGCPauseMillis=400`
+  - `yogieat-reservation-browser-worker`: `cpus=0.25`, `mem_limit=512m`, `mem_reservation=256m`, `shm_size=256m`
+  - `yogieat-reservation-browser-worker` env:
+    - `BROWSER_WORKER_MAX_CONCURRENCY=1`
+    - `BROWSER_WORKER_REQUEST_TIMEOUT_MS=30000`
+    - `BROWSER_WORKER_NAVIGATION_TIMEOUT_MS=15000`
   - `yogieat-db`: `cpus=0.35`, `mem_limit=768m`, `mem_reservation=384m`
   - `yogieat-db` env:
     - `PG_SHARED_BUFFERS=256MB`
@@ -153,7 +163,8 @@ ENV_FILE_PATH=~/.env \
   - 서버 스펙 목표: `2 vCPU / 4GB`
   - `DEV`와 동일한 `2 vCPU / 4GB 처리량 우선` 프로파일을 사용한다.
 
-서비스 합산 자원 사용량은 `1.80 vCPU`, `3200MiB`로 맞춰 OS/nginx/docker 여유를 남긴다.
+브라우저 워커 비활성 시 서비스 합산 자원 사용량은 기존처럼 OS/nginx/docker 여유를 남긴다.
+브라우저 워커 활성 시 headless Chromium 리소스 때문에 API/Admin 메모리를 낮춘 프로파일을 사용한다.
 
 `DEPLOY_SCOPE=app` 배포는 API/Admin/BATCH 중심으로 동작하며, DB는 필요 시 자동 복구(기동/재생성)된다.
 DB 설정을 강제로 재적용하려면 유지보수 창에 `DEPLOY_SCOPE=full` 배포를 사용한다.
@@ -164,7 +175,40 @@ DB 설정을 강제로 재적용하려면 유지보수 창에 `DEPLOY_SCOPE=full
 - 외부 진입점은 API만 허용
 - Admin은 별도 포트(기본 8081)를 통해 인스턴스 내부 프록시(nginx)에서 라우팅한다.
 - Batch는 외부 요청을 받지 않음
+- Reservation Browser Worker는 외부 요청을 받지 않고 Compose 내부 network에서만 Batch가 호출한다.
 - API/Admin/Batch/DB는 동일 bridge network(`yogieat-network`) 사용
+
+### Reservation Browser Worker
+
+예약 링크 자동 후보 수집에서 `RESERVATION_SEARCH_PROVIDER=browser-worker`를 사용할 때만 필요하다.
+
+#### 이미지 빌드/배포
+
+브라우저 워커는 Jib 대상이 아니므로 별도 Docker image로 빌드하고 push한다.
+
+```bash
+docker build -t yogieat/yogieat-reservation-browser-worker:<tag> reservation-browser-worker
+docker push yogieat/yogieat-reservation-browser-worker:<tag>
+```
+
+서버 `.env` 또는 배포 env에 다음 값을 추가한다.
+
+```bash
+RESERVATION_BROWSER_WORKER_ENABLED=true
+RESERVATION_BROWSER_WORKER_IMAGE_FULL_URL=yogieat/yogieat-reservation-browser-worker:<tag>
+RESERVATION_SEARCH_PROVIDER=browser-worker
+RESERVATION_SEARCH_ENABLED=true
+RESERVATION_BROWSER_WORKER_BASE_URL=http://yogieat-reservation-browser-worker:8090
+RESERVATION_BACKFILL_MAX_RESTAURANTS=5
+```
+
+#### 운영 주의사항
+
+- worker는 외부 포트를 publish하지 않는다.
+- persistent profile은 `reservation_browser_profile` Docker volume에 저장된다.
+- profile volume에는 cookie/session 상태가 남을 수 있으므로 일반 백업 대상에서 제외한다.
+- `docker compose logs -f yogieat-reservation-browser-worker`로 `status`, `failureReason`, `elapsedMs`, `candidateCount`를 확인한다.
+- 403, 429, CAPTCHA, timeout은 정상 실패 케이스로 보고 `AUTO_MATCH/PENDING` 후보를 만들지 않는다.
 
 ### SSL
 - 운영은 인스턴스의 `nginx + letsencrypt`로 TLS 종료한다.
