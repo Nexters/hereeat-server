@@ -9,6 +9,7 @@ include 'batch:sync'
 // External integration modules
 include 'external:ai'
 include 'external:kakao'
+include 'external:reservation'
 
 // Storage modules
 include 'storage:db-core'
