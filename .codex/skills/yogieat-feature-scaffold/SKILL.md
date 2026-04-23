@@ -23,12 +23,16 @@ Use this skill when implementing a new feature or extending an existing flow in 
    - prefer resource-oriented paths
    - prefer extending a resource representation over introducing a view-specific endpoint
    - use `201 Created` for stable resource creation and add `Location` only when the feature explicitly needs it
-6. Decide transaction semantics with the same care as layer placement:
+6. For DB schema changes, run the Flyway preflight before editing migration files:
+   - ask whether shared dev/prod DB or another active branch already has an applied migration version or filename that could overlap
+   - restore exact missing applied migrations before adding new ones
+   - put new changes in the next version and never edit an applied migration in place
+7. Decide transaction semantics with the same care as layer placement:
    - facade or service query methods should use `@Transactional(readOnly = true)`
    - mutating methods should use write transactions
    - do not let write flows accidentally inherit `readOnly = true` from class-level defaults
-7. Keep adapters thin in `storage`, `external`, and `support`.
-8. Pick the smallest validation scope using the Java 25 validation skill.
+8. Keep adapters thin in `storage`, `external`, and `support`.
+9. Pick the smallest validation scope using the Java 25 validation skill.
 
 ## Rules
 
@@ -41,10 +45,12 @@ Use this skill when implementing a new feature or extending an existing flow in 
 - Do not add private helper chains when the logic should become a validator or processor.
 - Avoid endpoint names that describe a screen or dashboard when the API is still returning one resource or a collection of that resource.
 - Prefer `201 Created` for resource creation and add `Location` only when the current feature explicitly benefits from it.
+- For Flyway migrations, ask about shared applied versions before editing, treat applied files as immutable, and use follow-up versions for corrections.
 
 ## Output
 
 - Affected modules
 - Intended component types
 - Likely entrypoints
+- Flyway preflight result when schema changes are involved
 - Validation scope

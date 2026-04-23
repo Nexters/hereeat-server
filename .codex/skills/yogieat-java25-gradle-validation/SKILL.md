@@ -16,6 +16,7 @@ Use this skill when you need the smallest validation command that still proves a
 3. Run `./gradlew compileJava --daemon -q`.
 4. Choose the smallest matching test scope.
 5. Escalate to `./gradlew test --daemon` for storage, public API, shared contract, root build, or mixed multi-module changes.
+6. For Flyway migration changes, verify version ordering, missing applied migrations, and duplicate version risk before accepting the validation result.
 
 ## Commands
 
@@ -35,6 +36,13 @@ Use this skill when you need the smallest validation command that still proves a
   - `./gradlew :support:swagger:test`
 - Escalated scope:
   - `./gradlew test --daemon`
+
+## Flyway Checks
+
+- Ask whether shared dev/prod DB already has an applied migration version or filename that could overlap before migration edits proceed.
+- Treat `storage/db-core/src/main/resources/db/migration/**` changes as full-test escalation.
+- Check that every shared applied version is represented locally by the exact migration file.
+- Do not recommend editing an already-applied migration to resolve checksum or validation failures; use an exact restore or a new follow-up migration.
 
 ## Notes
 

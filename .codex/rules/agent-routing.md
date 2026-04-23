@@ -13,6 +13,7 @@
   - new feature
   - change-impact mapping
   - multi-module pathfinding
+  - DB schema or Flyway migration impact mapping
 - `yogieat-testing-guard` skill first
   - test writing
   - test refactor
@@ -30,12 +31,20 @@
   - Gradle scope
   - Spotless, compile, test, CI parity
   - module-local vs full-test decisions
+  - Flyway migration version or applied-history validation risk
 - `harness_curator`
   - repeated prompt patterns
   - recurring review comments
   - repeated misunderstandings
   - candidate or stable rule promotion
   - repeated testing review feedback
+
+## Flyway Prompt Preflight
+
+- When a prompt asks for a DB schema change, Flyway migration, migration repair, or migration version rename, stop before editing migration files and ask one short confirmation question:
+  - whether any shared dev/prod DB or active branch already has an applied migration version or filename that could overlap.
+- If the user already provided the applied version context, proceed using that information and state the assumption.
+- If overlap exists, restore the exact applied migration first and place new work in the next migration version.
 
 ## Spawn Guidance
 

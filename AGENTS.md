@@ -30,6 +30,8 @@
 - 선언형 트랜잭션 의미가 필요한 로직은 self-invocation 을 금지하고 별도 빈으로 분리한다.
 - Facade와 Service의 조회 경로는 `@Transactional(readOnly = true)` 여부를 먼저 검토하고, 변경 경로는 write transaction 경계를 명시한다.
 - 임시 migration, bootstrap, initializer, backfill 코드는 제거 시점이 명확해야 한다.
+- Flyway migration은 적용 후 불변 이력으로 취급한다. 이미 공유 DB에 적용된 migration 파일은 수정하거나 삭제하지 말고, 보정은 다음 version migration으로 처리한다.
+- Flyway DB 작업 전에는 공유 dev/prod DB나 다른 브랜치에 이미 적용된 migration version/filename이 있는지 개발자에게 먼저 확인한다.
 - 테스트는 startup side effect 나 전역 magic reset 보다 test-local fixture 또는 setup 을 우선한다.
 - 새로운 구조를 만들기 전에 가장 가까운 기존 feature slice 를 먼저 따른다.
 - HTTP API는 화면명이나 구현 목적보다 리소스 중심 URI를 우선한다. `dashboard`, `screen`, `page` 같은 view-oriented 경로는 지양한다.
@@ -50,6 +52,7 @@
   - public API main code
   - shared contract
   - mixed multi-module changes
+- Flyway migration 변경은 full test 승격 대상이며, migration version 충돌과 공유 DB applied history 누락 여부를 함께 검토한다.
 - Repo-local validation helper:
   - `.codex/hooks/verify.sh`
 
