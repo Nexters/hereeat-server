@@ -47,6 +47,35 @@ services:
       - ${ENV_FILE_PATH:-~/.env}
     depends_on:
       - yogieat-db
+
+  yogieat-reservation-browser-worker:
+    profiles:
+      - reservation-browser-worker
+    image: ${RESERVATION_BROWSER_WORKER_IMAGE_FULL_URL:-yogieat/yogieat-reservation-browser-worker:local}
+    container_name: ${RESERVATION_BROWSER_WORKER_CONTAINER_NAME:-yogieat-reservation-browser-worker}
+    restart: always
+    environment:
+      - TZ=Asia/Seoul
+      - PORT=8090
+      - BROWSER_WORKER_MAX_CONCURRENCY=${BROWSER_WORKER_MAX_CONCURRENCY:-1}
+      - BROWSER_WORKER_REQUEST_TIMEOUT_MS=${BROWSER_WORKER_REQUEST_TIMEOUT_MS:-30000}
+      - BROWSER_WORKER_NAVIGATION_TIMEOUT_MS=${BROWSER_WORKER_NAVIGATION_TIMEOUT_MS:-15000}
+      - BROWSER_WORKER_MAX_QUERIES_PER_PROVIDER=${BROWSER_WORKER_MAX_QUERIES_PER_PROVIDER:-2}
+      - BROWSER_WORKER_MIN_MATCH_SCORE=${BROWSER_WORKER_MIN_MATCH_SCORE:-0.6}
+    networks:
+      - yogieat-network
+    env_file:
+      - ${ENV_FILE_PATH:-~/.env}
+    volumes:
+      - reservation_browser_profile:/ms-playwright-profile
+    shm_size: "256m"
+    healthcheck:
+      test: [ "CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8090/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   yogieat-db:
     image: postgis/postgis:15-3.3
     container_name: yogieat-db
@@ -93,3 +122,4 @@ networks:
 volumes:
   postgres_data:
   mongodb_data:
+  reservation_browser_profile:

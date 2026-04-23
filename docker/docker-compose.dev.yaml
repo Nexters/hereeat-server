@@ -1,9 +1,9 @@
 # Dev 2vCore, 4GB RAM, 50GB Storage
 services:
   yogieat-api:
-    cpus: "1.00"
-    mem_limit: "1536m"
-    mem_reservation: "768m"
+    cpus: "0.85"
+    mem_limit: "1280m"
+    mem_reservation: "640m"
     environment:
       - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=18
       - DATASOURCE_DB_CORE_MINIMUM_IDLE=4
@@ -14,7 +14,7 @@ services:
 
   yogieat-admin:
     cpus: "0.25"
-    mem_limit: "512m"
+    mem_limit: "384m"
     mem_reservation: "256m"
     environment:
       - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=6
@@ -34,6 +34,13 @@ services:
       - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=2000
       - SYNC_JOB_PARALLELISM=4
       - JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=55.0 -XX:MaxGCPauseMillis=400
+
+  yogieat-reservation-browser-worker:
+    cpus: "0.25"
+    mem_limit: "512m"
+    mem_reservation: "256m"
+    environment:
+      - BROWSER_WORKER_MAX_CONCURRENCY=1
 
   yogieat-db:
     cpus: "0.35"

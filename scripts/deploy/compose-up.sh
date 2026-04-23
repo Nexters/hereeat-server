@@ -51,8 +51,17 @@ validate_required_env() {
   DOCKERHUB_API_IMAGE_NAME="${DOCKERHUB_API_IMAGE_NAME:-yogieat-server-api}"
   DOCKERHUB_ADMIN_IMAGE_NAME="${DOCKERHUB_ADMIN_IMAGE_NAME:-yogieat-server-admin}"
   DOCKERHUB_BATCH_IMAGE_NAME="${DOCKERHUB_BATCH_IMAGE_NAME:-yogieat-server-batch-sync}"
+  RESERVATION_BROWSER_WORKER_ENABLED="${RESERVATION_BROWSER_WORKER_ENABLED:-false}"
+  RESERVATION_BROWSER_WORKER_CONTAINER_NAME="${RESERVATION_BROWSER_WORKER_CONTAINER_NAME:-yogieat-reservation-browser-worker}"
+  if [[ "${RESERVATION_BROWSER_WORKER_ENABLED}" == "true" ]]; then
+    [[ -n "${RESERVATION_BROWSER_WORKER_IMAGE_FULL_URL:-}" ]] \
+      || error "RESERVATION_BROWSER_WORKER_IMAGE_FULL_URL must be set when RESERVATION_BROWSER_WORKER_ENABLED=true"
+    COMPOSE_PROFILES="${COMPOSE_PROFILES:-reservation-browser-worker}"
+    export RESERVATION_BROWSER_WORKER_IMAGE_FULL_URL RESERVATION_BROWSER_WORKER_CONTAINER_NAME COMPOSE_PROFILES
+  fi
   export API_IMAGE_FULL_URL ADMIN_IMAGE_FULL_URL BATCH_IMAGE_FULL_URL
   export DOCKERHUB_API_IMAGE_NAME DOCKERHUB_ADMIN_IMAGE_NAME DOCKERHUB_BATCH_IMAGE_NAME
+  export RESERVATION_BROWSER_WORKER_ENABLED
 }
 
 resolve_env_file() {
@@ -185,6 +194,9 @@ cleanup_stale_app_containers() {
     "yogieat-admin:${DOCKERHUB_ADMIN_IMAGE_NAME}"
     "yogieat-batch-sync:${DOCKERHUB_BATCH_IMAGE_NAME}"
   )
+  if [[ "${RESERVATION_BROWSER_WORKER_ENABLED}" == "true" ]]; then
+    service_mappings+=("yogieat-reservation-browser-worker:${RESERVATION_BROWSER_WORKER_CONTAINER_NAME}")
+  fi
 
   for mapping in "${service_mappings[@]}"; do
     service_name="${mapping%%:*}"
@@ -208,21 +220,35 @@ cleanup_stale_app_containers() {
 }
 
 print_deploy_summary() {
+  local app_services
+  app_services="$(resolve_app_services)"
+
   echo "Deploy API image: ${API_IMAGE_FULL_URL}"
   echo "Deploy Admin image: ${ADMIN_IMAGE_FULL_URL}"
   echo "Deploy Batch image: ${BATCH_IMAGE_FULL_URL}"
+  if [[ "${RESERVATION_BROWSER_WORKER_ENABLED}" == "true" ]]; then
+    echo "Deploy Reservation Browser Worker image: ${RESERVATION_BROWSER_WORKER_IMAGE_FULL_URL}"
+  fi
   echo "Deploy scope: ${DEPLOY_SCOPE}"
   echo "Deploy env: ${DEPLOY_ENV}"
   echo "Enable edge SSL: ${ENABLE_EDGE_SSL}"
   echo "Env file path: ${ENV_FILE_PATH}"
   echo "Compose files: ${COMPOSE_FILES[*]}"
-  echo "Target services: yogieat-api yogieat-admin yogieat-batch-sync"
+  echo "Target services: ${app_services}"
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     echo "Auto restore DB: ${AUTO_RESTORE_DB:-true}"
     echo "Auto cleanup stale app containers: ${AUTO_CLEANUP_STALE_APP_CONTAINERS:-true}"
     echo "App network name: ${APP_NETWORK_NAME:-yogieat-network}"
   fi
   echo "Pull images on deploy: ${PULL_IMAGES_ON_DEPLOY:-true}"
+}
+
+resolve_app_services() {
+  local services=("yogieat-api" "yogieat-admin" "yogieat-batch-sync")
+  if [[ "${RESERVATION_BROWSER_WORKER_ENABLED}" == "true" ]]; then
+    services+=("yogieat-reservation-browser-worker")
+  fi
+  echo "${services[*]}"
 }
 
 main() {
@@ -241,14 +267,18 @@ main() {
 
   if [[ "${PULL_IMAGES_ON_DEPLOY}" == "true" ]]; then
     if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
-      compose_cmd pull yogieat-api yogieat-admin yogieat-batch-sync
+      # shellcheck disable=SC2207
+      app_services=($(resolve_app_services))
+      compose_cmd pull "${app_services[@]}"
     else
       compose_cmd pull
     fi
   fi
 
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
-    compose_cmd up -d --no-deps yogieat-api yogieat-admin yogieat-batch-sync
+    # shellcheck disable=SC2207
+    app_services=($(resolve_app_services))
+    compose_cmd up -d --no-deps "${app_services[@]}"
   else
     compose_cmd up -d
   fi
