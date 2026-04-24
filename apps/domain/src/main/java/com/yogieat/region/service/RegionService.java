@@ -44,8 +44,14 @@ public class RegionService {
     }
 
     @Transactional(readOnly = true)
-    public List<RegionSummary> findRegionDashboard() {
-        return regionRepository.findAllRegionSummariesOrderBySortOrder();
+    public List<RegionSummary> findRegionDashboard(String province) {
+        List<RegionSummary> regionSummaries = regionRepository.findAllRegionSummariesOrderBySortOrder();
+        if (province == null || province.isBlank()) {
+            return regionSummaries;
+        }
+        return regionSummaries.stream()
+                .filter(summary -> province.equals(summary.region().province()))
+                .toList();
     }
 
     @Transactional(readOnly = true)

@@ -138,7 +138,7 @@ class RegionMigrationIntegrationTest {
                 .extracting(RegionMaster::code)
                 .doesNotContain("YEOKSAM");
 
-        RegionSummary yeoksamSummary = regionService.findRegionDashboard().stream()
+        RegionSummary yeoksamSummary = regionService.findRegionDashboard(null).stream()
                 .filter(summary -> "YEOKSAM".equals(summary.region().code()))
                 .findFirst()
                 .orElseThrow();

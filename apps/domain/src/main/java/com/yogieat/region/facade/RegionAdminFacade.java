@@ -22,8 +22,8 @@ public class RegionAdminFacade {
     }
 
     @Transactional(readOnly = true)
-    public List<RegionSummary> getRegions() {
-        return regionService.findRegionDashboard();
+    public List<RegionSummary> getRegions(String province) {
+        return regionService.findRegionDashboard(province);
     }
 
     @Transactional
