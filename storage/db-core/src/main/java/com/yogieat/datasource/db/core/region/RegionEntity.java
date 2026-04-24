@@ -30,6 +30,9 @@ public class RegionEntity extends BaseEntity {
     @Column(name = "display_name", nullable = false)
     private String displayName;
 
+    @Column(nullable = false, length = 50)
+    private String province;
+
     @Column(nullable = false)
     private Double longitude;
 
@@ -45,6 +48,7 @@ public class RegionEntity extends BaseEntity {
     @Builder(access = AccessLevel.PRIVATE)
     private RegionEntity(
             String code,
+            String province,
             String displayName,
             Double longitude,
             Double latitude,
@@ -52,6 +56,7 @@ public class RegionEntity extends BaseEntity {
             int sortOrder
     ) {
         this.code = code;
+        this.province = province;
         this.displayName = displayName;
         this.longitude = longitude;
         this.latitude = latitude;
@@ -62,6 +67,7 @@ public class RegionEntity extends BaseEntity {
     public static RegionEntity of(RegionMaster regionMaster) {
         return RegionEntity.builder()
                 .code(regionMaster.code())
+                .province(regionMaster.province())
                 .displayName(regionMaster.displayName())
                 .longitude(toLongitude(regionMaster.coordinatesStandard()))
                 .latitude(toLatitude(regionMaster.coordinatesStandard()))
@@ -74,6 +80,7 @@ public class RegionEntity extends BaseEntity {
         return new RegionMaster(
                 entity.getId(),
                 entity.getCode(),
+                entity.getProvince(),
                 entity.getDisplayName(),
                 new GeoJson.Point(List.of(entity.getLongitude(), entity.getLatitude())),
                 entity.isActive(),
@@ -85,6 +92,7 @@ public class RegionEntity extends BaseEntity {
 
     public void apply(RegionMaster regionMaster) {
         this.code = regionMaster.code();
+        this.province = regionMaster.province();
         this.displayName = regionMaster.displayName();
         this.longitude = toLongitude(regionMaster.coordinatesStandard());
         this.latitude = toLatitude(regionMaster.coordinatesStandard());

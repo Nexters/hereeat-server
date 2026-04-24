@@ -31,6 +31,7 @@
   - repeated component placement clarifications
   - repeated validation scope corrections
   - repeated transaction or test harness pitfalls
+  - repeated Flyway migration version, checksum, or shared DB history pitfalls
   - repeated testing feedback about mocking boundaries, `verify(...)`, or hidden seed behavior
   - repeated API review feedback about resource-oriented URIs, creation response semantics, or view-specific endpoint drift
   - repeated prompt boilerplate that can be replaced by a skill or routing rule
@@ -46,3 +47,4 @@
   - if not, record it as a candidate
   - if it recurs, promote it
   - if it is a high-value testing review pattern, prefer promoting it into `.codex/rules/testing.md`
+  - if it is a high-risk Flyway or shared DB history pattern, prefer promoting it into `.codex/rules/architecture.md` and `.codex/rules/validation.md`

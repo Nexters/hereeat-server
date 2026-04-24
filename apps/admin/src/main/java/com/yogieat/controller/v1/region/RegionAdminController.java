@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -26,8 +28,12 @@ public class RegionAdminController {
     private final RegionAdminFacade regionAdminFacade;
 
     @GetMapping
-    public RegionAdminResponse.ListResponse getRegions() {
-        return RegionAdminResponse.ListResponse.from(regionAdminFacade.getRegions());
+    public RegionAdminResponse.ListResponse getRegions(
+            @RequestParam(required = false) String province
+    ) {
+        return RegionAdminResponse.ListResponse.from(
+                regionAdminFacade.getRegions(StringUtils.hasText(province) ? province.trim() : null)
+        );
     }
 
     @GetMapping("/{regionId}")

@@ -22,6 +22,7 @@ public final class RegionAdminResponse {
     public record RegionItemResponse(
             Long id,
             String name,
+            String province,
             String displayName,
             GeoJson.Point coordinatesStandard,
             boolean active,
@@ -33,6 +34,7 @@ public final class RegionAdminResponse {
             return new RegionItemResponse(
                     region.id(),
                     region.code(),
+                    region.province(),
                     region.displayName(),
                     region.coordinatesStandard(),
                     region.active(),
@@ -48,6 +50,7 @@ public final class RegionAdminResponse {
                     new RegionItemResponse(
                             region.id(),
                             region.code(),
+                            region.province(),
                             region.displayName(),
                             region.coordinatesStandard(),
                             region.active(),

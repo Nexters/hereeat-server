@@ -29,6 +29,9 @@ Use this skill when the task is "where should this live?" or "does this still fi
 - Write methods accidentally inheriting `readOnly = true` or missing a write transaction boundary
 - Private helper sprawl that hides simple flow
 - Temporary migration or bootstrap code left in runtime after completion
+- Flyway migration files edited, renamed, deleted, or reused after they may have reached a shared DB
+- Missing preflight question for DB migration work: whether shared dev/prod or another branch already has an applied overlapping migration version or filename
+- Missing locally resolved migration for an applied Flyway version in shared DB history
 - View-oriented HTTP design such as `dashboard` endpoints for data that should still be a resource representation
 - Missing item endpoint after `POST` resource creation when the feature needs canonical item access
 

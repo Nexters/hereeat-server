@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 public final class RegionCommand {
     public record Create(
             String code,
+            String province,
             String displayName,
             GeoJson.Point coordinatesStandard,
             boolean active,
@@ -16,13 +17,14 @@ public final class RegionCommand {
 
     public record Patch(
             String code,
+            String province,
             String displayName,
             GeoJson.Point coordinatesStandard,
             Boolean active,
             Integer sortOrder
     ) {
         public static Patch empty() {
-            return new Patch(null, null, null, null, null);
+            return new Patch(null, null, null, null, null, null);
         }
     }
 }

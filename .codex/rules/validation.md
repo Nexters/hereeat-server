@@ -21,6 +21,7 @@
 Run `./gradlew test --daemon` when the diff touches any of the following:
 
 - `storage/**`
+- Flyway migrations under `storage/db-core/src/main/resources/db/migration/**`
 - public API main code in `apps:api` or `apps:admin`
 - shared contract or domain-wide interface changes
 - shared test infrastructure or fixtures used across multiple tests or modules
@@ -43,6 +44,14 @@ Run `./gradlew test --daemon` when the diff touches any of the following:
   - `./gradlew :<module>:test`
 
 If the change matches the full-test escalation rules, do not stay on module-local validation.
+
+## Flyway Migration Review
+
+- Before writing or renaming a migration, ask whether shared dev or prod already has an applied migration for the target version.
+- Check `storage/db-core/src/main/resources/db/migration` for duplicate or missing version numbers before validation.
+- If a shared DB has an applied version that is not present locally, recover the exact migration file first.
+- Do not modify applied migration contents to make validation pass. Use a new follow-up migration for corrections.
+- `flyway repair` changes history and must be treated as an explicit operational action, not a default development fix.
 
 ## Test-Specific Guidance
 

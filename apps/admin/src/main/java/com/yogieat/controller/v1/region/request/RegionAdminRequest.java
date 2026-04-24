@@ -14,6 +14,7 @@ public final class RegionAdminRequest {
 
     public record Create(
             @NotBlank String code,
+            @NotBlank String province,
             @NotBlank String displayName,
             @NotNull CoordinatesRequest coordinatesStandard,
             Boolean active,
@@ -26,6 +27,7 @@ public final class RegionAdminRequest {
 
             return new RegionCommand.Create(
                     normalizeCode(request.code()),
+                    trimOrNull(request.province()),
                     trimOrNull(request.displayName()),
                     parseCoordinates(request.coordinatesStandard()),
                     request.active() == null || request.active(),
@@ -36,6 +38,7 @@ public final class RegionAdminRequest {
 
     public record Patch(
             String code,
+            String province,
             String displayName,
             CoordinatesRequest coordinatesStandard,
             Boolean active,
@@ -48,6 +51,7 @@ public final class RegionAdminRequest {
 
             return new RegionCommand.Patch(
                     normalizeCode(request.code()),
+                    trimOrNull(request.province()),
                     trimOrNull(request.displayName()),
                     parseOptionalCoordinates(request.coordinatesStandard()),
                     request.active(),

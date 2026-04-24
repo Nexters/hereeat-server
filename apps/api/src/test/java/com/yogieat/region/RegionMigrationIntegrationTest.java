@@ -80,6 +80,7 @@ class RegionMigrationIntegrationTest {
         hongdae.apply(new RegionMaster(
                 hongdae.getId(),
                 hongdae.getCode(),
+                hongdae.getProvince(),
                 hongdae.getDisplayName(),
                 new GeoJson.Point(List.of(hongdae.getLongitude(), hongdae.getLatitude())),
                 false,
@@ -92,6 +93,7 @@ class RegionMigrationIntegrationTest {
         regionJpaRepository.save(RegionEntity.of(new RegionMaster(
                 null,
                 "YEOKSAM",
+                "서울",
                 "역삼역",
                 new GeoJson.Point(List.of(127.033, 37.5006)),
                 true,
@@ -113,6 +115,7 @@ class RegionMigrationIntegrationTest {
     void createRegionAndDashboard_ShouldSupportDbOnlyRegion() {
         RegionMaster yeoksam = regionService.createRegion(new RegionCommand.Create(
                 "YEOKSAM",
+                "서울",
                 "역삼역",
                 new GeoJson.Point(List.of(127.033, 37.5006)),
                 true,
@@ -135,7 +138,7 @@ class RegionMigrationIntegrationTest {
                 .extracting(RegionMaster::code)
                 .doesNotContain("YEOKSAM");
 
-        RegionSummary yeoksamSummary = regionService.findRegionDashboard().stream()
+        RegionSummary yeoksamSummary = regionService.findRegionDashboard(null).stream()
                 .filter(summary -> "YEOKSAM".equals(summary.region().code()))
                 .findFirst()
                 .orElseThrow();
@@ -148,6 +151,7 @@ class RegionMigrationIntegrationTest {
     void updateRegion_ShouldApplyOnlyPatchedFields() {
         RegionMaster yeoksam = regionService.createRegion(new RegionCommand.Create(
                 "YEOKSAM",
+                "서울",
                 "역삼역",
                 new GeoJson.Point(List.of(127.033, 37.5006)),
                 true,
@@ -156,6 +160,7 @@ class RegionMigrationIntegrationTest {
 
         regionService.updateRegion(yeoksam.id(), new RegionCommand.Patch(
                 null,
+                "경기",
                 "역삼",
                 null,
                 false,
@@ -164,6 +169,7 @@ class RegionMigrationIntegrationTest {
 
         RegionSummary updatedRegion = regionService.getRegionSummaryById(yeoksam.id());
         assertThat(updatedRegion.region().code()).isEqualTo("YEOKSAM");
+        assertThat(updatedRegion.region().province()).isEqualTo("경기");
         assertThat(updatedRegion.region().displayName()).isEqualTo("역삼");
         assertThat(updatedRegion.region().coordinatesStandard().getCoordinates()).containsExactly(127.033, 37.5006);
         assertThat(updatedRegion.region().active()).isFalse();
@@ -393,6 +399,7 @@ class RegionMigrationIntegrationTest {
             seededRegions.add(RegionEntity.of(new RegionMaster(
                     null,
                     region.name(),
+                    "서울",
                     region.getName(),
                     region.getCoordinatesStandard(),
                     true,

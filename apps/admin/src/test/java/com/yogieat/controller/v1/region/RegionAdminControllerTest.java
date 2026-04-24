@@ -74,11 +74,12 @@ class RegionAdminControllerTest {
     @Test
     @DisplayName("활성 지역 목록 조회 응답이 200으로 반환된다")
     void getRegions_ShouldReturn200_WhenRegionsExist() throws Exception {
-        when(regionAdminFacade.getRegions()).thenReturn(List.of(
+        when(regionAdminFacade.getRegions(null)).thenReturn(List.of(
                 new RegionSummary(
                         new RegionMaster(
                                 1L,
                                 "GANGNAM",
+                                "서울",
                                 "강남역",
                                 new GeoJson.Point(List.of(127.0276, 37.4979)),
                                 true,
@@ -92,6 +93,7 @@ class RegionAdminControllerTest {
                         new RegionMaster(
                                 2L,
                                 "HONGDAE",
+                                "서울",
                                 "홍대입구역",
                                 new GeoJson.Point(List.of(126.92378, 37.55684)),
                                 true,
@@ -107,12 +109,41 @@ class RegionAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.regions[0].id").value(1))
                 .andExpect(jsonPath("$.data.regions[0].name").value("GANGNAM"))
+                .andExpect(jsonPath("$.data.regions[0].province").value("서울"))
                 .andExpect(jsonPath("$.data.regions[0].displayName").value("강남역"))
                 .andExpect(jsonPath("$.data.regions[0].active").value(true))
                 .andExpect(jsonPath("$.data.regions[0].sortOrder").value(1))
                 .andExpect(jsonPath("$.data.regions[0].restaurantCount").value(12))
                 .andExpect(jsonPath("$.data.regions[0].coordinatesStandard.coordinates[0]").value(127.0276))
                 .andExpect(jsonPath("$.data.regions[1].name").value("HONGDAE"));
+    }
+
+    @Test
+    @DisplayName("province query param이 있으면 해당 province 지역만 반환한다")
+    void getRegions_ShouldFilterByProvince_WhenProvinceQueryParamExists() throws Exception {
+        when(regionAdminFacade.getRegions("경기")).thenReturn(List.of(
+                new RegionSummary(
+                        new RegionMaster(
+                                3L,
+                                "SUWON",
+                                "경기",
+                                "수원역",
+                                new GeoJson.Point(List.of(127.0000, 37.2667)),
+                                true,
+                                3,
+                                null,
+                                null
+                        ),
+                        4L
+                )
+        ));
+
+        mockMvc.perform(get(BASE_URL)
+                        .queryParam("province", " 경기 "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.regions.length()").value(1))
+                .andExpect(jsonPath("$.data.regions[0].name").value("SUWON"))
+                .andExpect(jsonPath("$.data.regions[0].province").value("경기"));
     }
 
     @Test
@@ -123,6 +154,7 @@ class RegionAdminControllerTest {
                         new RegionMaster(
                                 1L,
                                 "GANGNAM",
+                                "서울",
                                 "강남역",
                                 new GeoJson.Point(List.of(127.0276, 37.4979)),
                                 true,
@@ -148,6 +180,7 @@ class RegionAdminControllerTest {
                 new RegionMaster(
                         3L,
                         "YEOKSAM",
+                        "서울",
                         "역삼역",
                         new GeoJson.Point(List.of(127.033, 37.5006)),
                         true,
@@ -162,6 +195,7 @@ class RegionAdminControllerTest {
                         .content("""
                                 {
                                   "code": "yeoksam",
+                                  "province": "서울",
                                   "displayName": "역삼역",
                                   "coordinatesStandard": {
                                     "coordinates": [127.033, 37.5006]
@@ -172,6 +206,7 @@ class RegionAdminControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.region.id").value(3))
                 .andExpect(jsonPath("$.data.region.name").value("YEOKSAM"))
+                .andExpect(jsonPath("$.data.region.province").value("서울"))
                 .andExpect(jsonPath("$.data.region.displayName").value("역삼역"));
     }
 
@@ -183,6 +218,7 @@ class RegionAdminControllerTest {
                         new RegionMaster(
                                 3L,
                                 "YEOKSAM",
+                                "서울",
                                 "역삼",
                                 new GeoJson.Point(List.of(127.033, 37.5006)),
                                 false,

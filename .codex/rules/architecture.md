@@ -53,6 +53,11 @@
 - Use a dedicated bean for isolated transactional work such as `REQUIRES_NEW`.
 - Temporary initializer, bootstrap, migration, or backfill code must have an explicit removal condition.
 - Once a migration is complete, remove runtime migration paths instead of keeping them indefinitely.
+- Treat applied Flyway migrations as immutable history. Do not edit, rename, or delete a migration file once it may have reached a shared DB.
+- Before creating or changing a Flyway migration, ask the developer whether any migration version or filename has already been applied to shared dev, prod, or another active branch.
+- If a shared DB contains an applied migration that is missing locally, restore the exact migration file instead of replacing it with a different migration using the same version.
+- If a migration was wrong after it reached a shared DB, add a new follow-up version that fixes the schema or data. Do not rely on `flyway repair` except as an explicit operational recovery step.
+- Prefer timestamp-style Flyway versions for concurrent branch work when the team is ready to move away from sequential `V1`, `V2`, `V3` naming.
 
 ## Test Rules
 
