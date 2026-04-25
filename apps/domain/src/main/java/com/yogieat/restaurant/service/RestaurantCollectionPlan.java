@@ -12,10 +12,10 @@ final class RestaurantCollectionPlan {
     private RestaurantCollectionPlan() {
     }
 
-    static List<Request> create(List<RegionSummary> activeRegions, int categoryCount) {
+    static List<Request> create(List<RegionSummary> regionSummaries, int categoryCount) {
         int safeCategoryCount = Math.max(categoryCount, 1);
 
-        return activeRegions.stream()
+        return regionSummaries.stream()
                 .map(summary -> toRequest(summary, safeCategoryCount))
                 .filter(request -> request.remainingSlots() > 0)
                 .toList();

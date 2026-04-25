@@ -69,13 +69,13 @@ public class RestaurantCollectionProcessor {
 
     public void collectAllRegions() {
         try {
-            List<RegionSummary> activeRegions = regionService.findActiveRegionSummaries();
-            if (activeRegions.isEmpty()) {
+            List<RegionSummary> regionSummaries = regionService.findCollectionRegionSummaries();
+            if (regionSummaries.isEmpty()) {
                 return;
             }
 
             List<RestaurantCollectionPlan.Request> collectionRequests =
-                    RestaurantCollectionPlan.create(activeRegions, FOOD_CATEGORIES.size());
+                    RestaurantCollectionPlan.create(regionSummaries, FOOD_CATEGORIES.size());
 
             if (collectionRequests.isEmpty()) {
                 log.info("All active regions reached restaurant collection limit: {} restaurants",
