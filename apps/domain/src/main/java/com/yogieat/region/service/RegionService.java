@@ -60,6 +60,11 @@ public class RegionService {
     }
 
     @Transactional(readOnly = true)
+    public List<RegionSummary> findCollectionRegionSummaries() {
+        return regionRepository.findAllRegionSummariesOrderBySortOrder();
+    }
+
+    @Transactional(readOnly = true)
     public RegionMaster getActiveRegionByDisplayName(String displayName) {
         return regionRepository.findActiveByDisplayName(displayName)
                 .orElseThrow(() -> {

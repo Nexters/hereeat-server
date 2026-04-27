@@ -141,7 +141,8 @@ public class RestaurantEntity extends BaseEntity {
             // 추천 시간대
             TimeSlot timeSlot,
             // 휴무일
-            String offDays) {
+            String offDays,
+            LocalDateTime offDaysUpdatedAt) {
         this.externalId = externalId;
         this.name = name;
         this.address = address;
@@ -162,6 +163,7 @@ public class RestaurantEntity extends BaseEntity {
         this.aiMateSummaryContents = aiMateSummaryContents;
         this.timeSlot = timeSlot;
         this.offDays = offDays;
+        this.offDaysUpdatedAt = offDaysUpdatedAt;
     }
 
     /**
@@ -203,6 +205,10 @@ public class RestaurantEntity extends BaseEntity {
                 .timeSlot(createRestaurant.timeSlot())
                 // 휴무일
                 .offDays(createRestaurant.offDays())
+                .offDaysUpdatedAt(
+                        createRestaurant.offDays() != null
+                                ? LocalDateTime.now()
+                                : null)
                 .build();
     }
 

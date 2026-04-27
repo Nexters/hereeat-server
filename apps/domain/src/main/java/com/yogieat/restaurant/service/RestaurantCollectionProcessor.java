@@ -14,9 +14,11 @@ import com.yogieat.external.kakao.result.KakaoRestaurantData;
 import com.yogieat.region.domain.RegionMaster;
 import com.yogieat.region.domain.RegionSummary;
 import com.yogieat.region.service.RegionService;
+import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,41 +64,42 @@ public class RestaurantCollectionProcessor {
     private static final int RESTAURANTS_PER_REQUEST = 10;
     private static final int KAKAO_COLLECTION_CONCURRENT_PERMITS = 3;
     private static final int MIN_REVIEW_COUNT = 30;
-    private static final List<String> HIGH_VOLUME_REGION_CODES = List.of("GANGNAM", "HONGDAE");
-    private static final int DEFAULT_REGION_LIMIT = 50;
 
     private final Semaphore kakaoApiSemaphore = new Semaphore(KAKAO_COLLECTION_CONCURRENT_PERMITS);
 
     public void collectAllRegions() {
         try {
-            List<RegionSummary> activeRegions = regionService.findActiveRegionSummaries();
-            if (activeRegions.isEmpty()) {
+            List<RegionSummary> regionSummaries = regionService.findCollectionRegionSummaries();
+            if (regionSummaries.isEmpty()) {
                 return;
             }
 
-            ConcurrentHashMap<Long, Long> regionCounts = new ConcurrentHashMap<>(loadRegionCounts(activeRegions));
-            List<RegionSummary> regionsToCollect = filterRegionsNeedingCollection(activeRegions, regionCounts);
+            List<RestaurantCollectionPlan.Request> collectionRequests =
+                    RestaurantCollectionPlan.create(regionSummaries, FOOD_CATEGORIES.size());
 
-            if (regionsToCollect.isEmpty()) {
+            if (collectionRequests.isEmpty()) {
+                log.info("All active regions reached restaurant collection limit: {} restaurants",
+                        RestaurantCollectionPlan.REGION_RESTAURANT_LIMIT);
                 return;
             }
 
-            List<String> locationsToCollect = regionsToCollect.stream()
-                    .map(summary -> summary.region().displayName())
-                    .toList();
-            Map<String, RegionSummary> regionByLocation = regionsToCollect.stream()
+            logCollectionPlan(collectionRequests);
+
+            Map<String, RestaurantCollectionPlan.Request> requestByLocation = collectionRequests.stream()
                     .collect(Collectors.toMap(
-                            summary -> summary.region().displayName(),
+                            request -> request.regionSummary().region().displayName(),
                             Function.identity(),
-                            keepExistingRegion()
+                            keepExistingRequest()
                     ));
+            ConcurrentHashMap<Long, AtomicInteger> remainingSlotsByRegion =
+                    loadRemainingSlots(collectionRequests);
 
             String restaurantNames = restaurantRepository.findAll().stream()
-                    .map(com.yogieat.restaurant.domain.Restaurant::name)
+                    .map(Restaurant::name)
                     .collect(Collectors.joining(", "));
 
             Map<LocationCategoryKey, List<SuggestionRestaurant>> allSuggestions =
-                    geminiClient.generateRestaurantsBatch(locationsToCollect, FOOD_CATEGORIES, restaurantNames, RESTAURANTS_PER_REQUEST);
+                    generateBatchSuggestions(collectionRequests, restaurantNames);
 
             AtomicInteger totalProcessed = new AtomicInteger(0);
             AtomicInteger totalSuccess = new AtomicInteger(0);
@@ -112,21 +115,21 @@ public class RestaurantCollectionProcessor {
                     LocationCategoryKey key = entry.getKey();
                     List<SuggestionRestaurant> suggestions = entry.getValue();
 
-                    RegionSummary regionSummary = regionByLocation.get(key.location());
-                    if (regionSummary == null || isRegionLimitReached(regionSummary.region(), regionCounts)) {
+                    RestaurantCollectionPlan.Request request = requestByLocation.get(key.location());
+                    if (request == null) {
+                        continue;
+                    }
+
+                    RegionMaster region = request.regionSummary().region();
+                    AtomicInteger remainingSlots = remainingSlotsByRegion.get(region.id());
+                    if (remainingSlots == null || remainingSlots.get() <= 0) {
                         continue;
                     }
 
                     futures.add(executor.submit(() -> {
                         try {
-                            int processed = processRestaurantsForRegion(regionSummary.region(), key.category(), suggestions);
+                            int processed = processRestaurantsForRegion(region, key.category(), suggestions, remainingSlots);
                             totalProcessed.addAndGet(processed);
-                            if (processed > 0) {
-                                regionCounts.compute(
-                                        regionSummary.region().id(),
-                                        (regionId, count) -> count == null ? (long) processed : count + processed
-                                );
-                            }
                             totalSuccess.incrementAndGet();
                         } catch (Exception e) {
                             log.error("Failed: {} - {}", key.location(), key.category(), e);
@@ -158,42 +161,50 @@ public class RestaurantCollectionProcessor {
         }
     }
 
-    private Map<Long, Long> loadRegionCounts(List<RegionSummary> activeRegions) {
-        return activeRegions.stream()
+    private void logCollectionPlan(List<RestaurantCollectionPlan.Request> collectionRequests) {
+        collectionRequests.forEach(request -> log.info(
+                "Region {} needs collection: {}/{} restaurants, requesting {} per category",
+                request.regionSummary().region().displayName(),
+                request.regionSummary().restaurantCount(),
+                RestaurantCollectionPlan.REGION_RESTAURANT_LIMIT,
+                request.countPerCategory()
+        ));
+    }
+
+    private ConcurrentHashMap<Long, AtomicInteger> loadRemainingSlots(
+            List<RestaurantCollectionPlan.Request> collectionRequests
+    ) {
+        return collectionRequests.stream()
                 .collect(Collectors.toMap(
-                        summary -> summary.region().id(),
-                        RegionSummary::restaurantCount
+                        request -> request.regionSummary().region().id(),
+                        request -> new AtomicInteger(request.remainingSlots()),
+                        (existing, ignored) -> existing,
+                        ConcurrentHashMap::new
                 ));
     }
 
-    private List<RegionSummary> filterRegionsNeedingCollection(
-            List<RegionSummary> activeRegions,
-            Map<Long, Long> regionCounts
+    private Map<LocationCategoryKey, List<SuggestionRestaurant>> generateBatchSuggestions(
+            List<RestaurantCollectionPlan.Request> collectionRequests,
+            String restaurantNames
     ) {
-        List<RegionSummary> regionsToCollect = new ArrayList<>();
+        Map<LocationCategoryKey, List<SuggestionRestaurant>> suggestions = new HashMap<>();
+        Map<Integer, List<RestaurantCollectionPlan.Request>> requestsByCount = collectionRequests.stream()
+                .collect(Collectors.groupingBy(RestaurantCollectionPlan.Request::countPerCategory));
 
-        for (RegionSummary summary : activeRegions) {
-            RegionMaster region = summary.region();
-            long currentCount = regionCounts.getOrDefault(region.id(), 0L);
-            int limit = getRegionLimit(region);
+        requestsByCount.forEach((countPerCategory, requests) -> {
+            List<String> locationsToCollect = requests.stream()
+                    .map(request -> request.regionSummary().region().displayName())
+                    .toList();
 
-            if (currentCount < limit) {
-                regionsToCollect.add(summary);
-                log.info("Region {} needs collection: {}/{} restaurants",
-                        region.displayName(), currentCount, limit);
-            } else {
-                log.info("Region {} reached limit: {}/{} restaurants (skipping)",
-                        region.displayName(), currentCount, limit);
-            }
-        }
+            suggestions.putAll(geminiClient.generateRestaurantsBatch(
+                    locationsToCollect,
+                    FOOD_CATEGORIES,
+                    restaurantNames,
+                    countPerCategory
+            ));
+        });
 
-        return regionsToCollect;
-    }
-
-    private boolean isRegionLimitReached(RegionMaster region, Map<Long, Long> regionCounts) {
-        long currentCount = regionCounts.getOrDefault(region.id(), 0L);
-        int limit = getRegionLimit(region);
-        return currentCount >= limit;
+        return suggestions;
     }
 
     /**
@@ -221,6 +232,15 @@ public class RestaurantCollectionProcessor {
             String category,
             List<SuggestionRestaurant> suggestions
     ) {
+        return processRestaurantsForRegion(region, category, suggestions, new AtomicInteger(suggestions.size()));
+    }
+
+    private int processRestaurantsForRegion(
+            RegionMaster region,
+            String category,
+            List<SuggestionRestaurant> suggestions,
+            AtomicInteger remainingSlots
+    ) {
         RestaurantValidator.ValidationContext validationContext =
                 restaurantCollectionWriteService.prepareValidationContext(region);
 
@@ -232,7 +252,7 @@ public class RestaurantCollectionProcessor {
             for (SuggestionRestaurant suggestion : suggestions) {
                 futures.add(executor.submit(() -> {
                     processSingleSuggestion(
-                            suggestion, region, category, validationContext, savedCount
+                            suggestion, region, category, validationContext, savedCount, remainingSlots
                     );
                     return null;
                 }));
@@ -259,8 +279,13 @@ public class RestaurantCollectionProcessor {
             RegionMaster region,
             String category,
             RestaurantValidator.ValidationContext validationContext,
-            AtomicInteger savedCount
+            AtomicInteger savedCount,
+            AtomicInteger remainingSlots
     ) {
+        if (remainingSlots.get() <= 0) {
+            return;
+        }
+
         RestaurantEnrichedData enrichedData;
         try {
             kakaoApiSemaphore.acquire();
@@ -298,6 +323,10 @@ public class RestaurantCollectionProcessor {
             return;
         }
 
+        if (!tryAcquireSlot(remainingSlots)) {
+            return;
+        }
+
         boolean saved = restaurantCollectionWriteService.persistRestaurant(
                 suggestion,
                 region,
@@ -308,17 +337,28 @@ public class RestaurantCollectionProcessor {
         );
         if (saved) {
             savedCount.incrementAndGet();
+        } else {
+            releaseSlot(remainingSlots);
         }
     }
 
-    private int getRegionLimit(RegionMaster region) {
-        if (region != null && HIGH_VOLUME_REGION_CODES.contains(region.code())) {
-            return 100;
+    private boolean tryAcquireSlot(AtomicInteger remainingSlots) {
+        while (true) {
+            int current = remainingSlots.get();
+            if (current <= 0) {
+                return false;
+            }
+            if (remainingSlots.compareAndSet(current, current - 1)) {
+                return true;
+            }
         }
-        return DEFAULT_REGION_LIMIT;
     }
 
-    private BinaryOperator<RegionSummary> keepExistingRegion() {
+    private void releaseSlot(AtomicInteger remainingSlots) {
+        remainingSlots.incrementAndGet();
+    }
+
+    private BinaryOperator<RestaurantCollectionPlan.Request> keepExistingRequest() {
         return (existing, ignored) -> existing;
     }
 
