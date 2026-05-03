@@ -18,6 +18,7 @@ public record RestaurantSyncPatch(
         String priceLevel,
         String aiMateSummaryTitle,
         String aiMateSummaryContents,
+        String station,
         TimeSlot timeSlot,
         Long categoryId,
         String offDays

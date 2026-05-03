@@ -638,6 +638,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                     price_level = coalesce(:priceLevel, price_level),
                     ai_mate_summary_title = coalesce(:aiMateSummaryTitle, ai_mate_summary_title),
                     ai_mate_summary_contents = coalesce(:aiMateSummaryContents, ai_mate_summary_contents),
+                    station = coalesce(:station, station),
                     time_slot = coalesce(:timeSlot, time_slot),
                     category_id = coalesce(:categoryId, category_id),
                     off_days = coalesce(:offDays, off_days),
@@ -668,6 +669,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         .addValue("priceLevel", command.priceLevel())
                         .addValue("aiMateSummaryTitle", command.aiMateSummaryTitle())
                         .addValue("aiMateSummaryContents", command.aiMateSummaryContents())
+                        .addValue("station", command.station())
                         .addValue("timeSlot", command.timeSlot() != null ? command.timeSlot().name() : null)
                         .addValue("categoryId", command.categoryId())
                         .addValue("offDays", command.offDays())

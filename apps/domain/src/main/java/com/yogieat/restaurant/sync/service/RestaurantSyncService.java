@@ -492,6 +492,7 @@ public class RestaurantSyncService {
         String priceLevel = detail != null ? detail.priceLevel() : null;
         String aiMateSummaryTitle = detail != null ? detail.aiMateSummaryTitle() : null;
         String aiMateSummaryContents = detail != null ? toJson(detail.aiMateSummaryContents()) : null;
+        String station = detail != null ? detail.station() : null;
         Long categoryId = resolveCategoryId(detail);
         String offDays = detail != null ? offDaysToJson(detail.offDays()) : null;
 
@@ -510,6 +511,7 @@ public class RestaurantSyncService {
                 priceLevel,
                 aiMateSummaryTitle,
                 aiMateSummaryContents,
+                station,
                 detail != null ? detail.timeSlot() : null,
                 categoryId,
                 offDays

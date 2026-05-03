@@ -27,6 +27,7 @@ public record KakaoPlaceDetailData(
         String priceLevel,
         String aiMateSummaryTitle,
         List<String> aiMateSummaryContents,
+        String station,
         // 추천 시간대 (신규 필드)
         TimeSlot timeSlot,
         // 카카오 API 원본 카테고리 텍스트
@@ -59,6 +60,7 @@ public record KakaoPlaceDetailData(
                 null,
                 null,
                 List.of(),
+                null,
                 null,
                 null,
                 null,
