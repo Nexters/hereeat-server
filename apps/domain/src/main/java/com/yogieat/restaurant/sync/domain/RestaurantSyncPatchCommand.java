@@ -19,6 +19,7 @@ public record RestaurantSyncPatchCommand(
         String priceLevel,
         String aiMateSummaryTitle,
         String aiMateSummaryContents,
+        String station,
         TimeSlot timeSlot,
         Long categoryId,
         String offDays
@@ -51,6 +52,7 @@ public record RestaurantSyncPatchCommand(
                 patch.priceLevel(),
                 patch.aiMateSummaryTitle(),
                 patch.aiMateSummaryContents(),
+                patch.station(),
                 patch.timeSlot(),
                 patch.categoryId(),
                 patch.offDays()
