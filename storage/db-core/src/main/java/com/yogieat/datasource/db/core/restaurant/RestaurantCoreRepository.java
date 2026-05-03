@@ -20,6 +20,7 @@ import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
+import com.yogieat.restaurant.result.RestaurantDetailResult;
 import com.yogieat.restaurant.service.RestaurantAdminListCriteria;
 import com.yogieat.restaurant.service.RestaurantCommand;
 import com.yogieat.restaurant.service.RestaurantRepository;
@@ -340,6 +341,42 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         entity.getUpdatedAt()
                 )
         );
+    }
+
+    @Override
+    public Optional<RestaurantDetailResult> findRestaurantDetailById(Long restaurantId) {
+        Tuple tuple = createAdminRestaurantTupleQuery(RestaurantAdminListCriteria.of(null, null, null, null))
+                .where(restaurantEntity.id.eq(restaurantId))
+                .fetchOne();
+
+        if (tuple == null) {
+            return Optional.empty();
+        }
+
+        RestaurantEntity entity = tuple.get(restaurantEntity);
+        if (entity == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(RestaurantDetailResult.of(
+                entity.getId(),
+                entity.getName(),
+                entity.getStation(),
+                entity.getAddress(),
+                resolveRegion(entity.getRegionId()),
+                tuple.get(categoryEntity.largeCategory),
+                entity.getRating(),
+                entity.getImageUrl(),
+                entity.getMapUrl(),
+                entity.getDescription(),
+                entity.getPriceLevel(),
+                entity.getRepresentMenu(),
+                entity.getRepresentMenuPrice(),
+                entity.getRepresentativeReview(),
+                entity.getReviewCount(),
+                entity.getAiMateSummaryTitle(),
+                parseAiMateSummaryContents(entity.getAiMateSummaryContents())
+        ));
     }
 
     private JPAQuery<Tuple> createAdminRestaurantTupleQuery(

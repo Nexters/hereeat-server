@@ -8,6 +8,7 @@ import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
+import com.yogieat.restaurant.result.RestaurantDetailResult;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -40,6 +41,12 @@ public class RestaurantService {
     @Transactional(readOnly = true)
     public RestaurantAdminResult.Detail getAdminRestaurantDetailBy(Long id) {
         return restaurantRepository.findAdminRestaurantDetailById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public RestaurantDetailResult getRestaurantDetailBy(Long id) {
+        return restaurantRepository.findRestaurantDetailById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
     }
 
