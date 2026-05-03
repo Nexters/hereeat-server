@@ -1,6 +1,7 @@
 package com.yogieat.datasource.db.core.restaurant;
 
 import static com.yogieat.datasource.db.core.category.QCategoryEntity.*;
+import static com.yogieat.datasource.db.core.region.QRegionEntity.*;
 import static com.yogieat.datasource.db.core.restaurant.QRestaurantEntity.*;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -312,7 +313,6 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             return Optional.empty();
         }
 
-        Region resolvedRegion = resolveRegion(entity.getRegionId());
         return Optional.of(
                 RestaurantAdminResult.Detail.of(
                         entity.getId(),
@@ -327,7 +327,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         entity.getMapUrl(),
                         entity.getRepresentativeReview(),
                         entity.getDescription(),
-                        resolvedRegion,
+                        toRegion(tuple.get(regionEntity.code)),
                         toGeoJsonPoint(entity.getLocation()),
                         entity.getReviewCount(),
                         entity.getBlogReviewCount(),
@@ -345,7 +345,14 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
     @Override
     public Optional<RestaurantDetailResult> findRestaurantDetailById(Long restaurantId) {
-        Tuple tuple = createAdminRestaurantTupleQuery(RestaurantAdminListCriteria.of(null, null, null, null))
+        Tuple tuple = jpaQueryFactory
+                .select(restaurantEntity, categoryEntity.largeCategory, regionEntity.code)
+                .from(restaurantEntity)
+                .leftJoin(categoryEntity)
+                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
+                .leftJoin(regionEntity)
+                .on(restaurantEntity.regionId.eq(regionEntity.id))
+                .where(restaurantEntity.deletedAt.isNull())
                 .where(restaurantEntity.id.eq(restaurantId))
                 .fetchOne();
 
@@ -363,7 +370,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 entity.getName(),
                 entity.getStation(),
                 entity.getAddress(),
-                resolveRegion(entity.getRegionId()),
+                toRegion(tuple.get(regionEntity.code)),
                 tuple.get(categoryEntity.largeCategory),
                 entity.getRating(),
                 entity.getImageUrl(),
