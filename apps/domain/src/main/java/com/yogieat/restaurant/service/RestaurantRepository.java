@@ -6,6 +6,7 @@ import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
+import com.yogieat.restaurant.result.RestaurantDetailResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
@@ -61,6 +62,7 @@ public interface RestaurantRepository {
             RestaurantAdminListCriteria criteria
     );
     Optional<RestaurantAdminResult.Detail> findAdminRestaurantDetailById(Long restaurantId);
+    Optional<RestaurantDetailResult> findRestaurantDetailById(Long restaurantId);
     void deleteBy(Long restaurantId);
     List<RestaurantSyncTarget> findSyncTargetsByIds(List<Long> ids);
     void batchApplySyncPatch(List<RestaurantSyncPatchCommand> commands);

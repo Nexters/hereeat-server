@@ -17,13 +17,8 @@ springdoc:
     persist-authorization: true
     syntax-highlight:
       theme: agate
----
-spring:
-  config:
-    activate:
-      on-profile: local
 swagger:
-  domain: http://localhost:8080
+  server-url: http://localhost:8080
   user: yogieat
   password: yogieat1234
 
@@ -33,7 +28,7 @@ spring:
     activate:
       on-profile: dev
 swagger:
-  domain: ${SERVER_DOMAIN}
+  server-url: ${SWAGGER_SERVER_URL:https://dev-api.yogieat.com}
   user: yogieat
   password: yogieat1234
 ---
@@ -42,7 +37,7 @@ spring:
     activate:
       on-profile: prod
 swagger:
-  domain: ${SERVER_DOMAIN}
+  server-url: ${SWAGGER_SERVER_URL:https://api.yogieat.com}
   user: ${SWAGGER_USER}
   password: ${SWAGGER_PASSWORD}
 ---

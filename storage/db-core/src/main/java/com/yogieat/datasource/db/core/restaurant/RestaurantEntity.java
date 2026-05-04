@@ -104,6 +104,8 @@ public class RestaurantEntity extends BaseEntity {
     private String aiMateSummaryTitle;
     @Column(columnDefinition = "TEXT")
     private String aiMateSummaryContents;  // JSON 문자열
+    @Column(name = "station", length = 30)
+    private String station;
 
     // 추천 시간대 (신규 필드)
     @Column(name = "time_slot", columnDefinition = "VARCHAR(20)")
@@ -138,6 +140,7 @@ public class RestaurantEntity extends BaseEntity {
             String priceLevel,
             String aiMateSummaryTitle,
             String aiMateSummaryContents,
+            String station,
             // 추천 시간대
             TimeSlot timeSlot,
             // 휴무일
@@ -161,6 +164,7 @@ public class RestaurantEntity extends BaseEntity {
         this.priceLevel = priceLevel;
         this.aiMateSummaryTitle = aiMateSummaryTitle;
         this.aiMateSummaryContents = aiMateSummaryContents;
+        this.station = station;
         this.timeSlot = timeSlot;
         this.offDays = offDays;
         this.offDaysUpdatedAt = offDaysUpdatedAt;
@@ -318,6 +322,9 @@ public class RestaurantEntity extends BaseEntity {
         }
         if (patch.aiMateSummaryContents() != null && !patch.aiMateSummaryContents().isBlank()) {
             this.aiMateSummaryContents = patch.aiMateSummaryContents();
+        }
+        if (patch.station() != null && !patch.station().isBlank()) {
+            this.station = patch.station();
         }
         if (patch.timeSlot() != null) {
             this.timeSlot = patch.timeSlot();

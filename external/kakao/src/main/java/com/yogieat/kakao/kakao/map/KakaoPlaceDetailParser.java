@@ -78,6 +78,7 @@ public class KakaoPlaceDetailParser {
             String priceLevel = extractPriceLevel(panel);
             String aiMateSummaryTitle = extractAiMateSummaryTitle(panel);
             List<String> aiMateSummaryContents = extractAiMateSummaryContents(panel);
+            String station = extractText(panel.at("/find_way/subway"), "station_simple_name");
 
             // TimeSlot 추출 (폴백 전략: blog_summaries → visitor 데이터)
             TimeSlot timeSlot = extractTimeSlot(panel);
@@ -111,6 +112,7 @@ public class KakaoPlaceDetailParser {
                     priceLevel,
                     aiMateSummaryTitle,
                     aiMateSummaryContents,
+                    station,
                     timeSlot,
                     apiCategoryName2,
                     apiCategoryName3,

@@ -1,6 +1,7 @@
 package com.yogieat.datasource.db.core.restaurant;
 
 import static com.yogieat.datasource.db.core.category.QCategoryEntity.*;
+import static com.yogieat.datasource.db.core.region.QRegionEntity.*;
 import static com.yogieat.datasource.db.core.restaurant.QRestaurantEntity.*;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -20,6 +21,7 @@ import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
+import com.yogieat.restaurant.result.RestaurantDetailResult;
 import com.yogieat.restaurant.service.RestaurantAdminListCriteria;
 import com.yogieat.restaurant.service.RestaurantCommand;
 import com.yogieat.restaurant.service.RestaurantRepository;
@@ -262,21 +264,32 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             int page,
             int size
     ) {
-        List<Tuple> tuples = createAdminRestaurantTupleQuery(criteria)
+        List<Tuple> tuples = jpaQueryFactory
+                .select(
+                        restaurantEntity.id,
+                        restaurantEntity.name,
+                        restaurantEntity.categoryId,
+                        categoryEntity.largeCategory,
+                        categoryEntity.mediumCategory,
+                        restaurantEntity.rating,
+                        restaurantEntity.imageUrl,
+                        regionEntity.code,
+                        restaurantEntity.updatedAt
+                )
+                .from(restaurantEntity)
+                .leftJoin(categoryEntity)
+                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
+                .leftJoin(regionEntity)
+                .on(restaurantEntity.regionId.eq(regionEntity.id))
+                .where(buildAdminRestaurantConditions(criteria))
                 .orderBy(restaurantEntity.updatedAt.desc(), restaurantEntity.id.desc())
                 .offset((long) page * size)
                 .limit(size)
                 .fetch();
-        Map<Long, Region> regionMap = resolveRegionMap(
-                tuples.stream()
-                        .map(tuple -> tuple.get(restaurantEntity))
-                        .map(RestaurantEntity::getRegionId)
-                        .toList()
-        );
 
         return tuples
                 .stream()
-                .map(tuple -> toAdminListItem(tuple, regionMap))
+                .map(this::toAdminListItem)
                 .toList();
     }
 
@@ -284,12 +297,15 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     public long countAdminRestaurantList(
             RestaurantAdminListCriteria criteria
     ) {
-        Long total = jpaQueryFactory.select(restaurantEntity.count())
-                .from(restaurantEntity)
-                .leftJoin(categoryEntity)
-                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
-                .where(buildAdminRestaurantConditions(criteria))
-                .fetchOne();
+        JPAQuery<Long> query = jpaQueryFactory.select(restaurantEntity.count())
+                .from(restaurantEntity);
+
+        if (criteria.largeCategory() != null) {
+            query.leftJoin(categoryEntity)
+                    .on(restaurantEntity.categoryId.eq(categoryEntity.id));
+        }
+
+        Long total = query.where(buildAdminRestaurantConditions(criteria)).fetchOne();
 
         return total == null ? 0L : total;
     }
@@ -311,7 +327,6 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             return Optional.empty();
         }
 
-        Region resolvedRegion = resolveRegion(entity.getRegionId());
         return Optional.of(
                 RestaurantAdminResult.Detail.of(
                         entity.getId(),
@@ -326,7 +341,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         entity.getMapUrl(),
                         entity.getRepresentativeReview(),
                         entity.getDescription(),
-                        resolvedRegion,
+                        toRegion(tuple.get(regionEntity.code)),
                         toGeoJsonPoint(entity.getLocation()),
                         entity.getReviewCount(),
                         entity.getBlogReviewCount(),
@@ -342,6 +357,49 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         );
     }
 
+    @Override
+    public Optional<RestaurantDetailResult> findRestaurantDetailById(Long restaurantId) {
+        Tuple tuple = jpaQueryFactory
+                .select(restaurantEntity, categoryEntity.largeCategory, regionEntity.code)
+                .from(restaurantEntity)
+                .leftJoin(categoryEntity)
+                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
+                .leftJoin(regionEntity)
+                .on(restaurantEntity.regionId.eq(regionEntity.id))
+                .where(restaurantEntity.deletedAt.isNull())
+                .where(restaurantEntity.id.eq(restaurantId))
+                .fetchOne();
+
+        if (tuple == null) {
+            return Optional.empty();
+        }
+
+        RestaurantEntity entity = tuple.get(restaurantEntity);
+        if (entity == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(RestaurantDetailResult.of(
+                entity.getId(),
+                entity.getName(),
+                entity.getStation(),
+                entity.getAddress(),
+                toRegion(tuple.get(regionEntity.code)),
+                tuple.get(categoryEntity.largeCategory),
+                entity.getRating(),
+                entity.getImageUrl(),
+                entity.getMapUrl(),
+                entity.getDescription(),
+                entity.getPriceLevel(),
+                entity.getRepresentMenu(),
+                entity.getRepresentMenuPrice(),
+                entity.getRepresentativeReview(),
+                entity.getReviewCount(),
+                entity.getAiMateSummaryTitle(),
+                parseAiMateSummaryContents(entity.getAiMateSummaryContents())
+        ));
+    }
+
     private JPAQuery<Tuple> createAdminRestaurantTupleQuery(
             RestaurantAdminListCriteria criteria
     ) {
@@ -353,18 +411,17 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .where(buildAdminRestaurantConditions(criteria));
     }
 
-    private RestaurantAdminListItemResult toAdminListItem(Tuple tuple, Map<Long, Region> regionMap) {
-        RestaurantEntity entity = tuple.get(restaurantEntity);
+    private RestaurantAdminListItemResult toAdminListItem(Tuple tuple) {
         return new RestaurantAdminListItemResult(
-                entity.getId(),
-                entity.getName(),
-                entity.getCategoryId(),
+                tuple.get(restaurantEntity.id),
+                tuple.get(restaurantEntity.name),
+                tuple.get(restaurantEntity.categoryId),
                 tuple.get(categoryEntity.largeCategory),
                 tuple.get(categoryEntity.mediumCategory),
-                entity.getRating(),
-                entity.getImageUrl(),
-                regionMap.get(entity.getRegionId()),
-                entity.getUpdatedAt()
+                tuple.get(restaurantEntity.rating),
+                tuple.get(restaurantEntity.imageUrl),
+                toRegion(tuple.get(regionEntity.code)),
+                tuple.get(restaurantEntity.updatedAt)
         );
     }
 
@@ -638,6 +695,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                     price_level = coalesce(:priceLevel, price_level),
                     ai_mate_summary_title = coalesce(:aiMateSummaryTitle, ai_mate_summary_title),
                     ai_mate_summary_contents = coalesce(:aiMateSummaryContents, ai_mate_summary_contents),
+                    station = coalesce(:station, station),
                     time_slot = coalesce(:timeSlot, time_slot),
                     category_id = coalesce(:categoryId, category_id),
                     off_days = coalesce(:offDays, off_days),
@@ -668,6 +726,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         .addValue("priceLevel", command.priceLevel())
                         .addValue("aiMateSummaryTitle", command.aiMateSummaryTitle())
                         .addValue("aiMateSummaryContents", command.aiMateSummaryContents())
+                        .addValue("station", command.station())
                         .addValue("timeSlot", command.timeSlot() != null ? command.timeSlot().name() : null)
                         .addValue("categoryId", command.categoryId())
                         .addValue("offDays", command.offDays())
