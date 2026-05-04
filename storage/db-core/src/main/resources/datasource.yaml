@@ -1,8 +1,4 @@
 spring:
-  flyway:
-    clean-disabled: true
-    locations: classpath:db/migration
-    validate-on-migrate: true
   jpa:
     open-in-view: false
     properties:
@@ -16,8 +12,6 @@ spring:
   config:
     activate:
       on-profile: test
-  flyway:
-    enabled: false
   jpa:
     hibernate:
       ddl-auto: create
@@ -45,13 +39,9 @@ spring:
   config:
     activate:
       on-profile: local
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 0
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         show_log: true
@@ -77,13 +67,9 @@ spring:
   config:
     activate:
       on-profile: dev
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 0
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         show_log: true
@@ -109,13 +95,9 @@ spring:
   config:
     activate:
       on-profile: prod
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 0
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         show_log: true
