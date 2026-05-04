@@ -8,6 +8,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -16,7 +17,12 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "t_participant")
+@Table(
+        name = "t_participant",
+        indexes = {
+            @Index(name = "idx_participant_gathering_id_nickname", columnList = "gathering_id, nickname")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ParticipantEntity extends BaseEntity {
 

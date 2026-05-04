@@ -264,21 +264,32 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             int page,
             int size
     ) {
-        List<Tuple> tuples = createAdminRestaurantTupleQuery(criteria)
+        List<Tuple> tuples = jpaQueryFactory
+                .select(
+                        restaurantEntity.id,
+                        restaurantEntity.name,
+                        restaurantEntity.categoryId,
+                        categoryEntity.largeCategory,
+                        categoryEntity.mediumCategory,
+                        restaurantEntity.rating,
+                        restaurantEntity.imageUrl,
+                        regionEntity.code,
+                        restaurantEntity.updatedAt
+                )
+                .from(restaurantEntity)
+                .leftJoin(categoryEntity)
+                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
+                .leftJoin(regionEntity)
+                .on(restaurantEntity.regionId.eq(regionEntity.id))
+                .where(buildAdminRestaurantConditions(criteria))
                 .orderBy(restaurantEntity.updatedAt.desc(), restaurantEntity.id.desc())
                 .offset((long) page * size)
                 .limit(size)
                 .fetch();
-        Map<Long, Region> regionMap = resolveRegionMap(
-                tuples.stream()
-                        .map(tuple -> tuple.get(restaurantEntity))
-                        .map(RestaurantEntity::getRegionId)
-                        .toList()
-        );
 
         return tuples
                 .stream()
-                .map(tuple -> toAdminListItem(tuple, regionMap))
+                .map(this::toAdminListItem)
                 .toList();
     }
 
@@ -286,12 +297,15 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     public long countAdminRestaurantList(
             RestaurantAdminListCriteria criteria
     ) {
-        Long total = jpaQueryFactory.select(restaurantEntity.count())
-                .from(restaurantEntity)
-                .leftJoin(categoryEntity)
-                .on(restaurantEntity.categoryId.eq(categoryEntity.id))
-                .where(buildAdminRestaurantConditions(criteria))
-                .fetchOne();
+        JPAQuery<Long> query = jpaQueryFactory.select(restaurantEntity.count())
+                .from(restaurantEntity);
+
+        if (criteria.largeCategory() != null) {
+            query.leftJoin(categoryEntity)
+                    .on(restaurantEntity.categoryId.eq(categoryEntity.id));
+        }
+
+        Long total = query.where(buildAdminRestaurantConditions(criteria)).fetchOne();
 
         return total == null ? 0L : total;
     }
@@ -397,18 +411,17 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .where(buildAdminRestaurantConditions(criteria));
     }
 
-    private RestaurantAdminListItemResult toAdminListItem(Tuple tuple, Map<Long, Region> regionMap) {
-        RestaurantEntity entity = tuple.get(restaurantEntity);
+    private RestaurantAdminListItemResult toAdminListItem(Tuple tuple) {
         return new RestaurantAdminListItemResult(
-                entity.getId(),
-                entity.getName(),
-                entity.getCategoryId(),
+                tuple.get(restaurantEntity.id),
+                tuple.get(restaurantEntity.name),
+                tuple.get(restaurantEntity.categoryId),
                 tuple.get(categoryEntity.largeCategory),
                 tuple.get(categoryEntity.mediumCategory),
-                entity.getRating(),
-                entity.getImageUrl(),
-                regionMap.get(entity.getRegionId()),
-                entity.getUpdatedAt()
+                tuple.get(restaurantEntity.rating),
+                tuple.get(restaurantEntity.imageUrl),
+                toRegion(tuple.get(regionEntity.code)),
+                tuple.get(restaurantEntity.updatedAt)
         );
     }
 

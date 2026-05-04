@@ -22,7 +22,8 @@ import lombok.NoArgsConstructor;
         name = "t_gathering",
         indexes = {
             @Index(name = "idx_gathering_region_id", columnList = "region_id"),
-            @Index(name = "idx_gathering_region_id_deleted_at", columnList = "region_id, deleted_at")
+            @Index(name = "idx_gathering_region_id_deleted_at", columnList = "region_id, deleted_at"),
+            @Index(name = "idx_gathering_access_key", columnList = "access_key")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
