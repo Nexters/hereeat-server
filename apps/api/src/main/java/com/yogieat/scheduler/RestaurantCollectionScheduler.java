@@ -4,10 +4,12 @@ import com.yogieat.restaurant.service.RestaurantCollectionProcessor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("prod")
 @RequiredArgsConstructor
 @Slf4j
 public class RestaurantCollectionScheduler {
