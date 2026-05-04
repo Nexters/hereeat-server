@@ -26,6 +26,10 @@ jwt:
   access-token-validity: 3600000
   refresh-token-validity: 604800000
 
+admin:
+  warmup:
+    enabled: ${ADMIN_WARMUP_ENABLED:true}
+
 restaurant:
   collection:
     processor:
