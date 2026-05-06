@@ -164,10 +164,11 @@ public class KakaoPlaceDetailParser {
 
         JsonNode blogReviews = panel.at("/blog_review/reviews");
         if (blogReviews != null && blogReviews.isArray() && !blogReviews.isEmpty()) {
-            JsonNode firstBlogReview = blogReviews.get(0);
-            String contents = extractText(firstBlogReview, "contents");
-            if (contents != null && !contents.isBlank()) {
-                return contents;
+            for (JsonNode blogReview : blogReviews) {
+                String contents = extractText(blogReview, "contents");
+                if (isValidRepresentativeReview(contents)) {
+                    return contents;
+                }
             }
         }
         return null;
@@ -191,7 +192,7 @@ public class KakaoPlaceDetailParser {
             }
             int rating = ratingNode.asInt();
             String contents = extractText(review, "contents");
-            if (contents == null || contents.isBlank()) {
+            if (!isValidRepresentativeReview(contents)) {
                 continue;
             }
             String registeredAt = extractText(review, "registered_at");
@@ -225,6 +226,28 @@ public class KakaoPlaceDetailParser {
 
         // 20자 이상 리뷰 우선, 없으면 최고 평점 리뷰
         return bestLongReview != null ? bestLongReview : bestAnyReview;
+    }
+
+    private boolean isValidRepresentativeReview(String contents) {
+        return contents != null && !contents.isBlank() && !isEnglishOnlyAsciiReview(contents);
+    }
+
+    private boolean isEnglishOnlyAsciiReview(String contents) {
+        boolean hasEnglishLetter = false;
+        for (int i = 0; i < contents.length(); i++) {
+            char character = contents.charAt(i);
+            if (character > 0x7F) {
+                return false;
+            }
+            if (isEnglishLetter(character)) {
+                hasEnglishLetter = true;
+            }
+        }
+        return hasEnglishLetter;
+    }
+
+    private boolean isEnglishLetter(char character) {
+        return (character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z');
     }
 
     private List<String> extractPhotos(JsonNode panel) {
