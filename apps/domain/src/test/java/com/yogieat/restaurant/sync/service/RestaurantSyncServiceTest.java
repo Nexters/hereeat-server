@@ -104,6 +104,22 @@ class RestaurantSyncServiceTest {
     }
 
     @Test
+    void syncChunk_whenDetailContainsRepresentativeReview_updatesRepresentativeReview() {
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+                new GeoJson.Point(List.of(127.0280, 37.4980)));
+        when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
+        when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
+                .thenReturn(KakaoPlaceDetailFetchResult.success(detailDataWithCoordinate("맛집", 37.498, 127.0285)));
+
+        RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(List.of(1L), Runnable::run);
+
+        assertThat(result.successCount()).isEqualTo(1);
+        verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
+        RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
+        assertThat(command.representativeReview()).isEqualTo("리뷰");
+    }
+
+    @Test
     void syncChunk_whenKakaoCategoryIsInferable_updatesCategoryId() {
         RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "와인코르크", Region.GANGNAM, "123",
                 new GeoJson.Point(List.of(127.0280, 37.4980)));

@@ -33,7 +33,7 @@ admin:
 restaurant:
   collection:
     processor:
-      enabled: false
+      enabled: ${RESTAURANT_COLLECTION_PROCESSOR_ENABLED:true}
   sync:
     service:
       enabled: false

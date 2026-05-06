@@ -24,6 +24,69 @@ class KakaoPlaceDetailParserTest {
     private static final int YEAR = 2026;
 
     @Test
+    @DisplayName("카카오맵 대표 리뷰가 영어 ASCII로만 구성되면 다음 유효한 리뷰를 사용한다")
+    void parse_skipsEnglishOnlyKakaoReview() throws Exception {
+        JsonNode panel = panel("""
+                {
+                  "summary": {
+                    "category": {"name1": "음식점", "name2": "한식", "name3": "육류,고기"},
+                    "name": "테스트식당",
+                    "confirm_id": "16053234",
+                    "address": {"road": "서울 어딘가"},
+                    "point": {"lat": 37.5, "lon": 127.0}
+                  },
+                  "kakaomap_review": {
+                    "score_set": {"average_score": 4.0, "review_count": 10},
+                    "reviews": [
+                      {
+                        "star_rating": 5,
+                        "contents": "Great food and friendly staff",
+                        "registered_at": "2026.04.20"
+                      },
+                      {
+                        "star_rating": 4,
+                        "contents": "국물이 진하고 고기가 부드러워서 다시 오고 싶어요",
+                        "registered_at": "2026.04.19"
+                      }
+                    ]
+                  }
+                }
+                """);
+
+        KakaoPlaceDetailData result = parser.parse(panel, PLACE_ID);
+
+        assertThat(result.representativeReview()).isEqualTo("국물이 진하고 고기가 부드러워서 다시 오고 싶어요");
+    }
+
+    @Test
+    @DisplayName("블로그 대표 리뷰가 영어 ASCII로만 구성되면 다음 유효한 리뷰를 사용한다")
+    void parse_skipsEnglishOnlyBlogReview() throws Exception {
+        JsonNode panel = panel("""
+                {
+                  "summary": {
+                    "category": {"name1": "음식점", "name2": "한식", "name3": "육류,고기"},
+                    "name": "테스트식당",
+                    "confirm_id": "16053234",
+                    "address": {"road": "서울 어딘가"},
+                    "point": {"lat": 37.5, "lon": 127.0}
+                  },
+                  "kakaomap_review": {"score_set": {"average_score": 4.0, "review_count": 10}},
+                  "blog_review": {
+                    "review_count": 2,
+                    "reviews": [
+                      {"contents": "Best noodles in Gangnam"},
+                      {"contents": "면이 쫄깃하고 국물이 좋아서 만족했어요"}
+                    ]
+                  }
+                }
+                """);
+
+        KakaoPlaceDetailData result = parser.parse(panel, PLACE_ID);
+
+        assertThat(result.representativeReview()).isEqualTo("면이 쫄깃하고 국물이 좋아서 만족했어요");
+    }
+
+    @Test
     @DisplayName("off_days_desc가 '휴무일'인 날짜만 off_days로 수집한다")
     void parse_collectsOffDays() throws Exception {
         int year = YEAR;
