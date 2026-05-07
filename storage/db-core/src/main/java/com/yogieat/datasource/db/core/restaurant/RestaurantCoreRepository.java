@@ -704,7 +704,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                     category_id = coalesce(:categoryId, category_id),
                     off_days = coalesce(:offDays, off_days),
                     off_days_updated_at = case when :offDays is not null then now() else off_days_updated_at end,
-                    phone_number = coalesce(:phoneNumber, phone_number),
+                    phone_number = coalesce(nullif(:phoneNumber, ''), phone_number),
                     updated_at = now()
                 where id = :restaurantId
                   and deleted_at is null
