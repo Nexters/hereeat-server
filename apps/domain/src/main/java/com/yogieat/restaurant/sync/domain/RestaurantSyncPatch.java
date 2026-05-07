@@ -21,6 +21,7 @@ public record RestaurantSyncPatch(
         String station,
         TimeSlot timeSlot,
         Long categoryId,
-        String offDays
+        String offDays,
+        String phoneNumber
 ) {
 }

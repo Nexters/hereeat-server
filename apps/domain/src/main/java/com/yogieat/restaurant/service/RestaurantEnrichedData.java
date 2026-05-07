@@ -29,6 +29,7 @@ final class RestaurantEnrichedData {
     LargeCategory apiLargeCategory;
     String apiMediumCategory;
     List<LocalDate> offDays;
+    String phoneNumber;
     boolean skip;
 
     private RestaurantEnrichedData() {
@@ -124,6 +125,10 @@ final class RestaurantEnrichedData {
 
     List<LocalDate> offDays() {
         return skip ? null : offDays;
+    }
+
+    String phoneNumber() {
+        return skip ? null : phoneNumber;
     }
 
     boolean isSkipped() {

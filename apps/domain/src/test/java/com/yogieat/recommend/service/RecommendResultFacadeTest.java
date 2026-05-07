@@ -147,6 +147,7 @@ class RecommendResultFacadeTest {
                 null,
                 null,
                 null,
+                null,
                 null
         );
     }

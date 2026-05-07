@@ -106,10 +106,11 @@ subprojects {
 
 // Git Hook installation at root level
 tasks.register('installGitHook', Copy) {
-    from file('scripts/pre-commit')
-    into file('.git/hooks')
+    def hooksDir = layout.projectDirectory.dir('.git/hooks')
+    from layout.projectDirectory.file('scripts/pre-commit')
+    into hooksDir
     doFirst {
-        file('.git/hooks').mkdirs()
+        hooksDir.asFile.mkdirs()
     }
 }
 

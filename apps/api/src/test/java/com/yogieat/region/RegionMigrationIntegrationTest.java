@@ -363,7 +363,8 @@ class RegionMigrationIntegrationTest {
                 "요약 제목",
                 "[\"요약\"]",
                 TimeSlot.LUNCH,
-                null
+                null,
+                "010-0000-0000"
         );
     }
 
