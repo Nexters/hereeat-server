@@ -119,6 +119,9 @@ public class RestaurantEntity extends BaseEntity {
     @Column(name = "off_days_updated_at")
     private LocalDateTime offDaysUpdatedAt;
 
+    @Column(name = "phone_number", length = 50)
+    private String phoneNumber;
+
     @Builder(access = AccessLevel.PRIVATE)
     private RestaurantEntity(
             String externalId,
@@ -145,7 +148,8 @@ public class RestaurantEntity extends BaseEntity {
             TimeSlot timeSlot,
             // 휴무일
             String offDays,
-            LocalDateTime offDaysUpdatedAt) {
+            LocalDateTime offDaysUpdatedAt,
+            String phoneNumber) {
         this.externalId = externalId;
         this.name = name;
         this.address = address;
@@ -168,6 +172,7 @@ public class RestaurantEntity extends BaseEntity {
         this.timeSlot = timeSlot;
         this.offDays = offDays;
         this.offDaysUpdatedAt = offDaysUpdatedAt;
+        this.phoneNumber = phoneNumber;
     }
 
     /**
@@ -213,6 +218,7 @@ public class RestaurantEntity extends BaseEntity {
                         createRestaurant.offDays() != null
                                 ? LocalDateTime.now()
                                 : null)
+                .phoneNumber(createRestaurant.phoneNumber())
                 .build();
     }
 
@@ -246,7 +252,8 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
                 // 휴무일
-                parseOffDays(entity.getOffDays())
+                parseOffDays(entity.getOffDays()),
+                entity.getPhoneNumber()
         );
     }
 
@@ -335,6 +342,9 @@ public class RestaurantEntity extends BaseEntity {
         if (patch.offDays() != null) {
             this.offDays = patch.offDays();
             this.offDaysUpdatedAt = LocalDateTime.now();
+        }
+        if (patch.phoneNumber() != null && !patch.phoneNumber().isBlank()) {
+            this.phoneNumber = patch.phoneNumber();
         }
     }
 

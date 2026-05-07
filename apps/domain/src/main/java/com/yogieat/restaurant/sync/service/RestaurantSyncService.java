@@ -495,6 +495,7 @@ public class RestaurantSyncService {
         String station = detail != null ? detail.station() : null;
         Long categoryId = resolveCategoryId(detail);
         String offDays = detail != null ? offDaysToJson(detail.offDays()) : null;
+        String phoneNumber = detail != null ? detail.phoneNumber() : null;
 
         return new RestaurantSyncPatch(
                 externalId,
@@ -514,7 +515,8 @@ public class RestaurantSyncService {
                 station,
                 detail != null ? detail.timeSlot() : null,
                 categoryId,
-                offDays
+                offDays,
+                phoneNumber
         );
     }
 

@@ -352,7 +352,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         parseAiMateSummaryContents(entity.getAiMateSummaryContents()),
                         entity.getTimeSlot(),
                         entity.getCreatedAt(),
-                        entity.getUpdatedAt()
+                        entity.getUpdatedAt(),
+                        entity.getPhoneNumber()
                 )
         );
     }
@@ -396,7 +397,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 entity.getRepresentativeReview(),
                 entity.getReviewCount(),
                 entity.getAiMateSummaryTitle(),
-                parseAiMateSummaryContents(entity.getAiMateSummaryContents())
+                parseAiMateSummaryContents(entity.getAiMateSummaryContents()),
+                entity.getPhoneNumber()
         ));
     }
 
@@ -528,7 +530,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 tuple.get(restaurantEntity.timeSlot),
                 tuple.get(restaurantEntity.createdAt),
                 tuple.get(restaurantEntity.updatedAt),
-                parseOffDays(tuple.get(restaurantEntity.offDays))
+                parseOffDays(tuple.get(restaurantEntity.offDays)),
+                null
         );
     }
 
@@ -700,6 +703,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                     category_id = coalesce(:categoryId, category_id),
                     off_days = coalesce(:offDays, off_days),
                     off_days_updated_at = case when :offDays is not null then now() else off_days_updated_at end,
+                    phone_number = coalesce(:phoneNumber, phone_number),
                     updated_at = now()
                 where id = :restaurantId
                   and deleted_at is null
@@ -730,6 +734,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         .addValue("timeSlot", command.timeSlot() != null ? command.timeSlot().name() : null)
                         .addValue("categoryId", command.categoryId())
                         .addValue("offDays", command.offDays())
+                        .addValue("phoneNumber", command.phoneNumber())
                 )
                 .toArray(MapSqlParameterSource[]::new);
 

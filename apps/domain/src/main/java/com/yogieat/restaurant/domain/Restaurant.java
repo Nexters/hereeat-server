@@ -34,6 +34,7 @@ public record Restaurant(
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         // 휴무일
-        List<LocalDate> offDays
+        List<LocalDate> offDays,
+        String phoneNumber
 ){
 }
