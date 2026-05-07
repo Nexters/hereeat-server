@@ -92,6 +92,12 @@ public class KakaoPlaceDetailParser {
             // 휴무일 추출
             List<LocalDate> offDays = extractOffDates(panel);
 
+            JsonNode phoneNumbers = panel.at("/summary/phone_numbers");
+            String phoneNumber = null;
+            if (phoneNumbers.isArray() && !phoneNumbers.isEmpty()) {
+                phoneNumber = extractText(phoneNumbers.get(0), "tel");
+            }
+
             log.debug("Successfully parsed place: placeId={}, rating={}, photos={}, review={}, reviewCount={}, blogReviewCount={}, timeSlot={}, apiLargeCategory={}, apiMediumCategory={}",
                     confirmId, rating, photoUrls.size(), representativeReview != null, reviewCount, blogReviewCount, timeSlot, apiLargeCategory, apiMediumCategory);
 
@@ -118,7 +124,8 @@ public class KakaoPlaceDetailParser {
                     apiCategoryName3,
                     apiLargeCategory,
                     apiMediumCategory,
-                    offDays
+                    offDays,
+                    phoneNumber
             );
         } catch (Exception e) {
             log.error("Failed to parse panel3 response for placeId: {}", requestedPlaceId, e);

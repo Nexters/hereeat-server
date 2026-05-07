@@ -32,7 +32,8 @@ public record CreateRestaurant(
         // 추천 시간대 (신규 필드)
         TimeSlot timeSlot,
         // 휴무일
-        String offDays  // JSON 문자열로 저장
+        String offDays,  // JSON 문자열로 저장
+        String phoneNumber
 ) {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -58,7 +59,8 @@ public record CreateRestaurant(
             // 추천 시간대 파라미터
             TimeSlot timeSlot,
             // 휴무일 파라미터
-            List<LocalDate> offDays
+            List<LocalDate> offDays,
+            String phoneNumber
     ) {
         return new CreateRestaurant(
                 externalId,
@@ -80,7 +82,8 @@ public record CreateRestaurant(
                 aiMateSummaryTitle,
                 toJson(aiMateSummaryContents),
                 timeSlot,
-                offDaysToJson(offDays)
+                offDaysToJson(offDays),
+                phoneNumber
         );
     }
 
@@ -139,7 +142,8 @@ public record CreateRestaurant(
                 detail == null ? null : detail.aiMateSummaryTitle(),
                 toJson(detail == null ? null : detail.aiMateSummaryContents()),
                 detail == null ? null : detail.timeSlot(),
-                offDaysToJson(detail == null ? null : detail.offDays())
+                offDaysToJson(detail == null ? null : detail.offDays()),
+                detail == null ? null : detail.phoneNumber()
         );
     }
 

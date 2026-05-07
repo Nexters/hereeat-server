@@ -36,6 +36,7 @@ public final class RestaurantAdminFixture {
                 List.of("summary-1"),
                 null,
                 null,
+                null,
                 null
         );
     }
@@ -63,6 +64,7 @@ public final class RestaurantAdminFixture {
                 "2-3",
                 "summary-title",
                 List.of("summary-1"),
+                null,
                 null,
                 null,
                 null

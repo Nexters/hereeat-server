@@ -22,7 +22,8 @@ public record RestaurantSyncPatchCommand(
         String station,
         TimeSlot timeSlot,
         Long categoryId,
-        String offDays
+        String offDays,
+        String phoneNumber
 ) {
     public static RestaurantSyncPatchCommand of(Long restaurantId, RestaurantSyncPatch patch) {
         Double longitude = null;
@@ -55,7 +56,8 @@ public record RestaurantSyncPatchCommand(
                 patch.station(),
                 patch.timeSlot(),
                 patch.categoryId(),
-                patch.offDays()
+                patch.offDays(),
+                patch.phoneNumber()
         );
     }
 }

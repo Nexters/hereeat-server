@@ -56,7 +56,8 @@ class RestaurantControllerTest {
                 "대표 리뷰",
                 120,
                 "AI 요약 제목",
-                List.of("요약1", "요약2")
+                List.of("요약1", "요약2"),
+                "010-0000-0000"
         ));
 
         mockMvc.perform(get("/api/v1/restaurants/1"))

@@ -89,7 +89,8 @@ public final class RestaurantAdminResult {
             List<String> aiMateSummaryContents,
             TimeSlot timeSlot,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt
+            LocalDateTime updatedAt,
+            String phoneNumber
     ) {
         public static Detail of(
                 Long id,
@@ -115,7 +116,8 @@ public final class RestaurantAdminResult {
                 List<String> aiMateSummaryContents,
                 TimeSlot timeSlot,
                 LocalDateTime createdAt,
-                LocalDateTime updatedAt
+                LocalDateTime updatedAt,
+                String phoneNumber
         ) {
             return new Detail(
                     id,
@@ -141,7 +143,8 @@ public final class RestaurantAdminResult {
                     aiMateSummaryContents,
                     timeSlot,
                     createdAt,
-                    updatedAt
+                    updatedAt,
+                    phoneNumber
             );
         }
 
@@ -170,7 +173,8 @@ public final class RestaurantAdminResult {
                     restaurant.aiMateSummaryContents(),
                     restaurant.timeSlot(),
                     restaurant.createdAt(),
-                    restaurant.updatedAt()
+                    restaurant.updatedAt(),
+                    restaurant.phoneNumber()
             );
         }
     }

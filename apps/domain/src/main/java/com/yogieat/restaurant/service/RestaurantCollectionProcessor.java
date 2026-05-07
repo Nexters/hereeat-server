@@ -430,6 +430,7 @@ public class RestaurantCollectionProcessor {
         enrichedData.apiLargeCategory = detail.apiLargeCategory();
         enrichedData.apiMediumCategory = detail.apiMediumCategory();
         enrichedData.offDays = detail.offDays();
+        enrichedData.phoneNumber = detail.phoneNumber();
 
         if (!hasText(enrichedData.aiMateSummaryTitle)) {
             log.info("Skipping restaurant due to missing ai_mate data: {}", suggestion.name());

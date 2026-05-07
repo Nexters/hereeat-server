@@ -37,7 +37,8 @@ public record KakaoPlaceDetailData(
         LargeCategory apiLargeCategory,
         String apiMediumCategory,
         // 휴무일
-        List<LocalDate> offDays
+        List<LocalDate> offDays,
+        String phoneNumber
 ) {
     /**
      * Create a minimal detail data when panel3 call fails
@@ -60,6 +61,7 @@ public record KakaoPlaceDetailData(
                 null,
                 null,
                 List.of(),
+                null,
                 null,
                 null,
                 null,

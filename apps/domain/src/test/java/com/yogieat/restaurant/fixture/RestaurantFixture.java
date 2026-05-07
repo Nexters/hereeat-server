@@ -35,6 +35,7 @@ public final class RestaurantFixture {
                 TimeSlot.LUNCH,
                 null,
                 null,
+                null,
                 null
         );
     }
@@ -63,6 +64,7 @@ public final class RestaurantFixture {
                 TimeSlot.BOTH,
                 source.createdAt(),
                 source.updatedAt(),
+                null,
                 null
         );
     }
