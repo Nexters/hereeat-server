@@ -4,6 +4,16 @@ on:
   pull_request:
     branches:
       - develop
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/CODEOWNERS'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -32,4 +42,4 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build with Gradle
-        run: ./gradlew build --no-daemon
+        run: ./gradlew build --parallel --build-cache --configuration-cache --no-daemon

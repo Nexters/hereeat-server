@@ -21,16 +21,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v5
         with:
           java-version: ${{ matrix.java-version }}
           distribution: ${{ matrix.distribution }}
-          cache: 'gradle'
-          cache-dependency-path: |
-            **/*.gradle*
-            **/gradle-wrapper.properties
 
       - name: Setup Gradle Build
         uses: gradle/actions/setup-gradle@v4
@@ -41,9 +39,6 @@ jobs:
       - name: Run chmod to make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build with Gradle
-        run: ./gradlew build --no-daemon
-
       - name: Set image tags
         id: image-tags
         run: |
@@ -51,17 +46,33 @@ jobs:
           echo "admin_image=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
           echo "batch_image=${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
+      - name: Resolve deploy targets
+        id: deploy_targets
+        run: |
+          PREVIOUS_TAG="$(git tag --merged "${{ github.sha }}" --sort=-v:refname | grep -v "^${{ github.ref_name }}$" | head -n 1 || true)"
+          if [ -n "${PREVIOUS_TAG}" ]; then
+            git diff --name-only "${PREVIOUS_TAG}" "${{ github.sha }}" > changed-files.txt
+          elif git rev-parse "${{ github.sha }}^" >/dev/null 2>&1; then
+            git diff --name-only "${{ github.sha }}^" "${{ github.sha }}" > changed-files.txt
+          else
+            git ls-tree -r --name-only "${{ github.sha }}" > changed-files.txt
+          fi
+          cat changed-files.txt
+          scripts/ci/resolve-deploy-targets.sh < changed-files.txt
+
       - name: Build and push images with Jib
+        if: steps.deploy_targets.outputs.skip_deploy != 'true'
         env:
           API_IMAGE_FULL_URL: ${{ steps.image-tags.outputs.api_image }}
           ADMIN_IMAGE_FULL_URL: ${{ steps.image-tags.outputs.admin_image }}
           BATCH_IMAGE_FULL_URL: ${{ steps.image-tags.outputs.batch_image }}
           DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: ./gradlew jibPushAll --no-daemon
+        run: ./gradlew ${{ steps.deploy_targets.outputs.jib_tasks }} --parallel --build-cache --no-daemon
 
       # 서버로 docker 관련 파일 전송
       - name: Copy docker directory to Server
+        if: steps.deploy_targets.outputs.skip_deploy != 'true'
         uses: burnett01/rsync-deployments@7.0.1
         with:
           switches: -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group
@@ -72,6 +83,7 @@ jobs:
           remote_path: /home/ubuntu/docker/
 
       - name: Copy deploy script to Server
+        if: steps.deploy_targets.outputs.skip_deploy != 'true'
         uses: burnett01/rsync-deployments@7.0.1
         with:
           switches: -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group
@@ -82,6 +94,7 @@ jobs:
           remote_path: /home/ubuntu/scripts/deploy/
 
       - name: Deploy to Instance Server
+        if: steps.deploy_targets.outputs.skip_deploy != 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -102,15 +115,8 @@ jobs:
             DOCKERHUB_BATCH_IMAGE_NAME="${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}" \
             DEPLOY_SCOPE="app" \
             DEPLOY_ENV="prod" \
+            DEPLOY_SERVICES="${{ steps.deploy_targets.outputs.deploy_services }}" \
             ../scripts/deploy/compose-up.sh
-
-            ACTUAL_API_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_API_IMAGE_NAME }}')"
-            ACTUAL_ADMIN_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}')"
-            ACTUAL_BATCH_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}')"
-
-            [ "${ACTUAL_API_IMAGE}" = "${{ steps.image-tags.outputs.api_image }}" ] || { echo "API image mismatch: expected=${{ steps.image-tags.outputs.api_image }}, actual=${ACTUAL_API_IMAGE}"; exit 1; }
-            [ "${ACTUAL_ADMIN_IMAGE}" = "${{ steps.image-tags.outputs.admin_image }}" ] || { echo "ADMIN image mismatch: expected=${{ steps.image-tags.outputs.admin_image }}, actual=${ACTUAL_ADMIN_IMAGE}"; exit 1; }
-            [ "${ACTUAL_BATCH_IMAGE}" = "${{ steps.image-tags.outputs.batch_image }}" ] || { echo "BATCH image mismatch: expected=${{ steps.image-tags.outputs.batch_image }}, actual=${ACTUAL_BATCH_IMAGE}"; exit 1; }
 
             docker image prune -a -f
 
@@ -128,5 +134,6 @@ jobs:
             **API 이미지**: ${{ steps.image-tags.outputs.api_image }}
             **ADMIN 이미지**: ${{ steps.image-tags.outputs.admin_image }}
             **BATCH 이미지**: ${{ steps.image-tags.outputs.batch_image }}
+            **배포 서비스**: ${{ steps.deploy_targets.outputs.deploy_services || 'skip' }}
           color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
           username: GitHub Actions

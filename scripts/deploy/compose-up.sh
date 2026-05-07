@@ -10,6 +10,9 @@ warn() {
   echo "WARN: $*"
 }
 
+APP_SERVICES=("yogieat-api" "yogieat-admin" "yogieat-batch-sync")
+SELECTED_APP_SERVICES=()
+
 is_container_running() {
   local name="$1"
   docker ps --format '{{.Names}}' | grep -xq "${name}"
@@ -22,6 +25,88 @@ container_exists() {
 
 compose_cmd() {
   docker compose --env-file "${ENV_FILE_PATH}" "${COMPOSE_FILES[@]}" "$@"
+}
+
+default_container_names() {
+  DOCKERHUB_API_IMAGE_NAME="${DOCKERHUB_API_IMAGE_NAME:-yogieat-server-api}"
+  DOCKERHUB_ADMIN_IMAGE_NAME="${DOCKERHUB_ADMIN_IMAGE_NAME:-yogieat-server-admin}"
+  DOCKERHUB_BATCH_IMAGE_NAME="${DOCKERHUB_BATCH_IMAGE_NAME:-yogieat-server-batch-sync}"
+  export DOCKERHUB_API_IMAGE_NAME DOCKERHUB_ADMIN_IMAGE_NAME DOCKERHUB_BATCH_IMAGE_NAME
+}
+
+resolve_container_name() {
+  local service_name="$1"
+
+  case "${service_name}" in
+    yogieat-api)
+      echo "${DOCKERHUB_API_IMAGE_NAME}"
+      ;;
+    yogieat-admin)
+      echo "${DOCKERHUB_ADMIN_IMAGE_NAME}"
+      ;;
+    yogieat-batch-sync)
+      echo "${DOCKERHUB_BATCH_IMAGE_NAME}"
+      ;;
+    *)
+      error "unsupported deploy service: ${service_name}"
+      ;;
+  esac
+}
+
+resolve_image_url() {
+  local service_name="$1"
+
+  case "${service_name}" in
+    yogieat-api)
+      echo "${API_IMAGE_FULL_URL:-}"
+      ;;
+    yogieat-admin)
+      echo "${ADMIN_IMAGE_FULL_URL:-}"
+      ;;
+    yogieat-batch-sync)
+      echo "${BATCH_IMAGE_FULL_URL:-}"
+      ;;
+    *)
+      error "unsupported deploy service: ${service_name}"
+      ;;
+  esac
+}
+
+contains_app_service() {
+  local candidate="$1"
+  local service_name
+
+  for service_name in "${APP_SERVICES[@]}"; do
+    if [[ "${service_name}" == "${candidate}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+select_all_app_services() {
+  SELECTED_APP_SERVICES=("${APP_SERVICES[@]}")
+}
+
+configure_deploy_services() {
+  local deploy_services="${DEPLOY_SERVICES:-all}"
+  deploy_services="${deploy_services//,/ }"
+
+  if [[ -z "${deploy_services// /}" || "${deploy_services}" == "all" ]]; then
+    select_all_app_services
+    return 0
+  fi
+
+  SELECTED_APP_SERVICES=()
+  local service_name
+  for service_name in ${deploy_services}; do
+    contains_app_service "${service_name}" \
+      || error "DEPLOY_SERVICES contains unsupported service '${service_name}'. Allowed: all ${APP_SERVICES[*]}"
+    SELECTED_APP_SERVICES+=("${service_name}")
+  done
+
+  [[ "${#SELECTED_APP_SERVICES[@]}" -gt 0 ]] \
+    || error "DEPLOY_SERVICES resolved to an empty service list."
 }
 
 ensure_container_on_network() {
@@ -45,14 +130,14 @@ ensure_container_on_network() {
 }
 
 validate_required_env() {
-  [[ -n "${API_IMAGE_FULL_URL:-}" && -n "${ADMIN_IMAGE_FULL_URL:-}" && -n "${BATCH_IMAGE_FULL_URL:-}" ]] \
-    || error "API_IMAGE_FULL_URL, ADMIN_IMAGE_FULL_URL and BATCH_IMAGE_FULL_URL must be set"
+  local service_name image_url
 
-  DOCKERHUB_API_IMAGE_NAME="${DOCKERHUB_API_IMAGE_NAME:-yogieat-server-api}"
-  DOCKERHUB_ADMIN_IMAGE_NAME="${DOCKERHUB_ADMIN_IMAGE_NAME:-yogieat-server-admin}"
-  DOCKERHUB_BATCH_IMAGE_NAME="${DOCKERHUB_BATCH_IMAGE_NAME:-yogieat-server-batch-sync}"
+  for service_name in "${SELECTED_APP_SERVICES[@]}"; do
+    image_url="$(resolve_image_url "${service_name}")"
+    [[ -n "${image_url}" ]] || error "image URL env is missing for selected service '${service_name}'"
+  done
+
   export API_IMAGE_FULL_URL ADMIN_IMAGE_FULL_URL BATCH_IMAGE_FULL_URL
-  export DOCKERHUB_API_IMAGE_NAME DOCKERHUB_ADMIN_IMAGE_NAME DOCKERHUB_BATCH_IMAGE_NAME
 }
 
 resolve_env_file() {
@@ -180,15 +265,9 @@ cleanup_stale_app_containers() {
   fi
 
   local service_name container_name existing_container_id compose_container_id
-  local service_mappings=(
-    "yogieat-api:${DOCKERHUB_API_IMAGE_NAME}"
-    "yogieat-admin:${DOCKERHUB_ADMIN_IMAGE_NAME}"
-    "yogieat-batch-sync:${DOCKERHUB_BATCH_IMAGE_NAME}"
-  )
 
-  for mapping in "${service_mappings[@]}"; do
-    service_name="${mapping%%:*}"
-    container_name="${mapping##*:}"
+  for service_name in "${SELECTED_APP_SERVICES[@]}"; do
+    container_name="$(resolve_container_name "${service_name}")"
 
     if ! container_exists "${container_name}"; then
       continue
@@ -207,6 +286,25 @@ cleanup_stale_app_containers() {
   done
 }
 
+verify_deployed_images() {
+  VERIFY_DEPLOYED_IMAGES="${VERIFY_DEPLOYED_IMAGES:-true}"
+  if [[ "${VERIFY_DEPLOYED_IMAGES}" != "true" ]]; then
+    echo "Skip deployed image verification: VERIFY_DEPLOYED_IMAGES=false"
+    return 0
+  fi
+
+  local service_name container_name expected_image actual_image
+
+  for service_name in "${SELECTED_APP_SERVICES[@]}"; do
+    container_name="$(resolve_container_name "${service_name}")"
+    expected_image="$(resolve_image_url "${service_name}")"
+    actual_image="$(docker inspect --format '{{.Config.Image}}' "${container_name}")"
+
+    [[ "${actual_image}" = "${expected_image}" ]] \
+      || error "${service_name} image mismatch: expected=${expected_image}, actual=${actual_image}"
+  done
+}
+
 print_deploy_summary() {
   echo "Deploy API image: ${API_IMAGE_FULL_URL}"
   echo "Deploy Admin image: ${ADMIN_IMAGE_FULL_URL}"
@@ -216,7 +314,7 @@ print_deploy_summary() {
   echo "Enable edge SSL: ${ENABLE_EDGE_SSL}"
   echo "Env file path: ${ENV_FILE_PATH}"
   echo "Compose files: ${COMPOSE_FILES[*]}"
-  echo "Target services: yogieat-api yogieat-admin yogieat-batch-sync"
+  echo "Target services: ${SELECTED_APP_SERVICES[*]}"
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
     echo "Auto restore DB: ${AUTO_RESTORE_DB:-true}"
     echo "Auto cleanup stale app containers: ${AUTO_CLEANUP_STALE_APP_CONTAINERS:-true}"
@@ -226,6 +324,8 @@ print_deploy_summary() {
 }
 
 main() {
+  default_container_names
+  configure_deploy_services
   validate_required_env
   resolve_env_file
   configure_scope_and_files
@@ -241,17 +341,19 @@ main() {
 
   if [[ "${PULL_IMAGES_ON_DEPLOY}" == "true" ]]; then
     if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
-      compose_cmd pull yogieat-api yogieat-admin yogieat-batch-sync
+      compose_cmd pull "${SELECTED_APP_SERVICES[@]}"
     else
       compose_cmd pull
     fi
   fi
 
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
-    compose_cmd up -d --no-deps yogieat-api yogieat-admin yogieat-batch-sync
+    compose_cmd up -d --no-deps "${SELECTED_APP_SERVICES[@]}"
   else
     compose_cmd up -d
   fi
+
+  verify_deployed_images
 
   echo "Deploy completed: scope=${DEPLOY_SCOPE}, edge_ssl=${ENABLE_EDGE_SSL}, env_file=${ENV_FILE_PATH}"
 }

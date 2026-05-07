@@ -6,6 +6,10 @@ on:
       version:
         description: 'version'
         required: true
+      services:
+        description: 'services to deploy: all, yogieat-api, yogieat-admin, yogieat-batch-sync'
+        required: false
+        default: 'all'
 
 env:
   DOCKERHUB_USERNAME: yogieat
@@ -66,15 +70,8 @@ jobs:
             DOCKERHUB_BATCH_IMAGE_NAME="${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}" \
             DEPLOY_SCOPE="app" \
             DEPLOY_ENV="prod" \
+            DEPLOY_SERVICES="${{ github.event.inputs.services }}" \
             ../scripts/deploy/compose-up.sh
-
-            ACTUAL_API_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_API_IMAGE_NAME }}')"
-            ACTUAL_ADMIN_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}')"
-            ACTUAL_BATCH_IMAGE="$(docker inspect --format '{{.Config.Image}}' '${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}')"
-
-            [ "${ACTUAL_API_IMAGE}" = "${API_IMAGE}" ] || { echo "API image mismatch: expected=${API_IMAGE}, actual=${ACTUAL_API_IMAGE}"; exit 1; }
-            [ "${ACTUAL_ADMIN_IMAGE}" = "${ADMIN_IMAGE}" ] || { echo "ADMIN image mismatch: expected=${ADMIN_IMAGE}, actual=${ACTUAL_ADMIN_IMAGE}"; exit 1; }
-            [ "${ACTUAL_BATCH_IMAGE}" = "${BATCH_IMAGE}" ] || { echo "BATCH image mismatch: expected=${BATCH_IMAGE}, actual=${ACTUAL_BATCH_IMAGE}"; exit 1; }
 
             docker image prune -a -f
 
@@ -93,5 +90,6 @@ jobs:
             **API 이미지**: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_API_IMAGE_NAME }}:${{ github.event.inputs.version }}
             **ADMIN 이미지**: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_ADMIN_IMAGE_NAME }}:${{ github.event.inputs.version }}
             **BATCH 이미지**: ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKERHUB_BATCH_IMAGE_NAME }}:${{ github.event.inputs.version }}
+            **배포 서비스**: ${{ github.event.inputs.services }}
           color: ${{ job.status == 'success' && '0x57F287' || '0xED4245' }}
           username: GitHub Actions
