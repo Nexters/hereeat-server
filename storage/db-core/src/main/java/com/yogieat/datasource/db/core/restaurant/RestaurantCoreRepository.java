@@ -158,7 +158,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.timeSlot,
                         restaurantEntity.createdAt,
                         restaurantEntity.updatedAt,
-                        restaurantEntity.offDays
+                        restaurantEntity.offDays,
+                        restaurantEntity.phoneNumber
                 )
                 .from(restaurantEntity)
                 .where(
@@ -531,7 +532,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 tuple.get(restaurantEntity.createdAt),
                 tuple.get(restaurantEntity.updatedAt),
                 parseOffDays(tuple.get(restaurantEntity.offDays)),
-                null
+                tuple.get(restaurantEntity.phoneNumber)
         );
     }
 
