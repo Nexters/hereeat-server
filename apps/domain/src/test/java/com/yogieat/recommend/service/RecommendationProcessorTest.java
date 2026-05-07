@@ -632,6 +632,7 @@ class RecommendationProcessorTest {
                 TimeSlot.BOTH,
                 null,
                 null,
+                null,
                 null
         );
     }

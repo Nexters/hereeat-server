@@ -259,7 +259,8 @@ class RestaurantSyncServiceTest {
                 null,
                 null,
                 null,
-                List.of()
+                null,
+                null
         );
     }
 
@@ -287,7 +288,8 @@ class RestaurantSyncServiceTest {
                 null,
                 null,
                 null,
-                List.of()
+                null,
+                null
         );
     }
 
@@ -315,7 +317,8 @@ class RestaurantSyncServiceTest {
                 name3,
                 null,
                 null,
-                List.of()
+                null,
+                null
         );
     }
 }
