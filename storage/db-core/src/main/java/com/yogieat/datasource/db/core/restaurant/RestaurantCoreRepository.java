@@ -370,8 +370,11 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .on(restaurantEntity.categoryId.eq(categoryEntity.id))
                 .leftJoin(regionEntity)
                 .on(restaurantEntity.regionId.eq(regionEntity.id))
-                .where(restaurantEntity.deletedAt.isNull())
-                .where(restaurantEntity.id.eq(restaurantId))
+                .where(
+                        restaurantEntity.deletedAt.isNull(),
+                        restaurantEntity.isDisplay.isTrue(),
+                        restaurantEntity.id.eq(restaurantId)
+                )
                 .fetchOne();
 
         if (tuple == null) {
