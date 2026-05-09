@@ -36,7 +36,8 @@ public final class RestaurantFixture {
                 null,
                 null,
                 null,
-                null
+                null,
+                true
         );
     }
 
@@ -65,7 +66,8 @@ public final class RestaurantFixture {
                 source.createdAt(),
                 source.updatedAt(),
                 null,
-                null
+                null,
+                true
         );
     }
 
@@ -89,7 +91,8 @@ public final class RestaurantFixture {
                 "2-3",
                 "updated-summary-title",
                 List.of("summary"),
-                TimeSlot.BOTH
+                TimeSlot.BOTH,
+                true
         );
     }
 

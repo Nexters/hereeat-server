@@ -154,7 +154,9 @@ public final class RestaurantRequest {
                     trimOrNull(request.priceLevel()),
                     trimOrNull(request.aiMateSummaryTitle()),
                     trimAiMateSummaryContents(request.aiMateSummaryContents()),
-                    parseTimeSlot(request.timeSlot())
+                    parseTimeSlot(request.timeSlot()),
+                    // 운영자 노출 토글은 별도 PR에서 도입 예정 — 현재 요청에서는 변경하지 않음
+                    null
             );
         }
     }

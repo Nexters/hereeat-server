@@ -89,7 +89,8 @@ class RestaurantSyncJobServiceTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                true
         )));
         when(syncJobRepository.existsByTargetRestaurantIdAndStatus(1L, RestaurantSyncJobStatus.RUNNING)).thenReturn(false);
         when(syncJobRepository.existsByTargetRestaurantIdAndStatus(1L, RestaurantSyncJobStatus.PENDING)).thenReturn(false);
@@ -177,7 +178,8 @@ class RestaurantSyncJobServiceTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                true
         )));
         when(syncJobRepository.existsByTargetRestaurantIdAndStatus(1L, RestaurantSyncJobStatus.RUNNING)).thenReturn(false);
         when(syncJobRepository.existsByTargetRestaurantIdAndStatus(1L, RestaurantSyncJobStatus.PENDING)).thenReturn(false);
