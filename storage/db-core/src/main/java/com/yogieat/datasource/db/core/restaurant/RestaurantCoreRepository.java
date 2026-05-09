@@ -276,7 +276,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.rating,
                         restaurantEntity.imageUrl,
                         regionEntity.code,
-                        restaurantEntity.updatedAt
+                        restaurantEntity.updatedAt,
+                        restaurantEntity.isDisplay
                 )
                 .from(restaurantEntity)
                 .leftJoin(categoryEntity)
@@ -425,7 +426,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 tuple.get(restaurantEntity.rating),
                 tuple.get(restaurantEntity.imageUrl),
                 toRegion(tuple.get(regionEntity.code)),
-                tuple.get(restaurantEntity.updatedAt)
+                tuple.get(restaurantEntity.updatedAt),
+                tuple.get(restaurantEntity.isDisplay)
         );
     }
 
