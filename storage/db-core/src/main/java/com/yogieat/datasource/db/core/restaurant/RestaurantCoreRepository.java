@@ -165,6 +165,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .from(restaurantEntity)
                 .where(
                         restaurantEntity.deletedAt.isNull(),
+                        restaurantEntity.isDisplay.isTrue(),
                         regionCondition(region),
                         restaurantEntity.categoryId.in(categoryIds),
                         recommendationTimeSlotCondition(gatheringTimeSlot),
