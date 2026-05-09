@@ -159,7 +159,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.createdAt,
                         restaurantEntity.updatedAt,
                         restaurantEntity.offDays,
-                        restaurantEntity.phoneNumber
+                        restaurantEntity.phoneNumber,
+                        restaurantEntity.isDisplay
                 )
                 .from(restaurantEntity)
                 .where(
