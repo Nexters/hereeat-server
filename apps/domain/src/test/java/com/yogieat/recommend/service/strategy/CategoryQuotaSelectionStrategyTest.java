@@ -106,7 +106,8 @@ class CategoryQuotaSelectionStrategyTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                true
         );
 
         return new CategoryScoredRestaurant(

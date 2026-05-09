@@ -122,6 +122,9 @@ public class RestaurantEntity extends BaseEntity {
     @Column(name = "phone_number", length = 50)
     private String phoneNumber;
 
+    @Column(name = "is_display")
+    private Boolean isDisplay;
+
     @Builder(access = AccessLevel.PRIVATE)
     private RestaurantEntity(
             String externalId,
@@ -149,7 +152,8 @@ public class RestaurantEntity extends BaseEntity {
             // 휴무일
             String offDays,
             LocalDateTime offDaysUpdatedAt,
-            String phoneNumber) {
+            String phoneNumber,
+            Boolean isDisplay) {
         this.externalId = externalId;
         this.name = name;
         this.address = address;
@@ -173,6 +177,8 @@ public class RestaurantEntity extends BaseEntity {
         this.offDays = offDays;
         this.offDaysUpdatedAt = offDaysUpdatedAt;
         this.phoneNumber = phoneNumber;
+        // null 인 경우 NOT NULL 컬럼 제약을 위반하지 않도록 기본값 true로 보정
+        this.isDisplay = isDisplay != null ? isDisplay : Boolean.TRUE;
     }
 
     /**
@@ -219,6 +225,7 @@ public class RestaurantEntity extends BaseEntity {
                                 ? LocalDateTime.now()
                                 : null)
                 .phoneNumber(createRestaurant.phoneNumber())
+                .isDisplay(createRestaurant.isDisplay())
                 .build();
     }
 
@@ -253,7 +260,8 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getUpdatedAt(),
                 // 휴무일
                 parseOffDays(entity.getOffDays()),
-                entity.getPhoneNumber()
+                entity.getPhoneNumber(),
+                entity.getIsDisplay()
         );
     }
 
@@ -408,6 +416,9 @@ public class RestaurantEntity extends BaseEntity {
         }
         if (command.timeSlot() != null) {
             this.timeSlot = command.timeSlot();
+        }
+        if (command.isDisplay() != null) {
+            this.isDisplay = command.isDisplay();
         }
     }
 

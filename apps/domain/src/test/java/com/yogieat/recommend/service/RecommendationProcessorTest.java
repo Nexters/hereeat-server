@@ -633,7 +633,8 @@ class RecommendationProcessorTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                true
         );
     }
 

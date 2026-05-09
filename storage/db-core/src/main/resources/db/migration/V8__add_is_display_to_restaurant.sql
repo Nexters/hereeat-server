@@ -1,0 +1,2 @@
+ALTER TABLE t_restaurant
+    ADD COLUMN is_display BOOLEAN NOT NULL DEFAULT TRUE;

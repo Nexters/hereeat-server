@@ -154,7 +154,8 @@ public final class RestaurantRequest {
                     trimOrNull(request.priceLevel()),
                     trimOrNull(request.aiMateSummaryTitle()),
                     trimAiMateSummaryContents(request.aiMateSummaryContents()),
-                    parseTimeSlot(request.timeSlot())
+                    parseTimeSlot(request.timeSlot()),
+                    null
             );
         }
     }
