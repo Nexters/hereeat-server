@@ -37,10 +37,12 @@ public final class RestaurantCommand {
             String priceLevel,
             String aiMateSummaryTitle,
             List<String> aiMateSummaryContents,
-            TimeSlot timeSlot
+            TimeSlot timeSlot,
+            Boolean isDisplay
     ) {
         public static Patch empty() {
             return new Patch(
+                    null,
                     null,
                     null,
                     null,

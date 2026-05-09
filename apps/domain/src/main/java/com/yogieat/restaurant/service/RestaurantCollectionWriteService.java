@@ -73,7 +73,9 @@ public class RestaurantCollectionWriteService {
                     enrichedData.aiMateSummaryContents(),
                     enrichedData.timeSlot(),
                     enrichedData.offDays(),
-                    enrichedData.phoneNumber()
+                    enrichedData.phoneNumber(),
+                    // 운영자 제어 필드 — 신규 수집은 기본 노출(true)
+                    Boolean.TRUE
             );
 
             restaurantRepository.save(createRestaurant, restaurantRegion.id());

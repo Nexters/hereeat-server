@@ -33,7 +33,9 @@ public record CreateRestaurant(
         TimeSlot timeSlot,
         // 휴무일
         String offDays,  // JSON 문자열로 저장
-        String phoneNumber
+        String phoneNumber,
+        // 노출 여부 (운영자 제어, null인 경우 기본 true)
+        Boolean isDisplay
 ) {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -60,7 +62,9 @@ public record CreateRestaurant(
             TimeSlot timeSlot,
             // 휴무일 파라미터
             List<LocalDate> offDays,
-            String phoneNumber
+            String phoneNumber,
+            // 노출 여부 파라미터
+            Boolean isDisplay
     ) {
         return new CreateRestaurant(
                 externalId,
@@ -83,7 +87,8 @@ public record CreateRestaurant(
                 toJson(aiMateSummaryContents),
                 timeSlot,
                 offDaysToJson(offDays),
-                phoneNumber
+                phoneNumber,
+                isDisplay
         );
     }
 
@@ -143,7 +148,9 @@ public record CreateRestaurant(
                 toJson(detail == null ? null : detail.aiMateSummaryContents()),
                 detail == null ? null : detail.timeSlot(),
                 offDaysToJson(detail == null ? null : detail.offDays()),
-                detail == null ? null : detail.phoneNumber()
+                detail == null ? null : detail.phoneNumber(),
+                // 외부 매퍼는 운영자 제어 필드인 isDisplay를 설정하지 않으며, Entity 빌더에서 기본값(true)으로 보정한다.
+                null
         );
     }
 

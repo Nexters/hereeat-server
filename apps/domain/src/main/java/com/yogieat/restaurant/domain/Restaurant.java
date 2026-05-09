@@ -35,6 +35,8 @@ public record Restaurant(
         LocalDateTime updatedAt,
         // 휴무일
         List<LocalDate> offDays,
-        String phoneNumber
+        String phoneNumber,
+        // 노출 여부 (운영자 제어)
+        Boolean isDisplay
 ){
 }
