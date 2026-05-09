@@ -122,7 +122,7 @@ public class RestaurantEntity extends BaseEntity {
     @Column(name = "phone_number", length = 50)
     private String phoneNumber;
 
-    @Column(name = "is_display")
+    @Column(name = "is_display", nullable = false)
     private Boolean isDisplay;
 
     @Builder(access = AccessLevel.PRIVATE)
