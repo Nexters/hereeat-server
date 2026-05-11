@@ -147,7 +147,7 @@ public record CreateRestaurant(
                 detail == null ? null : detail.timeSlot(),
                 offDaysToJson(detail == null ? null : detail.offDays()),
                 detail == null ? null : detail.phoneNumber(),
-                null
+                false
         );
     }
 

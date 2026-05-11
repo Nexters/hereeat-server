@@ -60,7 +60,8 @@ public final class RestaurantRequest {
             String priceLevel,
             String aiMateSummaryTitle,
             List<String> aiMateSummaryContents,
-            String timeSlot
+            String timeSlot,
+            Boolean isDisplay
     ) {
         public static Patch from(
                 String externalId,
@@ -81,7 +82,8 @@ public final class RestaurantRequest {
                 String priceLevel,
                 String aiMateSummaryTitle,
                 List<String> aiMateSummaryContents,
-                String timeSlot
+                String timeSlot,
+                Boolean isDisplay
         ) {
             return new Patch(
                     externalId,
@@ -102,12 +104,14 @@ public final class RestaurantRequest {
                     priceLevel,
                     aiMateSummaryTitle,
                     aiMateSummaryContents,
-                    timeSlot
+                    timeSlot,
+                    isDisplay
             );
         }
 
         public static Patch of() {
             return new Patch(
+                    null,
                     null,
                     null,
                     null,
@@ -155,7 +159,7 @@ public final class RestaurantRequest {
                     trimOrNull(request.aiMateSummaryTitle()),
                     trimAiMateSummaryContents(request.aiMateSummaryContents()),
                     parseTimeSlot(request.timeSlot()),
-                    null
+                    request.isDisplay()
             );
         }
     }
