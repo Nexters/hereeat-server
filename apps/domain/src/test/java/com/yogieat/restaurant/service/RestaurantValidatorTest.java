@@ -82,7 +82,7 @@ class RestaurantValidatorTest {
                 .thenReturn(List.of(restaurant()));
 
         RestaurantValidator.ValidationContext context =
-                restaurantValidator.prepareForBatchValidation(1L, Region.GANGNAM.getName());
+                restaurantValidator.prepareForBatchValidation(1L, Region.fromString("GANGNAM").getName());
 
         assertThat(context.containsExternalId("ext-1")).isTrue();
         assertThat(context.containsNameAddress("식당1", "주소1")).isTrue();
@@ -109,7 +109,7 @@ class RestaurantValidatorTest {
                 null,
                 null,
                 null,
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 null,
                 null,
                 null,
@@ -122,7 +122,10 @@ class RestaurantValidatorTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null,
+                null,
+                true
         );
     }
 }

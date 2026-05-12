@@ -90,7 +90,10 @@ public final class RestaurantAdminResult {
             TimeSlot timeSlot,
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
-            String phoneNumber
+            String phoneNumber,
+            String teamRecommendationTitle,
+            String teamRecommendationReason,
+            Boolean isDisplay
     ) {
         public static Detail of(
                 Long id,
@@ -117,7 +120,10 @@ public final class RestaurantAdminResult {
                 TimeSlot timeSlot,
                 LocalDateTime createdAt,
                 LocalDateTime updatedAt,
-                String phoneNumber
+                String phoneNumber,
+                String teamRecommendationTitle,
+                String teamRecommendationReason,
+                Boolean isDisplay
         ) {
             return new Detail(
                     id,
@@ -144,7 +150,10 @@ public final class RestaurantAdminResult {
                     timeSlot,
                     createdAt,
                     updatedAt,
-                    phoneNumber
+                    phoneNumber,
+                    teamRecommendationTitle,
+                    teamRecommendationReason,
+                    isDisplay
             );
         }
 
@@ -174,7 +183,10 @@ public final class RestaurantAdminResult {
                     restaurant.timeSlot(),
                     restaurant.createdAt(),
                     restaurant.updatedAt(),
-                    restaurant.phoneNumber()
+                    restaurant.phoneNumber(),
+                    restaurant.teamRecommendationTitle(),
+                    restaurant.teamRecommendationReason(),
+                    restaurant.isDisplay()
             );
         }
     }

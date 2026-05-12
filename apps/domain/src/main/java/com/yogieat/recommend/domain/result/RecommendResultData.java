@@ -122,6 +122,8 @@ public record RecommendResultData() {
             String priceLevel,
             String aiMateSummaryTitle,
             List<String> aiMateSummaryContents,
+            String teamRecommendationTitle,
+            String teamRecommendationReason,
             // 추천 근거 텍스트 (신규)
             String reasonText
     ) {
@@ -148,6 +150,8 @@ public record RecommendResultData() {
                 String priceLevel,
                 String aiMateSummaryTitle,
                 List<String> aiMateSummaryContents,
+                String teamRecommendationTitle,
+                String teamRecommendationReason,
                 // 추천 근거 텍스트
                 String reasonText
         ) {
@@ -173,6 +177,8 @@ public record RecommendResultData() {
                     priceLevel,
                     aiMateSummaryTitle,
                     aiMateSummaryContents,
+                    teamRecommendationTitle,
+                    teamRecommendationReason,
                     reasonText
             );
         }

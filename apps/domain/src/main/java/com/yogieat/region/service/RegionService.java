@@ -1,6 +1,5 @@
 package com.yogieat.region.service;
 
-import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.region.domain.RegionMaster;
@@ -33,9 +32,7 @@ public class RegionService {
 
     @Transactional(readOnly = true)
     public List<RegionMaster> findActiveRegions() {
-        return regionRepository.findAllActiveOrderBySortOrder().stream()
-                .filter(regionMaster -> Region.fromString(regionMaster.code()) != null)
-                .toList();
+        return regionRepository.findAllActiveOrderBySortOrder();
     }
 
     @Transactional(readOnly = true)

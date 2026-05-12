@@ -122,6 +122,15 @@ public class RestaurantEntity extends BaseEntity {
     @Column(name = "phone_number", length = 50)
     private String phoneNumber;
 
+    @Column(name = "team_recommendation_title", length = 50)
+    private String teamRecommendationTitle;
+
+    @Column(name = "team_recommendation_reason", columnDefinition = "TEXT")
+    private String teamRecommendationReason;
+
+    @Column(name = "is_display", nullable = false)
+    private Boolean isDisplay;
+
     @Builder(access = AccessLevel.PRIVATE)
     private RestaurantEntity(
             String externalId,
@@ -149,7 +158,10 @@ public class RestaurantEntity extends BaseEntity {
             // 휴무일
             String offDays,
             LocalDateTime offDaysUpdatedAt,
-            String phoneNumber) {
+            String phoneNumber,
+            String teamRecommendationTitle,
+            String teamRecommendationReason,
+            Boolean isDisplay) {
         this.externalId = externalId;
         this.name = name;
         this.address = address;
@@ -173,6 +185,10 @@ public class RestaurantEntity extends BaseEntity {
         this.offDays = offDays;
         this.offDaysUpdatedAt = offDaysUpdatedAt;
         this.phoneNumber = phoneNumber;
+        this.teamRecommendationTitle = teamRecommendationTitle;
+        this.teamRecommendationReason = teamRecommendationReason;
+        // null 인 경우 NOT NULL 컬럼 제약을 위반하지 않도록 기본값 true로 보정
+        this.isDisplay = isDisplay != null ? isDisplay : Boolean.TRUE;
     }
 
     /**
@@ -214,11 +230,11 @@ public class RestaurantEntity extends BaseEntity {
                 .timeSlot(createRestaurant.timeSlot())
                 // 휴무일
                 .offDays(createRestaurant.offDays())
-                .offDaysUpdatedAt(
-                        createRestaurant.offDays() != null
-                                ? LocalDateTime.now()
-                                : null)
+                .offDaysUpdatedAt(createRestaurant.offDays() != null ? LocalDateTime.now() : null)
                 .phoneNumber(createRestaurant.phoneNumber())
+                .teamRecommendationTitle(createRestaurant.teamRecommendationTitle())
+                .teamRecommendationReason(createRestaurant.teamRecommendationReason())
+                .isDisplay(createRestaurant.isDisplay())
                 .build();
     }
 
@@ -253,7 +269,10 @@ public class RestaurantEntity extends BaseEntity {
                 entity.getUpdatedAt(),
                 // 휴무일
                 parseOffDays(entity.getOffDays()),
-                entity.getPhoneNumber()
+                entity.getPhoneNumber(),
+                entity.getTeamRecommendationTitle(),
+                entity.getTeamRecommendationReason(),
+                entity.getIsDisplay()
         );
     }
 
@@ -408,6 +427,15 @@ public class RestaurantEntity extends BaseEntity {
         }
         if (command.timeSlot() != null) {
             this.timeSlot = command.timeSlot();
+        }
+        if (command.teamRecommendationTitle() != null) {
+            this.teamRecommendationTitle = command.teamRecommendationTitle();
+        }
+        if (command.teamRecommendationReason() != null) {
+            this.teamRecommendationReason = command.teamRecommendationReason();
+        }
+        if (command.isDisplay() != null) {
+            this.isDisplay = command.isDisplay();
         }
     }
 

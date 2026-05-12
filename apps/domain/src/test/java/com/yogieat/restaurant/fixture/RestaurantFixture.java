@@ -23,7 +23,7 @@ public final class RestaurantFixture {
                 "map",
                 "review",
                 "description",
-                Region.HONGDAE,
+                Region.fromString("HONGDAE"),
                 null,
                 1,
                 2,
@@ -36,7 +36,10 @@ public final class RestaurantFixture {
                 null,
                 null,
                 null,
-                null
+                null,
+                null,
+                null,
+                true
         );
     }
 
@@ -52,7 +55,7 @@ public final class RestaurantFixture {
                 "updated-map",
                 "updated-review",
                 "updated-description",
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 source.location(),
                 11,
                 21,
@@ -65,7 +68,10 @@ public final class RestaurantFixture {
                 source.createdAt(),
                 source.updatedAt(),
                 null,
-                null
+                null,
+                null,
+                null,
+                true
         );
     }
 
@@ -75,7 +81,7 @@ public final class RestaurantFixture {
                 "updated-name",
                 "updated-address",
                 10L,
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 4.7,
                 "updated-image",
                 "updated-map",
@@ -89,7 +95,10 @@ public final class RestaurantFixture {
                 "2-3",
                 "updated-summary-title",
                 List.of("summary"),
-                TimeSlot.BOTH
+                TimeSlot.BOTH,
+                "요기잇 개발자 픽",
+                "여기 정말 가봤는데, 메뉴가 맛있어요",
+                true
         );
     }
 

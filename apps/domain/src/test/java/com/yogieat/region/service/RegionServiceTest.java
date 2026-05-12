@@ -26,6 +26,21 @@ class RegionServiceTest {
     private RegionService regionService;
 
     @Test
+    void findActiveRegions_returns_db_only_regions() {
+        RegionMaster activeRegion = region(1L, "GANGNAM", "강남역", true);
+        RegionMaster dbOnlyRegion = region(2L, "YEOKSAM", "역삼역", true);
+
+        when(regionRepository.findAllActiveOrderBySortOrder())
+                .thenReturn(List.of(dbOnlyRegion, activeRegion));
+
+        List<RegionMaster> result = regionService.findActiveRegions();
+
+        assertThat(result)
+                .extracting(RegionMaster::code)
+                .containsExactly("YEOKSAM", "GANGNAM");
+    }
+
+    @Test
     void findCollectionRegionSummaries_returns_inactive_regions_for_collection() {
         RegionSummary activeRegion = summary(1L, "GANGNAM", "강남역", true);
         RegionSummary inactiveRegion = summary(2L, "SEONGSU", "성수역", false);
@@ -41,19 +56,20 @@ class RegionServiceTest {
     }
 
     private RegionSummary summary(Long id, String code, String displayName, boolean active) {
-        return new RegionSummary(
-                new RegionMaster(
-                        id,
-                        code,
-                        "서울",
-                        displayName,
-                        new GeoJson.Point(List.of(127.0, 37.0)),
-                        active,
-                        id.intValue(),
-                        null,
-                        null
-                ),
-                0
+        return new RegionSummary(region(id, code, displayName, active), 0);
+    }
+
+    private RegionMaster region(Long id, String code, String displayName, boolean active) {
+        return new RegionMaster(
+                id,
+                code,
+                "서울",
+                displayName,
+                new GeoJson.Point(List.of(127.0, 37.0)),
+                active,
+                id.intValue(),
+                null,
+                null
         );
     }
 }

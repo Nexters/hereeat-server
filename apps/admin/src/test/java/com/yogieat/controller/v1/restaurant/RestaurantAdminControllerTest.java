@@ -1,7 +1,9 @@
 package com.yogieat.controller.v1.restaurant;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -32,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -102,7 +105,10 @@ class RestaurantAdminControllerTest {
                 .andExpect(jsonPath("$.data.id").value(1L))
                 .andExpect(jsonPath("$.data.name").value("restaurant"))
                 .andExpect(jsonPath("$.data.largeCategory").value("KOREAN"))
-                .andExpect(jsonPath("$.data.mediumCategory").value("국밥"));
+                .andExpect(jsonPath("$.data.mediumCategory").value("국밥"))
+                .andExpect(jsonPath("$.data.teamRecommendationTitle").value("요기잇 개발자 픽"))
+                .andExpect(jsonPath("$.data.teamRecommendationReason").value("여기 정말 가봤는데, 국밥이 맛있어요"))
+                .andExpect(jsonPath("$.data.isDisplay").value(true));
     }
 
     @Test
@@ -116,7 +122,8 @@ class RestaurantAdminControllerTest {
                 "국밥",
                 4.5,
                 "image",
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
+                false,
                 LocalDateTime.now()
         );
         RestaurantAdminListResult result = RestaurantAdminListResult.of(List.of(item), 0, 10, 1);
@@ -127,7 +134,8 @@ class RestaurantAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].id").value(1L))
                 .andExpect(jsonPath("$.data.content[0].largeCategory").value("KOREAN"))
-                .andExpect(jsonPath("$.data.content[0].mediumCategory").value("국밥"));
+                .andExpect(jsonPath("$.data.content[0].mediumCategory").value("국밥"))
+                .andExpect(jsonPath("$.data.content[0].isDisplay").value(false));
     }
 
     @Test
@@ -150,6 +158,7 @@ class RestaurantAdminControllerTest {
                 .thenReturn(result);
 
         RestaurantRequest.Patch request = RestaurantAdminFixture.patchForUpdateName();
+        Mockito.clearInvocations(restaurantAdminFacade);
 
         mockMvc.perform(
                         patch(BASE_URL + "/1")
@@ -157,7 +166,58 @@ class RestaurantAdminControllerTest {
                                 .content(objectMapper.writeValueAsString(request))
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.name").value("updated"));
+                .andExpect(jsonPath("$.data.name").value("updated"))
+                .andExpect(jsonPath("$.data.teamRecommendationTitle").value("요기잇 개발자 픽"))
+                .andExpect(jsonPath("$.data.teamRecommendationReason").value("여기 정말 가봤는데, 국밥이 맛있어요"))
+                .andExpect(jsonPath("$.data.isDisplay").value(false));
+
+        ArgumentCaptor<RestaurantCommand.Patch> commandCaptor =
+                ArgumentCaptor.forClass(RestaurantCommand.Patch.class);
+        verify(restaurantAdminFacade).updateRestaurant(eq(1L), commandCaptor.capture());
+        RestaurantCommand.Patch command = commandCaptor.getValue();
+        assertThat(command.teamRecommendationTitle()).isEqualTo("요기잇 개발자 픽");
+        assertThat(command.teamRecommendationReason()).isEqualTo("여기 정말 가봤는데, 국밥이 맛있어요");
+    }
+
+    @Test
+    @DisplayName("팀 추천 문구를 빈 문자열로 수정하면 초기화 값으로 전달한다")
+    void updateRestaurant_ShouldPassEmptyTeamRecommendationFields() throws Exception {
+        RestaurantAdminResult.Detail result = RestaurantAdminFixture.sampleUpdatedRestaurantAdminDetail();
+        when(restaurantAdminFacade.updateRestaurant(eq(1L), any(RestaurantCommand.Patch.class)))
+                .thenReturn(result);
+
+        Map<String, Object> request = new HashMap<>();
+        request.put("teamRecommendationTitle", "  ");
+        request.put("teamRecommendationReason", "");
+        Mockito.clearInvocations(restaurantAdminFacade);
+
+        mockMvc.perform(
+                        patch(BASE_URL + "/1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<RestaurantCommand.Patch> commandCaptor =
+                ArgumentCaptor.forClass(RestaurantCommand.Patch.class);
+        verify(restaurantAdminFacade).updateRestaurant(eq(1L), commandCaptor.capture());
+        RestaurantCommand.Patch command = commandCaptor.getValue();
+        assertThat(command.teamRecommendationTitle()).isEmpty();
+        assertThat(command.teamRecommendationReason()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("팀 추천 제목이 50자를 초과하면 400을 반환한다")
+    void updateRestaurant_ShouldReturn400_WhenTeamRecommendationTitleTooLong() throws Exception {
+        Map<String, Object> request = new HashMap<>();
+        request.put("teamRecommendationTitle", "가".repeat(51));
+
+        mockMvc.perform(
+                        patch(BASE_URL + "/1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -177,6 +237,8 @@ class RestaurantAdminControllerTest {
     @DisplayName("지역 값이 유효하지 않으면 400을 반환한다")
     void updateRestaurant_ShouldReturn400_WhenRegionInvalid() throws Exception {
         RestaurantRequest.Patch request = RestaurantAdminFixture.patchForInvalidRegion();
+        when(restaurantAdminFacade.updateRestaurant(eq(1L), any(RestaurantCommand.Patch.class)))
+                .thenThrow(new CustomException(ErrorCode.INVALID_LOCATION_NAME));
 
         mockMvc.perform(
                         patch(BASE_URL + "/1")

@@ -1,6 +1,6 @@
 # 맛집 추천 시스템 아키텍처
 
-> 최종 업데이트: 2026-03-09
+> 최종 업데이트: 2026-05-08
 
 ## 왜 직접 추천 알고리즘을 설계했는가
 
@@ -17,14 +17,16 @@ Yogieat의 추천 시스템은 외부 ML 서비스 없이 **순수 Java 로직�
 
 ## 개요
 
-추천 파이프라인의 진입점은 `RecommendationProcessor.processRecommendation()` 입니다.
-모임 참여자의 선호/불호/거리 선호를 집계해 **Top 3 맛집을 자동 산출**하고, 결과를 `RecommendResult`에 저장합니다.
+추천 파이프라인의 계산 진입점은 `RecommendationProcessor.calculateRecommendations()`이고, 최초 추천 저장 진입점은 `RecommendationProcessor.processRecommendation()`입니다.
+모임 참여자의 선호/불호/거리 선호를 집계해 **Top 3 맛집을 자동 산출**하고, 최초 추천 결과는 `RecommendResult`에 저장합니다.
+재추천은 기존 결과를 덮어쓰지 않고 제외할 맛집 목록을 반영해 후보를 다시 산출한 뒤 `RecommendRerollHistory`에 요청/결과 이력을 저장합니다.
 
 핵심 목표:
 
 1. **선호 투표 비율을 반영한 카테고리 안배 추천** — 일식 3표, 아시안 2표이면 슬롯 2:1 배분
 2. **불호 우세 카테고리 제거** — 불호가 선호보다 많으면 SQL 단계에서 사전 제외
 3. **Top 3 보장과 선호 우선 정책의 균형** — Strict 필터 + Fallback 전략
+4. **모임 일정 맥락 반영** — 시간대와 휴무일을 후보 쿼리에서 선필터링
 
 ---
 
@@ -33,6 +35,7 @@ Yogieat의 추천 시스템은 외부 ML 서비스 없이 **순수 Java 로직�
 ```mermaid
 graph TB
     subgraph "Orchestration"
+        RRF["RecommendResultFacade<br/>API 유스케이스 + 락 + 이벤트"]
         RP["RecommendationProcessor<br/>점수 계산 + fallback 제어"]
     end
 
@@ -46,20 +49,31 @@ graph TB
         CQS["CategoryQuotaSelectionStrategy<br/>투표 비율 기반 슬롯 배분"]
     end
 
+    subgraph "Persistence"
+        RR["RecommendResult<br/>최초 추천 결과"]
+        RRH["RecommendRerollHistory<br/>재추천 이력"]
+        RRFail["RecommendResultFailed<br/>실패 컨텍스트"]
+    end
+
     subgraph "Value Objects"
         PS["PreferenceScore<br/>카테고리별 선호 점수"]
         CVS["CategoryVoteSummary<br/>선호표/불호표/제외 카테고리"]
         DSC["DistanceScoreContext<br/>거리 다수결 + ANY 가중치"]
     end
 
+    RRF --> RP
     RP --> RCF
     RP --> RSP
     RP --> RSS
+    RRF --> RRH
+    RP --> RR
+    RP --> RRFail
     RSS -.->|"구현"| CQS
     RCF --> PS
     RCF --> CVS
     RCF --> DSC
 
+    style RRF fill:#e1f5ff,stroke:#0288d1
     style RP fill:#e1f5ff,stroke:#0288d1
     style RCF fill:#fff4e1,stroke:#ff9800
     style RSP fill:#fff4e1,stroke:#ff9800
@@ -72,11 +86,14 @@ graph TB
 
 | 컴포넌트 | 역할 | 설계 패턴 |
 |:--|:--|:--|
+| `RecommendResultFacade` | 추천 결과 조회, 추천 진행, 재추천 API 유스케이스 오케스트레이션 | Facade |
 | `RecommendationProcessor` | 추천 처리 오케스트레이션, 점수 계산, fallback 제어 | Orchestrator |
 | `RecommendationContextFactory` | 참여자 입력을 추천용 파생 컨텍스트로 집계 | Factory |
 | `RecommendationSelectionStrategy` | Top-K 선정 전략 인터페이스 | Strategy (인터페이스) |
 | `CategoryQuotaSelectionStrategy` | 카테고리 투표 비율 기반 슬롯 배분 (최대 나머지 방식) | Strategy (구현) |
 | `RecommendationScoringPolicy` | 가중치/임계값 정책 객체 | Record (불변 정책) |
+| `RecommendValidator` | 과반수, 중복 진행, 재추천 가능 상태 검증 | Validator |
+| `RecommendRerollHistory` | 재추천 요청에서 제외한 맛집과 산출 결과 스냅샷 저장 | Domain Record |
 | `PreferenceScore` | 카테고리별 선호 점수 + 선호자/불호자 카운트 | Value Object |
 | `CategoryVoteSummary` | 카테고리별 선호표/불호표/제외 카테고리 | Value Object |
 | `DistanceScoreContext` | 거리 다수결 결과 + ANY 비중 반영 가중치 | Value Object |
@@ -85,32 +102,79 @@ graph TB
 
 ## 처리 흐름
 
+### 최초 추천 진행
+
 ```mermaid
 flowchart TD
-    A["processRecommendation 시작"] --> B["기존 추천 상태 확인<br/>(PENDING/COMPLETED/FAILED)"]
-    B --> C["Gathering 조회 (TimeSlot)"]
-    C --> D["Participant 조회"]
-    D --> E{"참여자 존재?"}
-    E -->|No| F["FAILED: NO_PARTICIPANTS"]
-    E -->|Yes| G["RecommendationContextFactory.create()"]
-    G --> H["Category 조회 (캐시)"]
-    H --> I["불호 우세 카테고리 제외 후<br/>candidateCategoryIds 구성"]
-    I --> J["findRecommendationCandidates<br/>(region, categoryIds, timeSlot)"]
-    J --> K{"후보 존재?"}
-    K -->|No| L["FAILED: NO_RESTAURANTS"]
-    K -->|Yes| M["후보 점수 계산 1회<br/>(scoreRestaurants)"]
-    M --> N["1단계: PREFERENCE_SCORE_POSITIVE"]
-    N --> N1["Strict 후보 필터<br/>(불호 0표 선호 카테고리)<br/>+ 슬롯용 유효표 계산"]
-    N1 --> O{"Top K 충족?"}
-    O -->|Yes| P["저장 (COMPLETED)<br/>+ 추천 근거 텍스트"]
+    A["POST /api/v1/recommend-results/proceed"] --> B["RecommendResultFacade.proceedRecommendation"]
+    B --> C["accessKey 락 획득"]
+    C --> D["모임 조회 + 현재 참여자 수 조회"]
+    D --> E{"과반수 초과?<br/>currentCount * 2 > peopleCount"}
+    E -->|No| F["PARTICIPANT_MAJORITY_NOT_REACHED"]
+    E -->|Yes| G{"이미 추천 결과 존재?"}
+    G -->|Yes| H["RECOMMEND_ALREADY_PROCEEDED"]
+    G -->|No| I["PENDING 생성"]
+    I --> J["RecommendResultCreatedEvent 발행"]
+    J --> K["RecommendationEventListener"]
+    K --> L["processRecommendation(gatheringId, region)"]
+
+    style F fill:#ffe1e1
+    style H fill:#ffe1e1
+    style I fill:#fff4e1
+    style L fill:#e1ffe1
+```
+
+### 추천 계산
+
+```mermaid
+flowchart TD
+    A["calculateRecommendations 시작"] --> B["Gathering 조회<br/>(TimeSlot, scheduledDate)"]
+    B --> C["Participant 조회"]
+    C --> D{"참여자 존재?"}
+    D -->|No| E["FAILED: NO_PARTICIPANTS"]
+    D -->|Yes| F["RecommendationContextFactory.create()"]
+    F --> G["Category 조회 (캐시)"]
+    G --> H["불호 우세 카테고리 제외 후<br/>candidateCategoryIds 구성"]
+    H --> I["findRecommendationCandidates<br/>(region, categoryIds, timeSlot,<br/>excludedRestaurantIds, scheduledDate)"]
+    I --> J{"후보 존재?"}
+    J -->|No| K["FAILED: NO_RESTAURANTS"]
+    J -->|Yes| L["후보 점수 계산 1회<br/>(scoreRestaurants)"]
+    L --> M["1단계: PREFERENCE_SCORE_POSITIVE"]
+    M --> N["Strict 후보 필터<br/>(불호 0표 선호 카테고리)<br/>+ 슬롯용 유효표 계산"]
+    N --> O{"Top K 충족?"}
+    O -->|Yes| P["Top K 반환"]
     O -->|No| Q["2단계: DISLIKED_EXCLUDED"]
     Q --> R["merge(primary, fallback)"]
     R --> P
 
-    style F fill:#ffe1e1
-    style L fill:#ffe1e1
+    style E fill:#ffe1e1
+    style K fill:#ffe1e1
     style P fill:#e1ffe1
 ```
+
+`processRecommendation()`은 위 계산 결과가 성공이면 `COMPLETED` 상태의 `RecommendResult` 3건을 rank 1~3으로 저장합니다.
+실패하거나 예외가 발생하면 PENDING 레코드를 정리한 뒤 `FAILED` 상태와 `RecommendResultFailed` 상세 컨텍스트를 저장합니다.
+
+### 재추천
+
+```mermaid
+flowchart TD
+    A["POST /api/v1/recommend-results/reroll"] --> B["RecommendResultFacade.rerollRecommendResults"]
+    B --> C["Gathering FOR UPDATE 조회"]
+    C --> D["기존 추천 결과 조회"]
+    D --> E{"COMPLETED 상태?"}
+    E -->|No| F["NOT_FOUND 또는 REROLL_NOT_AVAILABLE"]
+    E -->|Yes| G["요청 restaurantIds 정제<br/>(null/0 이하 제거, distinct)"]
+    G --> H["calculateRecommendations<br/>(excludedRestaurantIds 포함)"]
+    H --> I["재추천 응답 Ranking 생성"]
+    I --> J["RecommendRerollHistory 저장"]
+
+    style F fill:#ffe1e1
+    style J fill:#e1ffe1
+```
+
+재추천은 현재 저장된 `RecommendResult`를 삭제하거나 교체하지 않습니다.
+클라이언트가 넘긴 제외 맛집을 후보 쿼리의 `id NOT IN` 조건에 반영하고, 재추천 결과가 비어도 요청 이력은 저장합니다.
 
 ---
 
@@ -263,7 +327,19 @@ recommendation:
 
 > **설계 의도**: "아무도 싫어하지 않는 카테고리"를 우선 추천하여, 모임에서 불만이 최소화되는 결과를 도출합니다.
 
-### 2) 슬롯 배분용 유효표 산정 (`buildQuotaPreferenceVotes`)
+### 2) 단계별 포함 조건 (`FilterStrategy`)
+
+Strict 후보 적용 후에도 단계별 포함 조건을 한 번 더 적용합니다.
+
+| 단계 | 조건 |
+|:--|:--|
+| `PREFERENCE_SCORE_POSITIVE` | `totalPreferenceScore > 0` 이고 `netPreference >= -1` |
+| `DISLIKED_EXCLUDED` | `netPreference >= -1` |
+
+`netPreference = preferenceCount - dislikeCount` 이므로, 현재 구현은 불호가 선호보다 2명 이상 많은 카테고리를 단계 필터에서 제외합니다.
+불호가 선호보다 많은 카테고리는 앞선 카테고리 제외 정책에서 이미 후보 카테고리에서 빠지지만, 단계 필터는 strict 후보 복귀나 중립 입력 케이스에서도 동일한 안전장치로 동작합니다.
+
+### 3) 슬롯 배분용 유효표 산정 (`buildQuotaPreferenceVotes`)
 
 카테고리 슬롯 비율은 아래 우선순위로 투표값을 사용합니다.
 
@@ -271,7 +347,7 @@ recommendation:
 2. **단순 선호표**: 위가 전부 0이면 `preferenceVotes` 사용
 3. **균등표**: 선호 입력 자체가 없으면 후보 카테고리당 1표
 
-### 3) `CategoryQuotaSelectionStrategy` 슬롯 배분
+### 4) `CategoryQuotaSelectionStrategy` 슬롯 배분
 
 1. 카테고리별 후보를 점수순 정렬하고, 카테고리당 최대 `candidatePoolSize(10)`개 유지
 2. `rawQuota = (categoryVotes / totalVotes) × topK(3)` 계산
@@ -306,7 +382,7 @@ recommendation:
 ### 1) 추천 후보 전용 쿼리
 
 기존은 `findByRegion()`으로 지역 전체 맛집을 메모리로 가져온 뒤 Java에서 필터링했습니다.
-현재는 `findRecommendationCandidates(region, categoryIds, timeSlot)`로 SQL 선필터링을 수행합니다.
+현재는 `findRecommendationCandidates(region, categoryIds, timeSlot, excludedRestaurantIds, scheduledDate)`로 SQL 선필터링을 수행합니다.
 
 적용 조건:
 
@@ -314,8 +390,14 @@ recommendation:
 2. `region = ?`
 3. `category_id IN (?)`
 4. `time_slot IS NULL OR time_slot = BOTH OR time_slot = gatheringTimeSlot`
+5. 재추천 제외 맛집이 있으면 `id NOT IN (:excludedRestaurantIds)`
+6. 모임 예정일이 있으면 `off_days` JSON 텍스트에 해당 날짜가 포함되지 않음
+
+`gatheringTimeSlot`이 `null` 또는 `BOTH`이면 시간대 조건은 생략합니다.
+`scheduledDate`가 없으면 휴무일 조건도 생략합니다.
 
 또한 추천 계산에 필요한 컬럼만 projection 조회해 row 폭을 줄였습니다.
+추천 후보 projection은 점수 계산에 필요한 `id`, `categoryId`, `name`, `rating`, `regionId`, `location`, 리뷰 수, AI 요약, `timeSlot`, 생성/수정일, 휴무일 중심으로 구성합니다.
 
 ### 2) Fallback 점수 계산 중복 제거
 
@@ -362,7 +444,7 @@ Space: O(M + R)
 
 | 항목 | 이전 | 현재 |
 |:--|:--|:--|
-| DB 조회 범위 | 지역 전체 | 지역+카테고리+TimeSlot 선필터링 |
+| DB 조회 범위 | 지역 전체 | 지역+카테고리+TimeSlot+휴무일+제외 맛집 선필터링 |
 | fallback 점수 계산 | 최대 2회 | 1회 |
 | 카테고리 조회 | 매번 DB hit | 캐시 기반 |
 | 선호도 집계 | 레스토랑 루프 내부 반복 위험 | 사전 집계 컨텍스트 재사용 |
@@ -389,11 +471,15 @@ Space: O(M + R)
 | `NO_PARTICIPANTS` | 참여자 없음 |
 | `NO_RESTAURANTS` | 후보가 없거나 필터링 후 추천 불가 |
 | `PROCESSING_EXCEPTION` | 처리 중 예외 |
+| `ASYNC_PROCESSING_TIMEOUT` | 비동기 처리 타임아웃 또는 오래된 PENDING 정리 |
 
 실패 시:
 
 1. `t_recommend_result`에 `FAILED` 상태 저장
 2. `t_recommend_result_failed`에 상세 실패 컨텍스트 저장 (실패 사유, 에러 메시지, 발생 시각)
+
+`PendingRecommendCleanupJob`은 10분마다 실행되며, 1분 이상 `PENDING` 상태로 남은 추천 결과를 찾습니다.
+각 PENDING 레코드는 `PendingRecordCleanupProcessor`에서 독립 트랜잭션으로 삭제 후 `FAILED` 결과와 `ASYNC_PROCESSING_TIMEOUT` 실패 컨텍스트로 전환합니다.
 
 ---
 
@@ -411,8 +497,16 @@ Space: O(M + R)
 - 가중 선호 유효표 기반 동률 우선순위
 - 선호 중립 입력 ("상관없음")에서도 Top 3 반환
 - ANY 비중에 따른 거리 보너스 선형 축소
-- 후보 조회 시 category/timeSlot 선필터 파라미터 전달
+- 후보 조회 시 category/timeSlot/excludedRestaurantIds/scheduledDate 선필터 파라미터 전달
+- 재추천 제외 맛집 반영 후 결과 산출
 
 **`CategoryQuotaSelectionStrategyTest`**
 - 동률 카테고리 슬롯 분산
 - 선호 후보 부족 시 비선호 카테고리 보강으로 Top K 충족
+
+**`RecommendResultFacadeTest`**
+- 과반수 충족 시 PENDING 생성 및 이벤트 발행
+- 재추천 가능 상태 검증, 제외 맛집 정제, 재추천 이력 저장
+
+**`PendingRecordCleanupProcessorTest`**
+- 오래된 PENDING 레코드의 FAILED 전환 및 실패 컨텍스트 저장

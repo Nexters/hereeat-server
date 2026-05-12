@@ -84,7 +84,7 @@ class RecommendResultFacadeTest {
                 "모임",
                 LocalDate.of(2026, 3, 20),
                 null,
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 4,
                 null,
                 LocalDateTime.now(),
@@ -106,7 +106,7 @@ class RecommendResultFacadeTest {
         when(participantService.getByGatheringId(1L)).thenReturn(List.of());
         when(participantAnalyzer.aggregateCategoryPreferences(List.of())).thenReturn(CategoryAggregation.of(Map.of(), Map.of()));
         when(participantAnalyzer.aggregateDistanceRanges(List.of())).thenReturn(Map.of());
-        when(participantAnalyzer.determineMajorityDistanceRange(any(), eq(Region.GANGNAM))).thenReturn(DistanceRange.ANY);
+        when(participantAnalyzer.determineMajorityDistanceRange(any(), eq(Region.fromString("GANGNAM")))).thenReturn(DistanceRange.ANY);
         when(restaurantService.findByIds(List.of(101L))).thenReturn(originalRestaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
@@ -118,6 +118,12 @@ class RecommendResultFacadeTest {
         assertThat(result.rankings())
                 .extracting(RecommendResultData.Ranking::reasonText)
                 .containsExactly("original");
+        assertThat(result.rankings())
+                .extracting(RecommendResultData.Ranking::teamRecommendationTitle)
+                .containsExactly("요기잇 개발자 픽");
+        assertThat(result.rankings())
+                .extracting(RecommendResultData.Ranking::teamRecommendationReason)
+                .containsExactly("여기 정말 가봤는데, 메뉴가 맛있어요");
         assertThat(result.averageAgreementRate()).isEqualTo(35.0);
         verify(restaurantService).findByIds(List.of(101L));
         verifyNoInteractions(recommendRerollHistoryService);
@@ -135,7 +141,7 @@ class RecommendResultFacadeTest {
                 null,
                 null,
                 null,
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 new GeoJson.Point(List.of(127.0, 37.0)),
                 10,
                 0,
@@ -148,7 +154,10 @@ class RecommendResultFacadeTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                "요기잇 개발자 픽",
+                "여기 정말 가봤는데, 메뉴가 맛있어요",
+                true
         );
     }
 }

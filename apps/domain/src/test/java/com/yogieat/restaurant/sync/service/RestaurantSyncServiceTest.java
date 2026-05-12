@@ -71,7 +71,7 @@ class RestaurantSyncServiceTest {
 
     @Test
     void syncChunk_success_callsBatchApplyOnce() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", gangnam(), "123",
                 new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
@@ -87,7 +87,7 @@ class RestaurantSyncServiceTest {
 
     @Test
     void syncChunk_whenOnlyDetailAvailable_fillsMapUrlAndLocation() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", gangnam(), "123",
                 new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
@@ -105,7 +105,7 @@ class RestaurantSyncServiceTest {
 
     @Test
     void syncChunk_whenDetailContainsRepresentativeReview_updatesRepresentativeReview() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", gangnam(), "123",
                 new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
@@ -121,7 +121,7 @@ class RestaurantSyncServiceTest {
 
     @Test
     void syncChunk_whenKakaoCategoryIsInferable_updatesCategoryId() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "와인코르크", Region.GANGNAM, "123",
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "와인코르크", gangnam(), "123",
                 new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
@@ -140,7 +140,7 @@ class RestaurantSyncServiceTest {
     void syncChunk_whenRetryJitterRateIsZero_retriesWithoutRandomBoundError() {
         ReflectionTestUtils.setField(restaurantSyncService, "kakaoSyncRetryJitterRate", 0.0d);
 
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", gangnam(), "123",
                 new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
@@ -171,7 +171,7 @@ class RestaurantSyncServiceTest {
 
     @Test
     void syncChunk_whenTargetPointInvalid_deletesRestaurant() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", gangnam(), "123",
                 new GeoJson.Point(new ArrayList<>(Arrays.asList(127.0280, null))));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
 
@@ -187,7 +187,7 @@ class RestaurantSyncServiceTest {
 
     @Test
     void syncChunk_whenResolvedPointInvalid_deletesRestaurant() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "123",
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", gangnam(), "123",
                 new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
@@ -200,13 +200,13 @@ class RestaurantSyncServiceTest {
         assertThat(result.failedCount()).isEqualTo(0);
         verify(restaurantRepository).batchDeleteByIds(List.of(1L));
         verify(restaurantRepository, never()).batchApplySyncPatch(anyList());
-        verify(kakaoPlaceClient, never()).searchPlace("맛집", Region.GANGNAM.getName());
+        verify(kakaoPlaceClient, never()).searchPlace("맛집", gangnam().getName());
         verify(kakaoPlaceMapper, never()).toDomainData(any());
     }
 
     @Test
     void syncChunk_whenKakaoPlaceNotFound_deletesRestaurant() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", Region.GANGNAM, "not-found-id",
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "맛집", gangnam(), "not-found-id",
                 new GeoJson.Point(List.of(127.0280, 37.4980)));
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("not-found-id"))
@@ -233,6 +233,10 @@ class RestaurantSyncServiceTest {
         assertThat(result.failedCount()).isEqualTo(2);
         verify(restaurantRepository, never()).batchApplySyncPatch(anyList());
         verifyNoInteractions(kakaoPlaceClient, kakaoPlaceDetailClient, kakaoPlaceMapper);
+    }
+
+    private Region gangnam() {
+        return Region.of("GANGNAM", "강남역", new GeoJson.Point(List.of(127.0276, 37.4979)));
     }
 
     private KakaoPlaceDetailData detailData() {

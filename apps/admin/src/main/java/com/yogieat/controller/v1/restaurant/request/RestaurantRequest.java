@@ -9,6 +9,7 @@ import com.yogieat.restaurant.service.RestaurantCommand;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Objects;
 
@@ -60,7 +61,10 @@ public final class RestaurantRequest {
             String priceLevel,
             String aiMateSummaryTitle,
             List<String> aiMateSummaryContents,
-            String timeSlot
+            String timeSlot,
+            @Size(max = 50) String teamRecommendationTitle,
+            String teamRecommendationReason,
+            Boolean isDisplay
     ) {
         public static Patch from(
                 String externalId,
@@ -81,7 +85,10 @@ public final class RestaurantRequest {
                 String priceLevel,
                 String aiMateSummaryTitle,
                 List<String> aiMateSummaryContents,
-                String timeSlot
+                String timeSlot,
+                String teamRecommendationTitle,
+                String teamRecommendationReason,
+                Boolean isDisplay
         ) {
             return new Patch(
                     externalId,
@@ -102,12 +109,18 @@ public final class RestaurantRequest {
                     priceLevel,
                     aiMateSummaryTitle,
                     aiMateSummaryContents,
-                    timeSlot
+                    timeSlot,
+                    teamRecommendationTitle,
+                    teamRecommendationReason,
+                    isDisplay
             );
         }
 
         public static Patch of() {
             return new Patch(
+                    null,
+                    null,
+                    null,
                     null,
                     null,
                     null,
@@ -154,13 +167,23 @@ public final class RestaurantRequest {
                     trimOrNull(request.priceLevel()),
                     trimOrNull(request.aiMateSummaryTitle()),
                     trimAiMateSummaryContents(request.aiMateSummaryContents()),
-                    parseTimeSlot(request.timeSlot())
+                    parseTimeSlot(request.timeSlot()),
+                    trimOrEmpty(request.teamRecommendationTitle()),
+                    trimOrEmpty(request.teamRecommendationReason()),
+                    request.isDisplay()
             );
         }
     }
 
     private static String trimOrNull(String value) {
         if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.strip();
+    }
+
+    private static String trimOrEmpty(String value) {
+        if (value == null) {
             return null;
         }
         return value.strip();

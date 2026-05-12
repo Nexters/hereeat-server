@@ -7,7 +7,11 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
+import com.yogieat.common.error.CustomException;
+import com.yogieat.common.error.ErrorCode;
+import com.yogieat.datasource.db.core.region.RegionEntity;
 import com.yogieat.datasource.db.core.region.RegionJpaRepository;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.result.GatheringAdminItemResult;
@@ -53,7 +57,7 @@ public class GatheringCoreRepository implements GatheringRepository {
     public Gathering save(Gathering gathering) {
         GatheringEntity entity = GatheringEntity.from(
                 gathering,
-                resolveRegionId(gathering.region())
+                requireRegionId(gathering.region())
         );
         GatheringEntity savedEntity = gatheringJpaRepository.save(entity);
         return toDomain(savedEntity);
@@ -185,7 +189,15 @@ public class GatheringCoreRepository implements GatheringRepository {
         if (region == null) {
             return null;
         }
-        return regionJpaRepository.findIdByCode(region.name()).orElse(null);
+        return regionJpaRepository.findIdByCode(region.code()).orElse(null);
+    }
+
+    private Long requireRegionId(Region region) {
+        Long regionId = resolveRegionId(region);
+        if (regionId == null) {
+            throw new CustomException(ErrorCode.INVALID_LOCATION_NAME);
+        }
+        return regionId;
     }
 
     private BooleanExpression regionCondition(Region region) {
@@ -223,7 +235,7 @@ public class GatheringCoreRepository implements GatheringRepository {
         }
 
         return regionJpaRepository.findByIdAndDeletedAtIsNull(regionId)
-                .map(regionEntity -> toRegion(regionEntity.getCode()))
+                .map(this::toRegion)
                 .orElse(null);
     }
 
@@ -238,11 +250,18 @@ public class GatheringCoreRepository implements GatheringRepository {
 
         Map<Long, Region> regionMap = new HashMap<>();
         regionJpaRepository.findByIdInAndDeletedAtIsNull(distinctRegionIds)
-                .forEach(regionEntity -> regionMap.put(regionEntity.getId(), toRegion(regionEntity.getCode())));
+                .forEach(regionEntity -> regionMap.put(regionEntity.getId(), toRegion(regionEntity)));
         return regionMap;
     }
 
-    private Region toRegion(String regionCode) {
-        return Region.fromString(regionCode);
+    private Region toRegion(RegionEntity regionEntity) {
+        if (regionEntity == null) {
+            return null;
+        }
+        return Region.of(
+                regionEntity.getCode(),
+                regionEntity.getDisplayName(),
+                new GeoJson.Point(List.of(regionEntity.getLongitude(), regionEntity.getLatitude()))
+        );
     }
 }

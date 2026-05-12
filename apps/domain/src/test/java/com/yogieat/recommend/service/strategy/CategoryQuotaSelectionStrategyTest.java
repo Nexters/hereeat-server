@@ -93,7 +93,7 @@ class CategoryQuotaSelectionStrategyTest {
                 null,
                 null,
                 null,
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 null,
                 10,
                 0,
@@ -106,7 +106,10 @@ class CategoryQuotaSelectionStrategyTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null,
+                null,
+                true
         );
 
         return new CategoryScoredRestaurant(

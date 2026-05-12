@@ -100,7 +100,7 @@ class RecommendationProcessorTest {
     @DisplayName("선호표 3:2는 Top3 슬롯을 2:1로 배분한다")
     void returnsTwoJapaneseAndOneAsian_when_preferenceVotesAreThreeToTwo() {
         Long gatheringId = 1L;
-        Region region = Region.GANGNAM;
+        Region region = gangnam();
 
         List<Participant> participants = List.of(
                 participant(1L, gatheringId, DistanceRange.ANY, "일식", null),
@@ -140,7 +140,7 @@ class RecommendationProcessorTest {
     @DisplayName("불호가 선호보다 많은 카테고리는 추천 대상에서 제외된다")
     void excludesCategoryFromRecommendations_when_dislikeVotesExceedPreferenceVotes() {
         Long gatheringId = 2L;
-        Region region = Region.GANGNAM;
+        Region region = gangnam();
 
         List<Participant> participants = List.of(
                 participant(1L, gatheringId, DistanceRange.ANY, "한식", "일식,아시안"),
@@ -189,7 +189,7 @@ class RecommendationProcessorTest {
     @Test
     @DisplayName("ANY 비중이 높을수록 거리 보너스가 선형 축소된다")
     void reducesDistanceBonusLinearly_when_anyDistanceRatioIncreases() {
-        Region region = Region.GANGNAM;
+        Region region = gangnam();
         List<Category> categories = List.of(category(1L, LargeCategory.KOREAN));
         List<Restaurant> restaurants = List.of(
                 restaurant(1001L, 1L, "원거리한식", 4.5, point(127.0400, 37.5100), 10),
@@ -238,7 +238,7 @@ class RecommendationProcessorTest {
     @DisplayName("추천 후보 조회 시 불호 우세 카테고리를 제외하고 TimeSlot을 전달한다")
     void passesFilteredCategoriesAndGatheringTimeSlot_when_loadingRecommendationCandidates() {
         Long gatheringId = 21L;
-        Region region = Region.GANGNAM;
+        Region region = gangnam();
         Gathering gathering = new Gathering(
                 gatheringId,
                 "access-key",
@@ -292,7 +292,7 @@ class RecommendationProcessorTest {
     @DisplayName("재추천 계산 시 제외한 맛집 ID는 후보 조회 단계에서 제외한다")
     void returnsOnlyNonExcludedRestaurants_when_calculatingRerollRecommendations() {
         Long gatheringId = 22L;
-        Region region = Region.GANGNAM;
+        Region region = gangnam();
         Gathering gathering = new Gathering(
                 gatheringId,
                 "access-key",
@@ -359,7 +359,7 @@ class RecommendationProcessorTest {
     @DisplayName("불호 0표 선호 카테고리 후보가 Top3 이상이면 해당 카테고리만 추천한다")
     void returnsOnlyStrictCategoryRestaurants_when_strictCandidatesFillTop3() {
         Long gatheringId = 31L;
-        Region region = Region.GANGNAM;
+        Region region = gangnam();
 
         List<Participant> participants = List.of(
                 participant(1L, gatheringId, DistanceRange.ANY, "중식", "한식"),
@@ -405,7 +405,7 @@ class RecommendationProcessorTest {
     @DisplayName("Case 11: 한식 4표/양식 2표일 때 Top3를 한식 2개 + 양식 1개로 배분한다")
     void returnsTwoKoreanAndOneWestern_when_case11PreferenceVotesApply() {
         Long gatheringId = 41L;
-        Region region = Region.GANGNAM;
+        Region region = gangnam();
 
         List<Participant> participants = List.of(
                 participant(1L, gatheringId, DistanceRange.ANY, "한식", "양식,아시안"),
@@ -450,7 +450,7 @@ class RecommendationProcessorTest {
     @DisplayName("선호 입력이 모두 중립값이어도 후보 카테고리에서 Top3를 반환한다")
     void returnsTop3FromCandidateCategories_when_allPreferencesAreNeutral() {
         Long gatheringId = 51L;
-        Region region = Region.GANGNAM;
+        Region region = gangnam();
 
         List<Participant> participants = List.of(
                 participant(1L, gatheringId, DistanceRange.ANY, "상관없음", "없음"),
@@ -490,7 +490,7 @@ class RecommendationProcessorTest {
     @DisplayName("동률 선호표에서는 불호 패널티를 반영한 가중 선호점수로 카테고리 우선순위를 결정한다")
     void prioritizesWeightedPreferredCategory_when_preferenceVotesAreTied() {
         Long gatheringId = 52L;
-        Region region = Region.GANGNAM;
+        Region region = gangnam();
 
         List<Participant> participants = List.of(
                 participant(1L, gatheringId, DistanceRange.ANY, "한식,일식", null),
@@ -528,7 +528,7 @@ class RecommendationProcessorTest {
     @DisplayName("strict 후보가 2개뿐이면 전체 후보에서 보강해 Top3를 채운다")
     void backfillsTop3FromRemainingCandidates_when_strictCandidatesAreInsufficient() {
         Long gatheringId = 53L;
-        Region region = Region.GANGNAM;
+        Region region = gangnam();
 
         List<Participant> participants = List.of(
                 participant(1L, gatheringId, DistanceRange.ANY, "한식,일식", "없음"),
@@ -620,7 +620,7 @@ class RecommendationProcessorTest {
                 null,
                 null,
                 null,
-                Region.GANGNAM,
+                gangnam(),
                 location,
                 reviewCount,
                 0,
@@ -633,11 +633,18 @@ class RecommendationProcessorTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null,
+                null,
+                true
         );
     }
 
     private GeoJson.Point point(double x, double y) {
         return new GeoJson.Point(List.of(x, y));
+    }
+
+    private Region gangnam() {
+        return Region.of("GANGNAM", "강남역", point(127.0276, 37.4979));
     }
 }

@@ -44,7 +44,7 @@ class RestaurantControllerTest {
                 "맛집 이름",
                 "고속터미널역",
                 "서울 서초구 ...",
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 LargeCategory.KOREAN,
                 4.6,
                 "https://img.example.com/restaurant.jpg",
@@ -57,7 +57,9 @@ class RestaurantControllerTest {
                 120,
                 "AI 요약 제목",
                 List.of("요약1", "요약2"),
-                "010-0000-0000"
+                "010-0000-0000",
+                "요기잇 개발자 픽",
+                "여기 정말 가봤는데, 된장찌개가 맛있어요"
         ));
 
         mockMvc.perform(get("/api/v1/restaurants/1"))
@@ -66,6 +68,8 @@ class RestaurantControllerTest {
                 .andExpect(jsonPath("$.data.restaurantName").value("맛집 이름"))
                 .andExpect(jsonPath("$.data.station").value("고속터미널역"))
                 .andExpect(jsonPath("$.data.largeCategory").value("KOREAN"))
-                .andExpect(jsonPath("$.data.representMenuPrice").value(10000));
+                .andExpect(jsonPath("$.data.representMenuPrice").value(10000))
+                .andExpect(jsonPath("$.data.teamRecommendationTitle").value("요기잇 개발자 픽"))
+                .andExpect(jsonPath("$.data.teamRecommendationReason").value("여기 정말 가봤는데, 된장찌개가 맛있어요"));
     }
 }
