@@ -180,6 +180,47 @@ class RestaurantAdminControllerTest {
     }
 
     @Test
+    @DisplayName("팀 추천 문구를 빈 문자열로 수정하면 초기화 값으로 전달한다")
+    void updateRestaurant_ShouldPassEmptyTeamRecommendationFields() throws Exception {
+        RestaurantAdminResult.Detail result = RestaurantAdminFixture.sampleUpdatedRestaurantAdminDetail();
+        when(restaurantAdminFacade.updateRestaurant(eq(1L), any(RestaurantCommand.Patch.class)))
+                .thenReturn(result);
+
+        Map<String, Object> request = new HashMap<>();
+        request.put("teamRecommendationTitle", "  ");
+        request.put("teamRecommendationReason", "");
+        Mockito.clearInvocations(restaurantAdminFacade);
+
+        mockMvc.perform(
+                        patch(BASE_URL + "/1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<RestaurantCommand.Patch> commandCaptor =
+                ArgumentCaptor.forClass(RestaurantCommand.Patch.class);
+        verify(restaurantAdminFacade).updateRestaurant(eq(1L), commandCaptor.capture());
+        RestaurantCommand.Patch command = commandCaptor.getValue();
+        assertThat(command.teamRecommendationTitle()).isEmpty();
+        assertThat(command.teamRecommendationReason()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("팀 추천 제목이 50자를 초과하면 400을 반환한다")
+    void updateRestaurant_ShouldReturn400_WhenTeamRecommendationTitleTooLong() throws Exception {
+        Map<String, Object> request = new HashMap<>();
+        request.put("teamRecommendationTitle", "가".repeat(51));
+
+        mockMvc.perform(
+                        patch(BASE_URL + "/1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("위치 좌표가 잘못되면 400을 반환한다")
     void updateRestaurant_ShouldReturn400_WhenLocationInvalid() throws Exception {
         RestaurantRequest.Patch request = RestaurantAdminFixture.patchForInvalidLocation();

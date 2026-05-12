@@ -9,6 +9,7 @@ import com.yogieat.restaurant.service.RestaurantCommand;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Objects;
 
@@ -61,7 +62,7 @@ public final class RestaurantRequest {
             String aiMateSummaryTitle,
             List<String> aiMateSummaryContents,
             String timeSlot,
-            String teamRecommendationTitle,
+            @Size(max = 50) String teamRecommendationTitle,
             String teamRecommendationReason,
             Boolean isDisplay
     ) {
@@ -167,8 +168,8 @@ public final class RestaurantRequest {
                     trimOrNull(request.aiMateSummaryTitle()),
                     trimAiMateSummaryContents(request.aiMateSummaryContents()),
                     parseTimeSlot(request.timeSlot()),
-                    trimOrNull(request.teamRecommendationTitle()),
-                    trimOrNull(request.teamRecommendationReason()),
+                    trimOrEmpty(request.teamRecommendationTitle()),
+                    trimOrEmpty(request.teamRecommendationReason()),
                     request.isDisplay()
             );
         }
@@ -176,6 +177,13 @@ public final class RestaurantRequest {
 
     private static String trimOrNull(String value) {
         if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.strip();
+    }
+
+    private static String trimOrEmpty(String value) {
+        if (value == null) {
             return null;
         }
         return value.strip();

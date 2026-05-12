@@ -82,7 +82,7 @@ public class RestaurantAdminController {
     @PatchMapping("/{restaurantId}")
     public RestaurantAdminResponse.Detail updateRestaurant(
             @PathVariable Long restaurantId,
-            @RequestBody RestaurantRequest.Patch request
+            @Valid @RequestBody RestaurantRequest.Patch request
     ) {
         return RestaurantAdminResponse.Detail.from(restaurantAdminFacade.updateRestaurant(restaurantId, RestaurantRequest.Patch.toCommand(request)));
     }

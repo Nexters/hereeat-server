@@ -119,11 +119,11 @@ public class RestaurantValidator {
             throw new CustomException(ErrorCode.METHOD_ARGUMENT_TYPE_MISMATCH, REQUIRED_CATEGORY_REASON);
         }
 
-        if (command.region() == null || command.region().getName() == null || command.region().getName().isBlank()) {
+        if (command.region() == null || command.region().name() == null || command.region().name().isBlank()) {
             throw new CustomException(ErrorCode.INVALID_LOCATION_NAME, REQUIRED_REGION_REASON);
         }
 
-        if (command.region().getName().length() > MAX_REGION_NAME_LENGTH) {
+        if (command.region().name().length() > MAX_REGION_NAME_LENGTH) {
             throw new CustomException(ErrorCode.INVALID_LOCATION_NAME, REQUIRED_REGION_REASON);
         }
     }

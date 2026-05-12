@@ -428,10 +428,10 @@ public class RestaurantEntity extends BaseEntity {
         if (command.timeSlot() != null) {
             this.timeSlot = command.timeSlot();
         }
-        if (command.teamRecommendationTitle() != null && !command.teamRecommendationTitle().isBlank()) {
+        if (command.teamRecommendationTitle() != null) {
             this.teamRecommendationTitle = command.teamRecommendationTitle();
         }
-        if (command.teamRecommendationReason() != null && !command.teamRecommendationReason().isBlank()) {
+        if (command.teamRecommendationReason() != null) {
             this.teamRecommendationReason = command.teamRecommendationReason();
         }
         if (command.isDisplay() != null) {
