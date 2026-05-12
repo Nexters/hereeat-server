@@ -22,7 +22,7 @@ public class GatheringFixture {
                 title,
                 LocalDate.now().plusDays(7),
                 TimeSlot.LUNCH,
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 peopleCount);
     }
 

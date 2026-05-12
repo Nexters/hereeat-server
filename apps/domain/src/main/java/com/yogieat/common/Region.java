@@ -1,45 +1,83 @@
 package com.yogieat.common;
 
-import java.util.List;
-import lombok.Getter;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+import java.util.Locale;
+import java.util.Objects;
 
-@Getter
-public enum Region {
-    HONGDAE("홍대입구역", new GeoJson.Point(List.of(126.92378, 37.55684))),
-    GANGNAM("강남역", new GeoJson.Point(List.of(127.0276, 37.4979))),
-    GONGDEOK("공덕역", new GeoJson.Point(List.of(126.95070, 37.54437))),
-    EULJIRO3GA("을지로3가역", new GeoJson.Point(List.of(126.99224, 37.56623))),
-    SADANG("사당역", new GeoJson.Point(List.of(126.98231, 37.47625))),
-    JONGNO3GA("종로3가역", new GeoJson.Point(List.of(126.99171, 37.57270))),
-    JAMSIL("잠실역", new GeoJson.Point(List.of(127.10128, 37.51379))),
-    SAMGAKJI("삼각지역", new GeoJson.Point(List.of(126.97346, 37.53453))),
-    ;
+public final class Region {
 
-
+    private final String code;
     private final String name;
     private final GeoJson.Point coordinatesStandard;
 
-    Region(String name, GeoJson.Point coordinatesStandard) {
-        this.name = name;
+    private Region(String code, String name, GeoJson.Point coordinatesStandard) {
+        this.code = normalizeCode(code);
+        this.name = normalizeName(name);
         this.coordinatesStandard = coordinatesStandard;
     }
 
+    public static Region of(String code, String name, GeoJson.Point coordinatesStandard) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        return new Region(code, name, coordinatesStandard);
+    }
+
+    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
     public static Region fromString(String region) {
         if (region == null || region.isBlank()) {
             return null;
         }
+        return new Region(region, null, null);
+    }
 
-        String normalizedRegion = region.strip();
-        try {
-            return valueOf(normalizedRegion);
-        } catch (IllegalArgumentException ignored) {
-            for (Region value : values()) {
-                if (value.name().equalsIgnoreCase(normalizedRegion)
-                        || value.getName().equals(normalizedRegion)) {
-                    return value;
-                }
-            }
+    @JsonValue
+    public String code() {
+        return code;
+    }
+
+    public String name() {
+        return code;
+    }
+
+    public String getName() {
+        return name != null ? name : code;
+    }
+
+    public GeoJson.Point getCoordinatesStandard() {
+        return coordinatesStandard;
+    }
+
+    private static String normalizeCode(String code) {
+        return code.strip().toUpperCase(Locale.ROOT);
+    }
+
+    private static String normalizeName(String name) {
+        if (name == null || name.isBlank()) {
             return null;
         }
+        return name.strip();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Region region)) {
+            return false;
+        }
+        return Objects.equals(code, region.code);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(code);
+    }
+
+    @Override
+    public String toString() {
+        return code;
     }
 }

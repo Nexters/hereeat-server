@@ -60,6 +60,17 @@ class RegionControllerTest {
                         1,
                         null,
                         null
+                ),
+                new RegionMaster(
+                        3L,
+                        "YEOKSAM",
+                        "서울",
+                        "역삼역",
+                        new GeoJson.Point(List.of(127.033, 37.5006)),
+                        true,
+                        2,
+                        null,
+                        null
                 )
         ));
 
@@ -69,6 +80,8 @@ class RegionControllerTest {
                 .andExpect(jsonPath("$.data.regions[0].province").value("서울"))
                 .andExpect(jsonPath("$.data.regions[0].displayName").value("강남역"))
                 .andExpect(jsonPath("$.data.regions[0].coordinatesStandard.coordinates[0]").value(127.0276))
-                .andExpect(jsonPath("$.data.regions[1].code").value("HONGDAE"));
+                .andExpect(jsonPath("$.data.regions[1].code").value("HONGDAE"))
+                .andExpect(jsonPath("$.data.regions[2].code").value("YEOKSAM"))
+                .andExpect(jsonPath("$.data.regions[2].displayName").value("역삼역"));
     }
 }

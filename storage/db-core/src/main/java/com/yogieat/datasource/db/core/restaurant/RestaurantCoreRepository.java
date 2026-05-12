@@ -14,6 +14,7 @@ import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
+import com.yogieat.datasource.db.core.region.RegionEntity;
 import com.yogieat.datasource.db.core.region.RegionJpaRepository;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.region.domain.RegionMaster;
@@ -76,7 +77,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     public Restaurant save(CreateRestaurant createRestaurant, Long regionId) {
         RestaurantEntity entity = RestaurantEntity.from(
                 createRestaurant,
-                regionId != null ? regionId : resolveRegionId(createRestaurant.region())
+                regionId != null ? regionId : requireRegionId(createRestaurant.region())
         );
         RestaurantEntity savedEntity = restaurantJpaRepository.save(entity);
         return toDomain(savedEntity);
@@ -203,7 +204,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .orElseThrow(() -> new CustomException(ErrorCode.RESTAURANT_NOT_FOUND));
         entity.applyAdminPatch(
                 command,
-                command.region() != null ? resolveRegionId(command.region()) : null
+                command.region() != null ? requireRegionId(command.region()) : null
         );
         return toDomain(entity);
     }
@@ -219,7 +220,15 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         if (region == null) {
             return null;
         }
-        return regionJpaRepository.findIdByCode(region.name()).orElse(null);
+        return regionJpaRepository.findIdByCode(region.code()).orElse(null);
+    }
+
+    private Long requireRegionId(Region region) {
+        Long regionId = resolveRegionId(region);
+        if (regionId == null) {
+            throw new CustomException(ErrorCode.INVALID_LOCATION_NAME);
+        }
+        return regionId;
     }
 
     @Override
@@ -276,7 +285,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         categoryEntity.mediumCategory,
                         restaurantEntity.rating,
                         restaurantEntity.imageUrl,
-                        regionEntity.code,
+                        regionEntity,
                         restaurantEntity.updatedAt
                 )
                 .from(restaurantEntity)
@@ -344,7 +353,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         entity.getMapUrl(),
                         entity.getRepresentativeReview(),
                         entity.getDescription(),
-                        toRegion(tuple.get(regionEntity.code)),
+                        toRegion(tuple.get(regionEntity)),
                         toGeoJsonPoint(entity.getLocation()),
                         entity.getReviewCount(),
                         entity.getBlogReviewCount(),
@@ -364,7 +373,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     @Override
     public Optional<RestaurantDetailResult> findRestaurantDetailById(Long restaurantId) {
         Tuple tuple = jpaQueryFactory
-                .select(restaurantEntity, categoryEntity.largeCategory, regionEntity.code)
+                .select(restaurantEntity, categoryEntity.largeCategory, regionEntity)
                 .from(restaurantEntity)
                 .leftJoin(categoryEntity)
                 .on(restaurantEntity.categoryId.eq(categoryEntity.id))
@@ -391,7 +400,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 entity.getName(),
                 entity.getStation(),
                 entity.getAddress(),
-                toRegion(tuple.get(regionEntity.code)),
+                toRegion(tuple.get(regionEntity)),
                 tuple.get(categoryEntity.largeCategory),
                 entity.getRating(),
                 entity.getImageUrl(),
@@ -416,6 +425,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .from(restaurantEntity)
                 .leftJoin(categoryEntity)
                 .on(restaurantEntity.categoryId.eq(categoryEntity.id))
+                .leftJoin(regionEntity)
+                .on(restaurantEntity.regionId.eq(regionEntity.id))
                 .where(buildAdminRestaurantConditions(criteria));
     }
 
@@ -428,7 +439,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 tuple.get(categoryEntity.mediumCategory),
                 tuple.get(restaurantEntity.rating),
                 tuple.get(restaurantEntity.imageUrl),
-                toRegion(tuple.get(regionEntity.code)),
+                toRegion(tuple.get(regionEntity)),
                 tuple.get(restaurantEntity.updatedAt)
         );
     }
@@ -634,7 +645,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         }
 
         return regionJpaRepository.findByIdAndDeletedAtIsNull(regionId)
-                .map(regionEntity -> toRegion(regionEntity.getCode()))
+                .map(this::toRegion)
                 .orElse(null);
     }
 
@@ -649,7 +660,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
 
         Map<Long, Region> regionMap = new HashMap<>();
         regionJpaRepository.findByIdInAndDeletedAtIsNull(distinctRegionIds)
-                .forEach(regionEntity -> regionMap.put(regionEntity.getId(), toRegion(regionEntity.getCode())));
+                .forEach(regionEntity -> regionMap.put(regionEntity.getId(), toRegion(regionEntity)));
         return regionMap;
     }
 
@@ -668,8 +679,15 @@ public class RestaurantCoreRepository implements RestaurantRepository {
         return regionMap;
     }
 
-    private Region toRegion(String regionCode) {
-        return Region.fromString(regionCode);
+    private Region toRegion(RegionEntity regionEntity) {
+        if (regionEntity == null) {
+            return null;
+        }
+        return Region.of(
+                regionEntity.getCode(),
+                regionEntity.getDisplayName(),
+                new GeoJson.Point(List.of(regionEntity.getLongitude(), regionEntity.getLatitude()))
+        );
     }
 
     @Override

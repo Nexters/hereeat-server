@@ -44,7 +44,7 @@ class RestaurantControllerTest {
                 "맛집 이름",
                 "고속터미널역",
                 "서울 서초구 ...",
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 LargeCategory.KOREAN,
                 4.6,
                 "https://img.example.com/restaurant.jpg",

@@ -3,15 +3,19 @@ package com.yogieat.domain.participant.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.yogieat.DatabaseCleaner;
+import com.yogieat.common.GeoJson;
 import com.yogieat.common.Region;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
+import com.yogieat.datasource.db.core.region.RegionEntity;
+import com.yogieat.datasource.db.core.region.RegionJpaRepository;
 import com.yogieat.gathering.domain.Gathering;
 import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.gathering.service.GatheringRepository;
 import com.yogieat.participant.domain.command.ParticipantCommand;
 import com.yogieat.participant.service.ParticipantFacade;
 import com.yogieat.participant.service.ParticipantRepository;
+import com.yogieat.region.domain.RegionMaster;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -36,9 +40,25 @@ class ParticipantFacadeConcurrencyTest {
     @Autowired private ParticipantFacade participantFacade;
     @Autowired private GatheringRepository gatheringRepository;
     @Autowired private ParticipantRepository participantRepository;
+    @Autowired private RegionJpaRepository regionJpaRepository;
     @Autowired private ApplicationContext applicationContext;
 
     @BeforeEach
+    void setUp() {
+        DatabaseCleaner.clear(applicationContext);
+        regionJpaRepository.save(RegionEntity.of(new RegionMaster(
+                null,
+                "GANGNAM",
+                "서울",
+                "강남역",
+                new GeoJson.Point(List.of(127.0276, 37.4979)),
+                true,
+                1,
+                null,
+                null
+        )));
+    }
+
     @AfterEach
     void cleanup() {
         DatabaseCleaner.clear(applicationContext);
@@ -55,7 +75,7 @@ class ParticipantFacadeConcurrencyTest {
                         "Test Gathering",
                         LocalDate.now().plusDays(7),
                         TimeSlot.LUNCH,
-                        Region.GANGNAM,
+                        Region.fromString("GANGNAM"),
                         4,
                         null,
                         null,
@@ -177,7 +197,7 @@ class ParticipantFacadeConcurrencyTest {
                         title,
                         LocalDate.now().plusDays(7),
                         TimeSlot.LUNCH,
-                        Region.GANGNAM,
+                        Region.fromString("GANGNAM"),
                         4,
                         null,
                         null,

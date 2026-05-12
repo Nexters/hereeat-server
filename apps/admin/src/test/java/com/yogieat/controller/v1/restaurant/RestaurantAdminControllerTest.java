@@ -116,7 +116,7 @@ class RestaurantAdminControllerTest {
                 "국밥",
                 4.5,
                 "image",
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 LocalDateTime.now()
         );
         RestaurantAdminListResult result = RestaurantAdminListResult.of(List.of(item), 0, 10, 1);
@@ -177,6 +177,8 @@ class RestaurantAdminControllerTest {
     @DisplayName("지역 값이 유효하지 않으면 400을 반환한다")
     void updateRestaurant_ShouldReturn400_WhenRegionInvalid() throws Exception {
         RestaurantRequest.Patch request = RestaurantAdminFixture.patchForInvalidRegion();
+        when(restaurantAdminFacade.updateRestaurant(eq(1L), any(RestaurantCommand.Patch.class)))
+                .thenThrow(new CustomException(ErrorCode.INVALID_LOCATION_NAME));
 
         mockMvc.perform(
                         patch(BASE_URL + "/1")

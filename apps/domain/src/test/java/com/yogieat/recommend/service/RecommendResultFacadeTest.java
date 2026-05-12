@@ -84,7 +84,7 @@ class RecommendResultFacadeTest {
                 "모임",
                 LocalDate.of(2026, 3, 20),
                 null,
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 4,
                 null,
                 LocalDateTime.now(),
@@ -106,7 +106,7 @@ class RecommendResultFacadeTest {
         when(participantService.getByGatheringId(1L)).thenReturn(List.of());
         when(participantAnalyzer.aggregateCategoryPreferences(List.of())).thenReturn(CategoryAggregation.of(Map.of(), Map.of()));
         when(participantAnalyzer.aggregateDistanceRanges(List.of())).thenReturn(Map.of());
-        when(participantAnalyzer.determineMajorityDistanceRange(any(), eq(Region.GANGNAM))).thenReturn(DistanceRange.ANY);
+        when(participantAnalyzer.determineMajorityDistanceRange(any(), eq(Region.fromString("GANGNAM")))).thenReturn(DistanceRange.ANY);
         when(restaurantService.findByIds(List.of(101L))).thenReturn(originalRestaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
@@ -135,7 +135,7 @@ class RecommendResultFacadeTest {
                 null,
                 null,
                 null,
-                Region.GANGNAM,
+                Region.fromString("GANGNAM"),
                 new GeoJson.Point(List.of(127.0, 37.0)),
                 10,
                 0,
