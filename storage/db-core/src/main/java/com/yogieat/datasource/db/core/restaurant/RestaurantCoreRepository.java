@@ -159,11 +159,13 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.createdAt,
                         restaurantEntity.updatedAt,
                         restaurantEntity.offDays,
-                        restaurantEntity.phoneNumber
+                        restaurantEntity.phoneNumber,
+                        restaurantEntity.isDisplay
                 )
                 .from(restaurantEntity)
                 .where(
                         restaurantEntity.deletedAt.isNull(),
+                        restaurantEntity.isDisplay.isTrue(),
                         regionCondition(region),
                         restaurantEntity.categoryId.in(categoryIds),
                         recommendationTimeSlotCondition(gatheringTimeSlot),
@@ -368,8 +370,11 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 .on(restaurantEntity.categoryId.eq(categoryEntity.id))
                 .leftJoin(regionEntity)
                 .on(restaurantEntity.regionId.eq(regionEntity.id))
-                .where(restaurantEntity.deletedAt.isNull())
-                .where(restaurantEntity.id.eq(restaurantId))
+                .where(
+                        restaurantEntity.deletedAt.isNull(),
+                        restaurantEntity.isDisplay.isTrue(),
+                        restaurantEntity.id.eq(restaurantId)
+                )
                 .fetchOne();
 
         if (tuple == null) {
@@ -532,7 +537,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 tuple.get(restaurantEntity.createdAt),
                 tuple.get(restaurantEntity.updatedAt),
                 parseOffDays(tuple.get(restaurantEntity.offDays)),
-                tuple.get(restaurantEntity.phoneNumber)
+                tuple.get(restaurantEntity.phoneNumber),
+                tuple.get(restaurantEntity.isDisplay)
         );
     }
 

@@ -73,7 +73,8 @@ public class RestaurantCollectionWriteService {
                     enrichedData.aiMateSummaryContents(),
                     enrichedData.timeSlot(),
                     enrichedData.offDays(),
-                    enrichedData.phoneNumber()
+                    enrichedData.phoneNumber(),
+                    Boolean.TRUE
             );
 
             restaurantRepository.save(createRestaurant, restaurantRegion.id());

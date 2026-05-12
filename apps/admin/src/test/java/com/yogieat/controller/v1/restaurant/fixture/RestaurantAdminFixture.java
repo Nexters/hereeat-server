@@ -91,6 +91,7 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 null,
+                null,
                 null
         );
     }
@@ -115,6 +116,7 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 null,
+                null,
                 null
         );
     }
@@ -131,6 +133,7 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 "INVALID_REGION",
+                null,
                 null,
                 null,
                 null,
@@ -163,7 +166,8 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 null,
-                "INVALID_SLOT"
+                "INVALID_SLOT",
+                null
         );
     }
 }

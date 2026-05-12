@@ -364,7 +364,8 @@ class RegionMigrationIntegrationTest {
                 "[\"요약\"]",
                 TimeSlot.LUNCH,
                 null,
-                "010-0000-0000"
+                "010-0000-0000",
+                Boolean.TRUE
         );
     }
 
@@ -375,6 +376,7 @@ class RegionMigrationIntegrationTest {
                 null,
                 null,
                 region,
+                null,
                 null,
                 null,
                 null,
