@@ -34,6 +34,8 @@ public record CreateRestaurant(
         // 휴무일
         String offDays,  // JSON 문자열로 저장
         String phoneNumber,
+        String teamRecommendationTitle,
+        String teamRecommendationReason,
         Boolean isDisplay
 ) {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -86,6 +88,8 @@ public record CreateRestaurant(
                 timeSlot,
                 offDaysToJson(offDays),
                 phoneNumber,
+                null,
+                null,
                 isDisplay
         );
     }
@@ -147,6 +151,8 @@ public record CreateRestaurant(
                 detail == null ? null : detail.timeSlot(),
                 offDaysToJson(detail == null ? null : detail.offDays()),
                 detail == null ? null : detail.phoneNumber(),
+                null,
+                null,
                 false
         );
     }

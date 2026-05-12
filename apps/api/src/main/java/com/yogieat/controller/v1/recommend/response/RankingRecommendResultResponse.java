@@ -53,6 +53,10 @@ public record RankingRecommendResultResponse(
         String aiMateSummaryTitle,
         @Schema(description = "AI 요약 내용", example = "[\"양지곰탕 추천\", \"단체석\", \"콜키지 부과\"]")
         List<String> aiMateSummaryContents,
+        @Schema(description = "팀 추천 제목", example = "요기잇 개발자 픽")
+        String teamRecommendationTitle,
+        @Schema(description = "팀 추천 이유", example = "여기 정말 가봤는데, 양지곰탕이 맛있어요")
+        String teamRecommendationReason,
         // 추천 근거 텍스트 (신규)
         @Schema(description = "추천 근거 텍스트", example = "5명 중 3명이 일식을 골라서\n400시간 숙성으로 완성한 겉바속촉 돈카츠\n를 추천해요")
         String reasonText
@@ -80,6 +84,8 @@ public record RankingRecommendResultResponse(
                 ranking.priceLevel(),
                 ranking.aiMateSummaryTitle(),
                 ranking.aiMateSummaryContents(),
+                ranking.teamRecommendationTitle(),
+                ranking.teamRecommendationReason(),
                 ranking.reasonText()
         );
     }

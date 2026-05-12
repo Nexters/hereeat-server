@@ -107,6 +107,8 @@ class CategoryQuotaSelectionStrategyTest {
                 null,
                 null,
                 null,
+                null,
+                null,
                 true
         );
 

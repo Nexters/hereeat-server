@@ -37,6 +37,8 @@ public final class RestaurantFixture {
                 null,
                 null,
                 null,
+                null,
+                null,
                 true
         );
     }
@@ -67,6 +69,8 @@ public final class RestaurantFixture {
                 source.updatedAt(),
                 null,
                 null,
+                null,
+                null,
                 true
         );
     }
@@ -92,6 +96,8 @@ public final class RestaurantFixture {
                 "updated-summary-title",
                 List.of("summary"),
                 TimeSlot.BOTH,
+                "요기잇 개발자 픽",
+                "여기 정말 가봤는데, 메뉴가 맛있어요",
                 true
         );
     }

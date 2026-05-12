@@ -91,6 +91,8 @@ public final class RestaurantAdminResult {
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
             String phoneNumber,
+            String teamRecommendationTitle,
+            String teamRecommendationReason,
             Boolean isDisplay
     ) {
         public static Detail of(
@@ -119,6 +121,8 @@ public final class RestaurantAdminResult {
                 LocalDateTime createdAt,
                 LocalDateTime updatedAt,
                 String phoneNumber,
+                String teamRecommendationTitle,
+                String teamRecommendationReason,
                 Boolean isDisplay
         ) {
             return new Detail(
@@ -147,6 +151,8 @@ public final class RestaurantAdminResult {
                     createdAt,
                     updatedAt,
                     phoneNumber,
+                    teamRecommendationTitle,
+                    teamRecommendationReason,
                     isDisplay
             );
         }
@@ -178,6 +184,8 @@ public final class RestaurantAdminResult {
                     restaurant.createdAt(),
                     restaurant.updatedAt(),
                     restaurant.phoneNumber(),
+                    restaurant.teamRecommendationTitle(),
+                    restaurant.teamRecommendationReason(),
                     restaurant.isDisplay()
             );
         }

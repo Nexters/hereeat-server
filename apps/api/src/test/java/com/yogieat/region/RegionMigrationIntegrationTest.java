@@ -24,6 +24,7 @@ import com.yogieat.region.service.RegionService;
 import com.yogieat.restaurant.domain.CreateRestaurant;
 import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
+import com.yogieat.restaurant.result.RestaurantAdminResult;
 import com.yogieat.restaurant.service.RestaurantAdminListCriteria;
 import com.yogieat.restaurant.service.RestaurantCommand;
 import com.yogieat.restaurant.service.RestaurantRepository;
@@ -310,6 +311,10 @@ class RegionMigrationIntegrationTest {
         assertThat(restaurantRepository.countAdminRestaurantList(
                 RestaurantAdminListCriteria.of(null, Region.fromString("GANGNAM"), null, null)
         )).isEqualTo(1L);
+        RestaurantAdminResult.Detail adminRestaurantDetail = restaurantRepository
+                .findAdminRestaurantDetailById(regionIdOnlyRestaurantId)
+                .orElseThrow();
+        assertThat(adminRestaurantDetail.region()).isEqualTo(Region.fromString("GANGNAM"));
 
         List<Gathering> gangnamGatherings = gatheringRepository.findAdminGatherings(
                 GatheringAdminCriteria.List.of(null, Region.fromString("GANGNAM"), null, false)
@@ -358,6 +363,8 @@ class RegionMigrationIntegrationTest {
                 TimeSlot.LUNCH,
                 null,
                 "010-0000-0000",
+                null,
+                null,
                 Boolean.TRUE
         );
     }
@@ -369,6 +376,8 @@ class RegionMigrationIntegrationTest {
                 null,
                 null,
                 region,
+                null,
+                null,
                 null,
                 null,
                 null,

@@ -1,7 +1,9 @@
 package com.yogieat.controller.v1.restaurant;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -32,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -103,6 +106,8 @@ class RestaurantAdminControllerTest {
                 .andExpect(jsonPath("$.data.name").value("restaurant"))
                 .andExpect(jsonPath("$.data.largeCategory").value("KOREAN"))
                 .andExpect(jsonPath("$.data.mediumCategory").value("국밥"))
+                .andExpect(jsonPath("$.data.teamRecommendationTitle").value("요기잇 개발자 픽"))
+                .andExpect(jsonPath("$.data.teamRecommendationReason").value("여기 정말 가봤는데, 국밥이 맛있어요"))
                 .andExpect(jsonPath("$.data.isDisplay").value(true));
     }
 
@@ -153,6 +158,7 @@ class RestaurantAdminControllerTest {
                 .thenReturn(result);
 
         RestaurantRequest.Patch request = RestaurantAdminFixture.patchForUpdateName();
+        Mockito.clearInvocations(restaurantAdminFacade);
 
         mockMvc.perform(
                         patch(BASE_URL + "/1")
@@ -161,7 +167,16 @@ class RestaurantAdminControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("updated"))
+                .andExpect(jsonPath("$.data.teamRecommendationTitle").value("요기잇 개발자 픽"))
+                .andExpect(jsonPath("$.data.teamRecommendationReason").value("여기 정말 가봤는데, 국밥이 맛있어요"))
                 .andExpect(jsonPath("$.data.isDisplay").value(false));
+
+        ArgumentCaptor<RestaurantCommand.Patch> commandCaptor =
+                ArgumentCaptor.forClass(RestaurantCommand.Patch.class);
+        verify(restaurantAdminFacade).updateRestaurant(eq(1L), commandCaptor.capture());
+        RestaurantCommand.Patch command = commandCaptor.getValue();
+        assertThat(command.teamRecommendationTitle()).isEqualTo("요기잇 개발자 픽");
+        assertThat(command.teamRecommendationReason()).isEqualTo("여기 정말 가봤는데, 국밥이 맛있어요");
     }
 
     @Test

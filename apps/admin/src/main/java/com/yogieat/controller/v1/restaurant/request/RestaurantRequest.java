@@ -61,6 +61,8 @@ public final class RestaurantRequest {
             String aiMateSummaryTitle,
             List<String> aiMateSummaryContents,
             String timeSlot,
+            String teamRecommendationTitle,
+            String teamRecommendationReason,
             Boolean isDisplay
     ) {
         public static Patch from(
@@ -83,6 +85,8 @@ public final class RestaurantRequest {
                 String aiMateSummaryTitle,
                 List<String> aiMateSummaryContents,
                 String timeSlot,
+                String teamRecommendationTitle,
+                String teamRecommendationReason,
                 Boolean isDisplay
         ) {
             return new Patch(
@@ -105,12 +109,16 @@ public final class RestaurantRequest {
                     aiMateSummaryTitle,
                     aiMateSummaryContents,
                     timeSlot,
+                    teamRecommendationTitle,
+                    teamRecommendationReason,
                     isDisplay
             );
         }
 
         public static Patch of() {
             return new Patch(
+                    null,
+                    null,
                     null,
                     null,
                     null,
@@ -159,6 +167,8 @@ public final class RestaurantRequest {
                     trimOrNull(request.aiMateSummaryTitle()),
                     trimAiMateSummaryContents(request.aiMateSummaryContents()),
                     parseTimeSlot(request.timeSlot()),
+                    trimOrNull(request.teamRecommendationTitle()),
+                    trimOrNull(request.teamRecommendationReason()),
                     request.isDisplay()
             );
         }

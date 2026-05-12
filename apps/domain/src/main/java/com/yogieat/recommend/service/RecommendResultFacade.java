@@ -281,6 +281,8 @@ public class RecommendResultFacade {
                 restaurant.priceLevel(),
                 restaurant.aiMateSummaryTitle(),
                 restaurant.aiMateSummaryContents(),
+                restaurant.teamRecommendationTitle(),
+                restaurant.teamRecommendationReason(),
                 // 추천 근거 텍스트
                 reasonText
         );

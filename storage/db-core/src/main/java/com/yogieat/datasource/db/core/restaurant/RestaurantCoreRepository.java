@@ -161,6 +161,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.updatedAt,
                         restaurantEntity.offDays,
                         restaurantEntity.phoneNumber,
+                        restaurantEntity.teamRecommendationTitle,
+                        restaurantEntity.teamRecommendationReason,
                         restaurantEntity.isDisplay
                 )
                 .from(restaurantEntity)
@@ -367,6 +369,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         entity.getCreatedAt(),
                         entity.getUpdatedAt(),
                         entity.getPhoneNumber(),
+                        entity.getTeamRecommendationTitle(),
+                        entity.getTeamRecommendationReason(),
                         entity.getIsDisplay()
                 )
         );
@@ -415,7 +419,9 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 entity.getReviewCount(),
                 entity.getAiMateSummaryTitle(),
                 parseAiMateSummaryContents(entity.getAiMateSummaryContents()),
-                entity.getPhoneNumber()
+                entity.getPhoneNumber(),
+                entity.getTeamRecommendationTitle(),
+                entity.getTeamRecommendationReason()
         ));
     }
 
@@ -423,7 +429,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
             RestaurantAdminListCriteria criteria
     ) {
         return jpaQueryFactory
-                .select(restaurantEntity, categoryEntity.largeCategory, categoryEntity.mediumCategory)
+                .select(restaurantEntity, categoryEntity.largeCategory, categoryEntity.mediumCategory, regionEntity)
                 .from(restaurantEntity)
                 .leftJoin(categoryEntity)
                 .on(restaurantEntity.categoryId.eq(categoryEntity.id))
@@ -552,6 +558,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 tuple.get(restaurantEntity.updatedAt),
                 parseOffDays(tuple.get(restaurantEntity.offDays)),
                 tuple.get(restaurantEntity.phoneNumber),
+                tuple.get(restaurantEntity.teamRecommendationTitle),
+                tuple.get(restaurantEntity.teamRecommendationReason),
                 tuple.get(restaurantEntity.isDisplay)
         );
     }

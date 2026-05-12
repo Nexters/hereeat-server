@@ -118,6 +118,12 @@ class RecommendResultFacadeTest {
         assertThat(result.rankings())
                 .extracting(RecommendResultData.Ranking::reasonText)
                 .containsExactly("original");
+        assertThat(result.rankings())
+                .extracting(RecommendResultData.Ranking::teamRecommendationTitle)
+                .containsExactly("요기잇 개발자 픽");
+        assertThat(result.rankings())
+                .extracting(RecommendResultData.Ranking::teamRecommendationReason)
+                .containsExactly("여기 정말 가봤는데, 메뉴가 맛있어요");
         assertThat(result.averageAgreementRate()).isEqualTo(35.0);
         verify(restaurantService).findByIds(List.of(101L));
         verifyNoInteractions(recommendRerollHistoryService);
@@ -149,6 +155,8 @@ class RecommendResultFacadeTest {
                 null,
                 null,
                 null,
+                "요기잇 개발자 픽",
+                "여기 정말 가봤는데, 메뉴가 맛있어요",
                 true
         );
     }

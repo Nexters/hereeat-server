@@ -28,7 +28,9 @@ public final class RestaurantDetailResponse {
             Integer reviewCount,
             String aiMateSummaryTitle,
             List<String> aiMateSummaryContents,
-            String phoneNumber
+            String phoneNumber,
+            String teamRecommendationTitle,
+            String teamRecommendationReason
     ) {
         public static Detail from(RestaurantDetailResult result) {
             return new Detail(
@@ -49,7 +51,9 @@ public final class RestaurantDetailResponse {
                     result.reviewCount(),
                     result.aiMateSummaryTitle(),
                     result.aiMateSummaryContents(),
-                    result.phoneNumber()
+                    result.phoneNumber(),
+                    result.teamRecommendationTitle(),
+                    result.teamRecommendationReason()
             );
         }
     }

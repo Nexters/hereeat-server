@@ -22,7 +22,9 @@ public record RestaurantDetailResult(
         Integer reviewCount,
         String aiMateSummaryTitle,
         List<String> aiMateSummaryContents,
-        String phoneNumber
+        String phoneNumber,
+        String teamRecommendationTitle,
+        String teamRecommendationReason
 ) {
     public static RestaurantDetailResult of(
             Long restaurantId,
@@ -42,7 +44,9 @@ public record RestaurantDetailResult(
             Integer reviewCount,
             String aiMateSummaryTitle,
             List<String> aiMateSummaryContents,
-            String phoneNumber
+            String phoneNumber,
+            String teamRecommendationTitle,
+            String teamRecommendationReason
     ) {
         return new RestaurantDetailResult(
                 restaurantId,
@@ -62,7 +66,9 @@ public record RestaurantDetailResult(
                 reviewCount,
                 aiMateSummaryTitle,
                 aiMateSummaryContents,
-                phoneNumber
+                phoneNumber,
+                teamRecommendationTitle,
+                teamRecommendationReason
         );
     }
 }

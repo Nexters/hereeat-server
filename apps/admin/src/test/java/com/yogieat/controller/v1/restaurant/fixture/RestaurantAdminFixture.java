@@ -38,6 +38,8 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 null,
+                "요기잇 개발자 픽",
+                "여기 정말 가봤는데, 국밥이 맛있어요",
                 true
         );
     }
@@ -69,6 +71,8 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 null,
+                "요기잇 개발자 픽",
+                "여기 정말 가봤는데, 국밥이 맛있어요",
                 false
         );
     }
@@ -94,6 +98,8 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 null,
+                "요기잇 개발자 픽",
+                "  여기 정말 가봤는데, 국밥이 맛있어요  ",
                 null
         );
     }
@@ -119,6 +125,8 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 null,
+                null,
+                null,
                 null
         );
     }
@@ -135,6 +143,8 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 "INVALID_REGION",
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -169,6 +179,8 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 "INVALID_SLOT",
+                null,
+                null,
                 null
         );
     }
