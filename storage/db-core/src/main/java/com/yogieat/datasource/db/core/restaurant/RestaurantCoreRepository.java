@@ -286,6 +286,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         restaurantEntity.rating,
                         restaurantEntity.imageUrl,
                         regionEntity,
+                        restaurantEntity.isDisplay,
                         restaurantEntity.updatedAt
                 )
                 .from(restaurantEntity)
@@ -365,7 +366,8 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                         entity.getTimeSlot(),
                         entity.getCreatedAt(),
                         entity.getUpdatedAt(),
-                        entity.getPhoneNumber()
+                        entity.getPhoneNumber(),
+                        entity.getIsDisplay()
                 )
         );
     }
@@ -440,6 +442,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                 tuple.get(restaurantEntity.rating),
                 tuple.get(restaurantEntity.imageUrl),
                 toRegion(tuple.get(regionEntity)),
+                tuple.get(restaurantEntity.isDisplay),
                 tuple.get(restaurantEntity.updatedAt)
         );
     }

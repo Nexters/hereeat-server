@@ -37,7 +37,8 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 null,
-                null
+                null,
+                true
         );
     }
 
@@ -67,7 +68,8 @@ public final class RestaurantAdminFixture {
                 null,
                 null,
                 null,
-                null
+                null,
+                false
         );
     }
 

@@ -14,6 +14,7 @@ public record RestaurantListItemResponse(
         Double rating,
         String imageUrl,
         Region region,
+        Boolean isDisplay,
         LocalDateTime updatedAt
 ) {
     public static RestaurantListItemResponse from(RestaurantAdminListItemResult result) {
@@ -26,6 +27,7 @@ public record RestaurantListItemResponse(
                 result.rating(),
                 result.imageUrl(),
                 result.region(),
+                result.isDisplay(),
                 result.updatedAt()
         );
     }

@@ -84,6 +84,7 @@ public final class RestaurantAdminResponse {
             String aiMateSummaryTitle,
             List<String> aiMateSummaryContents,
             TimeSlot timeSlot,
+            Boolean isDisplay,
             LocalDateTime createdAt,
             LocalDateTime updatedAt
     ) {
@@ -111,6 +112,7 @@ public final class RestaurantAdminResponse {
                     result.aiMateSummaryTitle(),
                     result.aiMateSummaryContents(),
                     result.timeSlot(),
+                    result.isDisplay(),
                     result.createdAt(),
                     result.updatedAt()
             );

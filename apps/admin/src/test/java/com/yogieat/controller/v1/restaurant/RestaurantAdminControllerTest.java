@@ -102,7 +102,8 @@ class RestaurantAdminControllerTest {
                 .andExpect(jsonPath("$.data.id").value(1L))
                 .andExpect(jsonPath("$.data.name").value("restaurant"))
                 .andExpect(jsonPath("$.data.largeCategory").value("KOREAN"))
-                .andExpect(jsonPath("$.data.mediumCategory").value("국밥"));
+                .andExpect(jsonPath("$.data.mediumCategory").value("국밥"))
+                .andExpect(jsonPath("$.data.isDisplay").value(true));
     }
 
     @Test
@@ -117,6 +118,7 @@ class RestaurantAdminControllerTest {
                 4.5,
                 "image",
                 Region.fromString("GANGNAM"),
+                false,
                 LocalDateTime.now()
         );
         RestaurantAdminListResult result = RestaurantAdminListResult.of(List.of(item), 0, 10, 1);
@@ -127,7 +129,8 @@ class RestaurantAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].id").value(1L))
                 .andExpect(jsonPath("$.data.content[0].largeCategory").value("KOREAN"))
-                .andExpect(jsonPath("$.data.content[0].mediumCategory").value("국밥"));
+                .andExpect(jsonPath("$.data.content[0].mediumCategory").value("국밥"))
+                .andExpect(jsonPath("$.data.content[0].isDisplay").value(false));
     }
 
     @Test
@@ -157,7 +160,8 @@ class RestaurantAdminControllerTest {
                                 .content(objectMapper.writeValueAsString(request))
                 )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.name").value("updated"));
+                .andExpect(jsonPath("$.data.name").value("updated"))
+                .andExpect(jsonPath("$.data.isDisplay").value(false));
     }
 
     @Test
