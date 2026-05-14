@@ -128,7 +128,15 @@ public class LockManager {
             if (acquired) {
                 lock.unlock();
                 log.debug("Lock released for key: {}", key);
+                removeStringLockIfIdle(key, lock);
             }
+        }
+    }
+
+    private void removeStringLockIfIdle(String key, ReentrantLock lock) {
+        if (!lock.isLocked() && !lock.hasQueuedThreads()) {
+            stringLocks.remove(key, lock);
+            log.debug("Removed idle lock for key: {}", key);
         }
     }
 

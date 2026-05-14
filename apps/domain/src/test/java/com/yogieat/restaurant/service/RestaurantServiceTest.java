@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -82,6 +84,27 @@ class RestaurantServiceTest {
     }
 
     @Test
+    @DisplayName("맛집 생성 시 기존 맛집이 있으면 외부 조회와 락 없이 중복 응답을 반환한다")
+    void createRestaurant_ShouldReturnDuplicatedWithoutExternalLookup_WhenRestaurantAlreadyExists() {
+        String externalId = "external";
+        RestaurantCommand.Create command = new RestaurantCommand.Create(
+                externalId,
+                1L,
+                Region.fromString("HONGDAE"),
+                null
+        );
+        Restaurant existingRestaurant = RestaurantFixture.sampleSourceRestaurantForAdmin();
+
+        when(restaurantRepository.findByExternalId(externalId)).thenReturn(Optional.of(existingRestaurant));
+
+        RestaurantAdminResult.Create result = restaurantService.createRestaurant(command);
+
+        assertThat(result).isEqualTo(RestaurantAdminResult.Create.duplicated(existingRestaurant.id()));
+        verify(restaurantAdminLookupService, never()).fetchPlaceDetail(anyString());
+        verify(lockManager, never()).executeWithLock(anyString(), Mockito.<LockManager.Task<RestaurantAdminResult.Create>>any());
+    }
+
+    @Test
     @DisplayName("맛집 생성 중 유니크 충돌이 발생하면 기존 맛집을 중복 응답으로 반환한다")
     void createRestaurant_ShouldReturnDuplicated_WhenSaveConflictsWithExistingExternalId() {
         String externalId = "external";
@@ -100,7 +123,7 @@ class RestaurantServiceTest {
                     return task.execute();
                 });
         when(restaurantRepository.findByExternalId(externalId))
-                .thenReturn(Optional.empty(), Optional.of(existingRestaurant));
+                .thenReturn(Optional.empty(), Optional.empty(), Optional.of(existingRestaurant));
         when(restaurantAdminLookupService.fetchPlaceDetail(externalId))
                 .thenReturn(KakaoPlaceDetailFetchResult.success(sampleDetail(externalId)));
         when(restaurantCommandService.save(any(CreateRestaurant.class)))
@@ -109,6 +132,12 @@ class RestaurantServiceTest {
         RestaurantAdminResult.Create result = restaurantService.createRestaurant(command);
 
         assertThat(result).isEqualTo(RestaurantAdminResult.Create.duplicated(existingRestaurant.id()));
+        InOrder inOrder = Mockito.inOrder(restaurantAdminLookupService, lockManager);
+        inOrder.verify(restaurantAdminLookupService).fetchPlaceDetail(externalId);
+        inOrder.verify(lockManager).executeWithLock(
+                eq("restaurant:create:" + externalId),
+                Mockito.<LockManager.Task<RestaurantAdminResult.Create>>any()
+        );
         verify(lockManager).executeWithLock(
                 eq("restaurant:create:" + externalId),
                 Mockito.<LockManager.Task<RestaurantAdminResult.Create>>any()

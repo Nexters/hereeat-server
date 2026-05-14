@@ -60,16 +60,26 @@ public class RestaurantService {
         return restaurantRepository.applyAdminPatch(id, command);
     }
 
-    @Transactional
     public RestaurantAdminResult.Create createRestaurant(RestaurantCommand.Create command) {
         restaurantValidator.validateCreateCommand(command);
         String externalId = command.externalId().strip();
+
+        return restaurantRepository.findByExternalId(externalId)
+                .map(restaurant -> RestaurantAdminResult.Create.duplicated(restaurant.id()))
+                .orElseGet(() -> createRestaurantByExternalId(command, externalId));
+    }
+
+    private RestaurantAdminResult.Create createRestaurantByExternalId(
+            RestaurantCommand.Create command,
+            String externalId
+    ) {
+        CreateRestaurant createRestaurant = prepareCreateRestaurant(command, externalId);
 
         return lockManager.executeWithLock(
                 buildCreateLockKey(externalId),
                 () -> restaurantRepository.findByExternalId(externalId)
                         .map(restaurant -> RestaurantAdminResult.Create.duplicated(restaurant.id()))
-                        .orElseGet(() -> createRestaurantByExternalId(command, externalId))
+                        .orElseGet(() -> saveRestaurantHandlingRace(createRestaurant, externalId))
         );
     }
 
@@ -88,7 +98,7 @@ public class RestaurantService {
         return restaurantRepository.countActiveRestaurants();
     }
 
-    private RestaurantAdminResult.Create createRestaurantByExternalId(
+    private CreateRestaurant prepareCreateRestaurant(
             RestaurantCommand.Create command,
             String externalId
     ) {
@@ -102,16 +112,21 @@ public class RestaurantService {
 
         restaurantValidator.validateCreateDetail(detailResult.detail());
 
+        return CreateRestaurant.fromKakaoPlaceDetail(
+                detailResult.detail(),
+                command.categoryId(),
+                externalId,
+                command.region(),
+                command.description()
+        );
+    }
+
+    private RestaurantAdminResult.Create saveRestaurantHandlingRace(
+            CreateRestaurant createRestaurant,
+            String externalId
+    ) {
         try {
-            Restaurant createdRestaurant = restaurantCommandService.save(
-                    CreateRestaurant.fromKakaoPlaceDetail(
-                            detailResult.detail(),
-                            command.categoryId(),
-                            externalId,
-                            command.region(),
-                            command.description()
-                    )
-            );
+            Restaurant createdRestaurant = restaurantCommandService.save(createRestaurant);
             return RestaurantAdminResult.Create.created(createdRestaurant.id());
         } catch (DataIntegrityViolationException e) {
             return restaurantRepository.findByExternalId(externalId)
