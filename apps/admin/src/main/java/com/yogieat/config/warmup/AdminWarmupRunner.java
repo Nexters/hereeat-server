@@ -13,15 +13,16 @@ import javax.sql.DataSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StopWatch;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class AdminWarmupRunner {
+public class AdminWarmupRunner implements ApplicationRunner {
 
     private static final String DUMMY_BCRYPT_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
@@ -36,8 +37,8 @@ public class AdminWarmupRunner {
     @Value("${admin.warmup.enabled:true}")
     private boolean enabled;
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void warmUpAfterApplicationReady() {
+    @Override
+    public void run(ApplicationArguments args) {
         warmUp();
     }
 
@@ -67,10 +68,16 @@ public class AdminWarmupRunner {
     }
 
     private void runStep(String stepName, WarmupStep step) {
+        StopWatch stopWatch = new StopWatch(stepName);
         try {
+            stopWatch.start();
             step.run();
-            log.debug("Admin warmup step completed: {}", stepName);
+            stopWatch.stop();
+            log.info("Admin warmup step completed: {} ({} ms)", stepName, stopWatch.getTotalTimeMillis());
         } catch (Exception e) {
+            if (stopWatch.isRunning()) {
+                stopWatch.stop();
+            }
             log.warn("Admin warmup step failed: {}", stepName, e);
         }
     }

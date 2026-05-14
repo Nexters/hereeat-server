@@ -83,6 +83,11 @@ public class RestaurantService {
         return restaurantRepository.countAdminRestaurantList(criteria);
     }
 
+    @Transactional(readOnly = true)
+    public long countActiveRestaurants() {
+        return restaurantRepository.countActiveRestaurants();
+    }
+
     private RestaurantAdminResult.Create createRestaurantByExternalId(
             RestaurantCommand.Create command,
             String externalId
