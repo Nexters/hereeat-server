@@ -9,6 +9,7 @@ import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.result.RestaurantAdminListItemResult;
 import com.yogieat.restaurant.result.RestaurantAdminResult;
 import com.yogieat.restaurant.result.RestaurantDetailResult;
+import com.yogieat.util.LockManager;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -18,9 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class RestaurantService {
+    private static final String RESTAURANT_CREATE_LOCK_PREFIX = "restaurant:create:";
+
     private final RestaurantRepository restaurantRepository;
+    private final RestaurantCommandService restaurantCommandService;
     private final RestaurantAdminLookupService restaurantAdminLookupService;
     private final RestaurantValidator restaurantValidator;
+    private final LockManager lockManager;
 
     @Transactional(readOnly = true)
     public Restaurant getBy(Long id) {
@@ -60,9 +65,12 @@ public class RestaurantService {
         restaurantValidator.validateCreateCommand(command);
         String externalId = command.externalId().strip();
 
-        return restaurantRepository.findByExternalId(externalId)
-                .map(restaurant -> RestaurantAdminResult.Create.duplicated(restaurant.id()))
-                .orElseGet(() -> createRestaurantByExternalId(command, externalId));
+        return lockManager.executeWithLock(
+                buildCreateLockKey(externalId),
+                () -> restaurantRepository.findByExternalId(externalId)
+                        .map(restaurant -> RestaurantAdminResult.Create.duplicated(restaurant.id()))
+                        .orElseGet(() -> createRestaurantByExternalId(command, externalId))
+        );
     }
 
     @Transactional
@@ -90,7 +98,7 @@ public class RestaurantService {
         restaurantValidator.validateCreateDetail(detailResult.detail());
 
         try {
-            Restaurant createdRestaurant = restaurantRepository.save(
+            Restaurant createdRestaurant = restaurantCommandService.save(
                     CreateRestaurant.fromKakaoPlaceDetail(
                             detailResult.detail(),
                             command.categoryId(),
@@ -105,5 +113,9 @@ public class RestaurantService {
                     .map(restaurant -> RestaurantAdminResult.Create.duplicated(restaurant.id()))
                     .orElseThrow(() -> new CustomException(ErrorCode.KAKAO_API_ERROR));
         }
+    }
+
+    private String buildCreateLockKey(String externalId) {
+        return RESTAURANT_CREATE_LOCK_PREFIX + externalId;
     }
 }
