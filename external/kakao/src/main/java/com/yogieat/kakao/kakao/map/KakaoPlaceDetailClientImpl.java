@@ -42,6 +42,23 @@ public class KakaoPlaceDetailClientImpl implements KakaoPlaceDetailClient {
         );
     }
 
+    @Override
+    public void prefetchPlaceDetailResult(String placeId) {
+        if (placeId == null || placeId.isBlank()) {
+            return;
+        }
+
+        Thread.ofVirtual()
+                .name("kakao-detail-prefetch-", 0)
+                .start(() -> {
+                    try {
+                        fetchPlaceDetailResult(placeId);
+                    } catch (RuntimeException e) {
+                        log.debug("Failed to prefetch place detail: placeId={}", placeId, e);
+                    }
+                });
+    }
+
     private KakaoPlaceDetailFetchResult fetchPlaceDetailResultWithoutPolicy(String placeId) {
         if (placeId == null || placeId.isBlank()) {
             log.warn("Cannot fetch place detail: placeId is null or blank");
