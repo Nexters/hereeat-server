@@ -12,5 +12,8 @@ public interface KakaoPlaceDetailClient {
                 .orElseGet(KakaoPlaceDetailFetchResult::unavailable);
     }
 
+    default void prefetchPlaceDetailResult(String placeId) {
+    }
+
     Optional<KakaoPlaceDetailData> fetchPlaceDetail(String placeId);
 }

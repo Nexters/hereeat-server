@@ -34,7 +34,9 @@ public class RestaurantAdminLookupService {
             return List.of();
         }
 
-        return kakaoPlaceClient().searchPlaces(normalizedKeyword, null, requestedSize);
+        List<KaKaoPlaceDocumentResult> results = kakaoPlaceClient().searchPlaces(normalizedKeyword, null, requestedSize);
+        prefetchPlaceDetails(results);
+        return results;
     }
 
     public KakaoPlaceDetailFetchResult fetchPlaceDetail(String externalId) {
@@ -68,5 +70,21 @@ public class RestaurantAdminLookupService {
             throw new CustomException(ErrorCode.KAKAO_API_ERROR);
         }
         return client;
+    }
+
+    private void prefetchPlaceDetails(List<KaKaoPlaceDocumentResult> results) {
+        if (results == null || results.isEmpty()) {
+            return;
+        }
+
+        KakaoPlaceDetailClient client = kakaoPlaceDetailClientProvider.getIfAvailable();
+        if (client == null) {
+            return;
+        }
+
+        results.stream()
+                .map(KaKaoPlaceDocumentResult::id)
+                .filter(id -> id != null && !id.isBlank())
+                .forEach(client::prefetchPlaceDetailResult);
     }
 }
