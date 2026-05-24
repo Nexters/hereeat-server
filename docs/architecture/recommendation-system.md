@@ -180,7 +180,7 @@ flowchart TD
 
 ## 점수 모델
 
-최종 점수는 8개 요소의 합이며, 소수점 셋째 자리에서 반올림합니다.
+최종 점수는 9개 요소의 합이며, 소수점 셋째 자리에서 반올림합니다.
 
 ```text
 totalScore
@@ -192,6 +192,7 @@ totalScore
  + AI 요약 부스트
  + Cold Start 부스트
  + Freshness 부스트
+ + 팀 추천 부스트
 ```
 
 ### 1) 선호도 점수 — 순위별 가중 투표
@@ -276,6 +277,14 @@ agreementBonus = agreementRate / 100
 
 > **설계 의도**: Cold Start 부스트로 신규 맛집도 추천 대상에 포함되도록 하되, 평점 4.0 이상 조건으로 품질을 보장합니다. Freshness로 정보가 오래된 맛집에는 페널티를 부여합니다.
 
+### 8) 팀 추천 부스트
+
+| 조건 | 점수 |
+|:--|:--|
+| `teamRecommendationTitle`과 `teamRecommendationReason`이 모두 비어 있지 않음 | +3.0 |
+
+> **설계 의도**: 운영팀이 제목과 사유를 모두 작성한 맛집은 사용자 1순위 카테고리 선호 1표와 동일한 강도의 큐레이션 신호로 반영합니다.
+
 참고: `RecommendationScoringPolicy`에 `diversityBonus` 파라미터가 정의되어 있으나, 현재 점수 합산에는 사용하지 않습니다.
 
 ### 설정 오버라이드
@@ -286,6 +295,7 @@ agreementBonus = agreementRate / 100
 recommendation:
   scoring:
     distance-bonus: 1.0
+    team-recommendation-boost: 3.0
     ai-summary:
       group-size-threshold: 4
       group-keywords: ["단체석", "대형 테이블", "모임", "단체"]
