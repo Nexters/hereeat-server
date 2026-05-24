@@ -12,6 +12,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record RecommendationScoringPolicy(
         @DefaultValue("1.0") double distanceBonus,
         @DefaultValue("0.5") double diversityBonus,
+        @DefaultValue("3.0") double teamRecommendationBoost,
         @DefaultValue AiSummary aiSummary,
         @DefaultValue ColdStart coldStart,
         @DefaultValue Freshness freshness,
@@ -24,7 +25,7 @@ public record RecommendationScoringPolicy(
      */
     public static RecommendationScoringPolicy defaults() {
         return new RecommendationScoringPolicy(
-                1.0, 0.5,
+                1.0, 0.5, 3.0,
                 new AiSummary(0.5, 0.3, -0.2, 4,
                         List.of("단체석", "대형 테이블", "모임", "단체"),
                         List.of("추천", "인기", "맛집", "특별", "유명"),

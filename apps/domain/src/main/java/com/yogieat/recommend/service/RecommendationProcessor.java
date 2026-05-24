@@ -400,6 +400,11 @@ public class RecommendationProcessor {
             // 8. Freshness 부스트 (정보 신선도)
             baseScore += calculateFreshnessBoost(restaurant, now);
 
+            // 9. 팀 추천 부스트
+            if (hasTeamRecommendation(restaurant)) {
+                baseScore += scoringPolicy.teamRecommendationBoost();
+            }
+
             // 소수점 셋째 자리 반올림
             baseScore = roundToThreeDecimals(baseScore);
 
@@ -733,6 +738,15 @@ public class RecommendationProcessor {
         }
 
         return 0.0;  // 30~90일: 0점
+    }
+
+    private boolean hasTeamRecommendation(Restaurant restaurant) {
+        return hasText(restaurant.teamRecommendationTitle())
+                && hasText(restaurant.teamRecommendationReason());
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     /**
