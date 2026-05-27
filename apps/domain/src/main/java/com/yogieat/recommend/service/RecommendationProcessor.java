@@ -40,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -741,12 +742,8 @@ public class RecommendationProcessor {
     }
 
     private boolean hasTeamRecommendation(Restaurant restaurant) {
-        return hasText(restaurant.teamRecommendationTitle())
-                && hasText(restaurant.teamRecommendationReason());
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
+        return StringUtils.hasText(restaurant.teamRecommendationTitle())
+                && StringUtils.hasText(restaurant.teamRecommendationReason());
     }
 
     /**

@@ -610,7 +610,7 @@ class RecommendationProcessorTest {
 
     private double scoreOf(List<RecommendResult> results, Long restaurantId) {
         return results.stream()
-                .filter(result -> result.restaurantId().equals(restaurantId))
+                .filter(result -> restaurantId.equals(result.restaurantId()))
                 .map(RecommendResult::score)
                 .findFirst()
                 .orElseThrow();
