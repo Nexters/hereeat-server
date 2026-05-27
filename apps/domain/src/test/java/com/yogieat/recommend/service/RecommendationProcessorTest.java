@@ -235,6 +235,38 @@ class RecommendationProcessorTest {
     }
 
     @Test
+    @DisplayName("팀 추천 제목과 사유가 모두 있으면 3점을 가산한다")
+    void addsTeamRecommendationBoost_when_titleAndReasonArePresent() {
+        Long gatheringId = 14L;
+        Region region = gangnam();
+        List<Participant> participants = List.of(
+                participant(1L, gatheringId, DistanceRange.ANY, "한식", null),
+                participant(2L, gatheringId, DistanceRange.ANY, "한식", null)
+        );
+        List<Category> categories = List.of(category(1L, LargeCategory.KOREAN));
+        List<Restaurant> restaurants = List.of(
+                restaurant(1001L, 1L, "팀추천한식", 4.5, point(127.0276, 37.4979), 10, "팀 추천", "직접 가본 맛집"),
+                restaurant(1002L, 1L, "초기화한식", 4.5, point(127.0277, 37.4978), 10, "", " "),
+                restaurant(1003L, 1L, "일반한식", 4.5, point(127.0278, 37.4977), 10)
+        );
+
+        when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
+        when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
+        when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
+                .thenReturn(restaurants);
+        when(categoryService.findAll()).thenReturn(categories);
+
+        recommendationProcessor.processRecommendation(gatheringId, region);
+
+        assertThat(savedRecommendationBatches).hasSize(1);
+        List<RecommendResult> results = savedRecommendationBatches.getFirst();
+        assertThat(restaurantIdsByRank(results)).containsExactly(1001L, 1002L, 1003L);
+        assertThat(scoreOf(results, 1001L) - scoreOf(results, 1002L)).isCloseTo(3.0, within(0.001));
+        assertThat(scoreOf(results, 1002L)).isCloseTo(scoreOf(results, 1003L), within(0.001));
+    }
+
+    @Test
     @DisplayName("추천 후보 조회 시 불호 우세 카테고리를 제외하고 TimeSlot을 전달한다")
     void passesFilteredCategoriesAndGatheringTimeSlot_when_loadingRecommendationCandidates() {
         Long gatheringId = 21L;
@@ -576,6 +608,14 @@ class RecommendationProcessorTest {
                 .toList();
     }
 
+    private double scoreOf(List<RecommendResult> results, Long restaurantId) {
+        return results.stream()
+                .filter(result -> restaurantId.equals(result.restaurantId()))
+                .map(RecommendResult::score)
+                .findFirst()
+                .orElseThrow();
+    }
+
     private Participant participant(
             Long participantId,
             Long gatheringId,
@@ -609,6 +649,19 @@ class RecommendationProcessorTest {
             GeoJson.Point location,
             Integer reviewCount
     ) {
+        return restaurant(id, categoryId, name, rating, location, reviewCount, null, null);
+    }
+
+    private Restaurant restaurant(
+            Long id,
+            Long categoryId,
+            String name,
+            Double rating,
+            GeoJson.Point location,
+            Integer reviewCount,
+            String teamRecommendationTitle,
+            String teamRecommendationReason
+    ) {
         return new Restaurant(
                 id,
                 "ext-" + id,
@@ -634,8 +687,8 @@ class RecommendationProcessorTest {
                 null,
                 null,
                 null,
-                null,
-                null,
+                teamRecommendationTitle,
+                teamRecommendationReason,
                 true
         );
     }
