@@ -138,9 +138,20 @@ class RestaurantSyncServiceTest {
     }
 
     @Test
-    void syncChunk_whenPreservingAdminEditableFields_omitsAdminEditableFieldsFromPatch() {
-        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "와인코르크", gangnam(), "123",
-                new GeoJson.Point(List.of(127.0280, 37.4980)));
+    void syncChunk_whenPreservingAdminEditableFields_keepsExistingAdminEditableFieldsInPatch() {
+        RestaurantSyncTarget target = new RestaurantSyncTarget(
+                1L,
+                "와인코르크",
+                gangnam().code(),
+                gangnam().getName(),
+                gangnam().getCoordinatesStandard(),
+                "123",
+                new GeoJson.Point(List.of(127.0280, 37.4980)),
+                "https://admin.example.com/image.jpg",
+                "관리자 요약",
+                "[\"관리자\", \"요약\"]",
+                77L
+        );
         when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
         when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
                 .thenReturn(KakaoPlaceDetailFetchResult.success(detailDataWithCategory("술집", "와인바")));
@@ -155,10 +166,10 @@ class RestaurantSyncServiceTest {
         assertThat(result.successCount()).isEqualTo(1);
         verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
         RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
-        assertThat(command.imageUrl()).isNull();
-        assertThat(command.aiMateSummaryTitle()).isNull();
-        assertThat(command.aiMateSummaryContents()).isNull();
-        assertThat(command.categoryId()).isNull();
+        assertThat(command.imageUrl()).isEqualTo("https://admin.example.com/image.jpg");
+        assertThat(command.aiMateSummaryTitle()).isEqualTo("관리자 요약");
+        assertThat(command.aiMateSummaryContents()).isEqualTo("[\"관리자\", \"요약\"]");
+        assertThat(command.categoryId()).isEqualTo(77L);
         assertThat(command.representativeReview()).isEqualTo("리뷰");
         verifyNoInteractions(categoryService);
     }
