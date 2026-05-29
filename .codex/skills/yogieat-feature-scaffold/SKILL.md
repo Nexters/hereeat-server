@@ -1,8 +1,6 @@
 ---
 name: yogieat-feature-scaffold
 description: Use when adding or extending a Yogieat feature in the Java 25 multi-module Spring Boot architecture. Maps the request to the smallest consistent slice across `apps:api/admin`, `apps:domain`, `storage`, `external`, and `support` while preserving the current Service, Facade, Processor, and Validator conventions.
-metadata:
-  short-description: Add a Yogieat feature without architectural drift
 ---
 
 # Yogieat Feature Scaffold

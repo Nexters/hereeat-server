@@ -1,8 +1,6 @@
 ---
 name: yogieat-testing-guard
 description: Use when writing, refactoring, or reviewing Yogieat tests. Focuses on behavior-first assertions, boundary-only mocking, test layer choice, and smell detection for spy-heavy or verify-heavy tests.
-metadata:
-  short-description: Guard Yogieat tests against implementation-coupled drift
 ---
 
 # Yogieat Testing Guard

@@ -1,8 +1,6 @@
 ---
 name: yogieat-harness-governor
 description: Use when repeated Yogieat prompts, review comments, or misunderstandings should be translated into harness candidates or stable rules. Classifies new observations, applies the candidate-to-promotion policy, and keeps harness updates intentional rather than noisy.
-metadata:
-  short-description: Govern Yogieat harness rules and promotions
 ---
 
 # Yogieat Harness Governor

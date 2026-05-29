@@ -4,7 +4,9 @@ import com.yogieat.batch.sync.config.SyncJobProperties;
 import com.yogieat.restaurant.service.RestaurantRepository;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncChunkResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
+import com.yogieat.restaurant.sync.domain.value.RestaurantSyncFieldUpdatePolicy;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
+import com.yogieat.restaurant.sync.domain.value.RestaurantSyncTriggerType;
 import com.yogieat.restaurant.sync.service.RestaurantSyncJobRepository;
 import com.yogieat.restaurant.sync.service.RestaurantSyncService;
 import java.time.Duration;
@@ -101,7 +103,8 @@ public class RestaurantSyncJobWorker {
         RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(
                 List.of(job.targetRestaurantId()),
                 syncJobExecutor,
-                Math.max(1, job.parallelism() == null ? 1 : job.parallelism())
+                Math.max(1, job.parallelism() == null ? 1 : job.parallelism()),
+                fieldUpdatePolicy(job)
         );
         syncJobRepository.updateProgress(
                 job.id(),
@@ -151,7 +154,8 @@ public class RestaurantSyncJobWorker {
 
             RestaurantSyncChunkResult chunkResult = syncChunkWithRetry(
                     ids,
-                    Math.max(1, job.parallelism() == null ? syncJobProperties.resolvedParallelism() : job.parallelism())
+                    Math.max(1, job.parallelism() == null ? syncJobProperties.resolvedParallelism() : job.parallelism()),
+                    fieldUpdatePolicy(job)
             );
             long chunkDurationMs = (System.nanoTime() - chunkStartAt) / 1_000_000L;
             long successCount = chunkResult.successCount();
@@ -257,14 +261,19 @@ public class RestaurantSyncJobWorker {
         }
     }
 
-    private RestaurantSyncChunkResult syncChunkWithRetry(List<Long> ids, int parallelism) {
+    private RestaurantSyncChunkResult syncChunkWithRetry(
+            List<Long> ids,
+            int parallelism,
+            RestaurantSyncFieldUpdatePolicy fieldUpdatePolicy
+    ) {
         RuntimeException lastError = null;
         for (int attempt = 1; attempt <= CHUNK_MAX_RETRY_ATTEMPTS + 1; attempt++) {
             try {
                 return restaurantSyncService.syncChunk(
                         ids,
                         syncJobExecutor,
-                        Math.max(1, parallelism)
+                        Math.max(1, parallelism),
+                        fieldUpdatePolicy
                 );
             } catch (RuntimeException e) {
                 lastError = e;
@@ -285,5 +294,12 @@ public class RestaurantSyncJobWorker {
             }
         }
         throw lastError;
+    }
+
+    private RestaurantSyncFieldUpdatePolicy fieldUpdatePolicy(RestaurantSyncJob job) {
+        if (job.triggerType() == RestaurantSyncTriggerType.SCHEDULED) {
+            return RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE;
+        }
+        return RestaurantSyncFieldUpdatePolicy.UPDATE_ALL;
     }
 }
