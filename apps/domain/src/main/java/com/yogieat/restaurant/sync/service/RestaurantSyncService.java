@@ -20,6 +20,7 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncPatch;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
+import com.yogieat.restaurant.sync.domain.value.RestaurantSyncFieldUpdatePolicy;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -116,6 +117,15 @@ public class RestaurantSyncService {
     }
 
     public RestaurantSyncChunkResult syncChunk(List<Long> ids, Executor executor, int maxParallelism) {
+        return syncChunk(ids, executor, maxParallelism, RestaurantSyncFieldUpdatePolicy.UPDATE_ALL);
+    }
+
+    public RestaurantSyncChunkResult syncChunk(
+            List<Long> ids,
+            Executor executor,
+            int maxParallelism,
+            RestaurantSyncFieldUpdatePolicy fieldUpdatePolicy
+    ) {
         if (ids.isEmpty()) {
             return RestaurantSyncChunkResult.of(0, 0, 0, List.of());
         }
@@ -135,7 +145,12 @@ public class RestaurantSyncService {
 
         List<CompletableFuture<SyncExecution>> futures = ids.stream()
                 .map(id -> CompletableFuture.supplyAsync(
-                        () -> syncTargetWithParallelismLimit(syncTargetSemaphore, id, targetMap.get(id)),
+                        () -> syncTargetWithParallelismLimit(
+                                syncTargetSemaphore,
+                                id,
+                                targetMap.get(id),
+                                fieldUpdatePolicy
+                        ),
                         executor
                 ))
                 .toList();
@@ -204,13 +219,14 @@ public class RestaurantSyncService {
     private SyncExecution syncTargetWithParallelismLimit(
             Semaphore syncTargetSemaphore,
             Long requestedId,
-            RestaurantSyncTarget target
+            RestaurantSyncTarget target,
+            RestaurantSyncFieldUpdatePolicy fieldUpdatePolicy
     ) {
         boolean acquired = false;
         try {
             syncTargetSemaphore.acquire();
             acquired = true;
-            return syncTarget(requestedId, target);
+            return syncTarget(requestedId, target, fieldUpdatePolicy);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return SyncExecution.failed(requestedId, "sync target semaphore interrupted");
@@ -221,7 +237,11 @@ public class RestaurantSyncService {
         }
     }
 
-    private SyncExecution syncTarget(Long requestedId, RestaurantSyncTarget target) {
+    private SyncExecution syncTarget(
+            Long requestedId,
+            RestaurantSyncTarget target,
+            RestaurantSyncFieldUpdatePolicy fieldUpdatePolicy
+    ) {
         if (target == null) {
             return SyncExecution.failed(requestedId, "restaurant not found");
         }
@@ -246,7 +266,7 @@ public class RestaurantSyncService {
                 );
             }
 
-            RestaurantSyncPatch patch = buildPatch(source, target.externalId());
+            RestaurantSyncPatch patch = buildPatch(source, target.externalId(), fieldUpdatePolicy);
             if (!isWithinRegionRadius(target, patch.location())) {
                 return SyncExecution.delete(target.id());
             }
@@ -470,7 +490,11 @@ public class RestaurantSyncService {
         }
     }
 
-    private RestaurantSyncPatch buildPatch(SyncSource source, String currentExternalId) {
+    private RestaurantSyncPatch buildPatch(
+            SyncSource source,
+            String currentExternalId,
+            RestaurantSyncFieldUpdatePolicy fieldUpdatePolicy
+    ) {
         KakaoRestaurantData searchData = null;
         if (source.place() != null) {
             searchData = kakaoPlaceMapper.toDomainData(source.place());
@@ -483,17 +507,25 @@ public class RestaurantSyncService {
         String mapUrl = resolveMapUrl(externalId, searchData);
         GeoJson.Point location = resolveLocation(searchData, detail);
         Double rating = detail != null ? detail.rating() : null;
-        String imageUrl = detail != null ? detail.mainPhotoUrl() : null;
+        boolean preserveAdminEditableFields =
+                fieldUpdatePolicy == RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE;
+        // TODO: Replace this scheduled-sync suppression with per-field admin override locks
+        //  for imageUrl, aiMateSummary, and categoryId.
+        String imageUrl = preserveAdminEditableFields ? null : detail != null ? detail.mainPhotoUrl() : null;
         String representativeReview = detail != null ? detail.representativeReview() : null;
         Integer reviewCount = detail != null ? detail.reviewCount() : null;
         Integer blogReviewCount = detail != null ? detail.blogReviewCount() : null;
         String representMenu = detail != null ? detail.representMenu() : null;
         Integer representMenuPrice = normalizeMenuPrice(detail != null ? detail.representMenuPrice() : null);
         String priceLevel = detail != null ? detail.priceLevel() : null;
-        String aiMateSummaryTitle = detail != null ? detail.aiMateSummaryTitle() : null;
-        String aiMateSummaryContents = detail != null ? toJson(detail.aiMateSummaryContents()) : null;
+        String aiMateSummaryTitle = preserveAdminEditableFields
+                ? null
+                : detail != null ? detail.aiMateSummaryTitle() : null;
+        String aiMateSummaryContents = preserveAdminEditableFields
+                ? null
+                : detail != null ? toJson(detail.aiMateSummaryContents()) : null;
         String station = detail != null ? detail.station() : null;
-        Long categoryId = resolveCategoryId(detail);
+        Long categoryId = preserveAdminEditableFields ? null : resolveCategoryId(detail);
         String offDays = detail != null ? offDaysToJson(detail.offDays()) : null;
         String phoneNumber = detail != null ? detail.phoneNumber() : null;
 

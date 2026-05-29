@@ -10,6 +10,7 @@ import com.yogieat.batch.sync.config.SyncJobProperties;
 import com.yogieat.restaurant.service.RestaurantRepository;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncChunkResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
+import com.yogieat.restaurant.sync.domain.value.RestaurantSyncFieldUpdatePolicy;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncJobStatus;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncTriggerType;
@@ -86,12 +87,68 @@ class RestaurantSyncJobWorkerTest {
         when(restaurantRepository.countActiveRestaurants()).thenReturn(1L);
         when(restaurantRepository.findActiveRestaurantIdsAfter(null, 50)).thenReturn(List.of(1L));
         when(restaurantRepository.findActiveRestaurantIdsAfter(1L, 50)).thenReturn(List.of());
-        when(restaurantSyncService.syncChunk(eq(List.of(1L)), eq(syncJobExecutor), eq(3)))
+        when(restaurantSyncService.syncChunk(
+                eq(List.of(1L)),
+                eq(syncJobExecutor),
+                eq(3),
+                eq(RestaurantSyncFieldUpdatePolicy.UPDATE_ALL)
+        ))
                 .thenReturn(RestaurantSyncChunkResult.of(1, 1, 0, List.of()));
 
         worker.pollPendingJob();
 
-        verify(restaurantSyncService).syncChunk(eq(List.of(1L)), eq(syncJobExecutor), eq(3));
+        verify(restaurantSyncService).syncChunk(
+                eq(List.of(1L)),
+                eq(syncJobExecutor),
+                eq(3),
+                eq(RestaurantSyncFieldUpdatePolicy.UPDATE_ALL)
+        );
+        verify(syncJobRepository).markSuccess(10L);
+    }
+
+    @Test
+    void pollPendingJob_shouldPreserveAdminEditableFieldsForScheduledJob() {
+        RestaurantSyncJob job = new RestaurantSyncJob(
+                10L,
+                RestaurantSyncScope.ALL,
+                RestaurantSyncTriggerType.SCHEDULED,
+                null,
+                RestaurantSyncJobStatus.RUNNING,
+                50,
+                3,
+                null,
+                0L,
+                0L,
+                0L,
+                0L,
+                null,
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now(),
+                LocalDateTime.now()
+        );
+        when(syncJobProperties.resolvedStaleRunningThresholdMinutes()).thenReturn(60L);
+        when(syncJobProperties.resolvedChunkSize()).thenReturn(50);
+        when(syncJobRepository.claimNextPendingJob()).thenReturn(Optional.of(job));
+        when(restaurantRepository.countActiveRestaurants()).thenReturn(1L);
+        when(restaurantRepository.findActiveRestaurantIdsAfter(null, 50)).thenReturn(List.of(1L));
+        when(restaurantRepository.findActiveRestaurantIdsAfter(1L, 50)).thenReturn(List.of());
+        when(restaurantSyncService.syncChunk(
+                eq(List.of(1L)),
+                eq(syncJobExecutor),
+                eq(3),
+                eq(RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE)
+        ))
+                .thenReturn(RestaurantSyncChunkResult.of(1, 1, 0, List.of()));
+
+        worker.pollPendingJob();
+
+        verify(restaurantSyncService).syncChunk(
+                eq(List.of(1L)),
+                eq(syncJobExecutor),
+                eq(3),
+                eq(RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE)
+        );
         verify(syncJobRepository).markSuccess(10L);
     }
 }

@@ -22,6 +22,7 @@ import com.yogieat.restaurant.service.RestaurantRepository;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncChunkResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncPatchCommand;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
+import com.yogieat.restaurant.sync.domain.value.RestaurantSyncFieldUpdatePolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -134,6 +135,32 @@ class RestaurantSyncServiceTest {
         verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
         RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
         assertThat(command.categoryId()).isEqualTo(88L);
+    }
+
+    @Test
+    void syncChunk_whenPreservingAdminEditableFields_omitsAdminEditableFieldsFromPatch() {
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "와인코르크", gangnam(), "123",
+                new GeoJson.Point(List.of(127.0280, 37.4980)));
+        when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
+        when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
+                .thenReturn(KakaoPlaceDetailFetchResult.success(detailDataWithCategory("술집", "와인바")));
+
+        RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(
+                List.of(1L),
+                Runnable::run,
+                1,
+                RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE
+        );
+
+        assertThat(result.successCount()).isEqualTo(1);
+        verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
+        RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
+        assertThat(command.imageUrl()).isNull();
+        assertThat(command.aiMateSummaryTitle()).isNull();
+        assertThat(command.aiMateSummaryContents()).isNull();
+        assertThat(command.categoryId()).isNull();
+        assertThat(command.representativeReview()).isEqualTo("리뷰");
+        verifyNoInteractions(categoryService);
     }
 
     @Test
