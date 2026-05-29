@@ -49,3 +49,5 @@ out/
 
 **/src/main/generated
 .*-database
+
+_workspace
