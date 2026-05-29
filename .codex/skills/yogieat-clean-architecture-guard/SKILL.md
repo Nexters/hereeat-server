@@ -1,8 +1,6 @@
 ---
 name: yogieat-clean-architecture-guard
 description: Use when deciding where new Yogieat code belongs or when reviewing architecture drift. Focuses on Service vs Facade boundaries, validator extraction, processor naming, transaction placement, dependency minimization, and preserving the existing multi-module structure.
-metadata:
-  short-description: Guard Yogieat layer boundaries and component roles
 ---
 
 # Yogieat Clean Architecture Guard

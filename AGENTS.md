@@ -7,6 +7,8 @@
 - Repo-local harness rules: `.codex/rules/*.md`
 - Testing guidance: `.codex/rules/testing.md`
 - Repo-local skills and agents: `.codex/skills/`, `.codex/agents/`
+- Harness dry-runs: `_workspace/evals/`
+- Keep active Markdown guidance around 100 lines; move detail into focused rules or skills.
 
 ## Architecture
 
@@ -20,52 +22,31 @@
 
 ## Stable Conventions
 
-- Controller는 Facade만 호출한다. Controller가 Service를 직접 호출하지 않는다.
-- Service는 본 도메인 내부 비즈니스 로직만 담당한다.
-- Facade는 여러 도메인 조합과 오케스트레이션만 담당한다.
-- Processor, Creator, Analyzer, Resolver는 이름 있는 하위 책임이 분명할 때만 도입한다.
-- Validator는 도메인 중심 컴포넌트로 분리하고 의존성 주입으로 사용한다.
-- private 메서드는 복잡도 감소가 분명할 때만 허용한다. 단순 흐름 분해용 helper 남용은 지양한다.
-- 의존성 주입은 최소화한다. collaborator가 늘어나면 책임 분리를 먼저 검토한다.
-- 선언형 트랜잭션 의미가 필요한 로직은 self-invocation 을 금지하고 별도 빈으로 분리한다.
-- Facade와 Service의 조회 경로는 `@Transactional(readOnly = true)` 여부를 먼저 검토하고, 변경 경로는 write transaction 경계를 명시한다.
-- 임시 migration, bootstrap, initializer, backfill 코드는 제거 시점이 명확해야 한다.
-- Flyway migration은 적용 후 불변 이력으로 취급한다. 이미 공유 DB에 적용된 migration 파일은 수정하거나 삭제하지 말고, 보정은 다음 version migration으로 처리한다.
-- Flyway DB 작업 전에는 공유 dev/prod DB나 다른 브랜치에 이미 적용된 migration version/filename이 있는지 개발자에게 먼저 확인한다.
-- 테스트는 startup side effect 나 전역 magic reset 보다 test-local fixture 또는 setup 을 우선한다.
-- 새로운 구조를 만들기 전에 가장 가까운 기존 feature slice 를 먼저 따른다.
-- HTTP API는 화면명이나 구현 목적보다 리소스 중심 URI를 우선한다. `dashboard`, `screen`, `page` 같은 view-oriented 경로는 지양한다.
-- 컬렉션 조회에 집계나 관리용 필드가 필요하면 별도 view endpoint보다 해당 리소스 표현이나 query parameter 확장을 먼저 검토한다.
-- 새 리소스 생성은 기본적으로 `201 Created` 와 body 응답을 사용하고, `Location` 헤더는 명시적으로 필요할 때만 추가한다.
+- Controller는 Facade만 호출하고, Facade는 조합/오케스트레이션, Service는 도메인 내부 로직을 맡는다.
+- Processor/Creator/Analyzer/Resolver/Validator는 이름 있는 책임이 분명할 때만 도입한다.
+- collaborator가 늘어나면 의존성 주입보다 책임 분리를 먼저 검토한다.
+- 선언형 트랜잭션이 필요하면 self-invocation을 피하고 별도 빈으로 분리한다.
+- Flyway migration은 적용 후 불변 이력이다. 공유 DB 적용 여부를 먼저 확인하고 보정은 다음 version으로 처리한다.
+- 테스트는 hidden bootstrap/reset보다 test-local fixture/setup을 우선한다.
+- API는 리소스 중심 URI와 `201 Created` 생성 응답을 기본으로 한다.
 
 ## Validation Defaults
 
 - Java toolchain: 25
 - Spring Boot: 3.5.9
 - Spotless: 7.0.2
-- 기본 종료 루틴:
-  - `./gradlew spotlessApply --daemon -q`
-  - `./gradlew compileJava --daemon -q`
-  - 최소 관련 테스트
-- 아래 변경은 `./gradlew test --daemon` 으로 승격한다.
-  - `storage/**`
-  - public API main code
-  - shared contract
-  - mixed multi-module changes
+- 기본 종료 루틴: `./gradlew spotlessApply --daemon -q`, `./gradlew compileJava --daemon -q`, 최소 관련 테스트.
+- `storage/**`, public API main code, shared contract, mixed multi-module changes는 `./gradlew test --daemon`으로 승격한다.
 - Flyway migration 변경은 full test 승격 대상이며, migration version 충돌과 공유 DB applied history 누락 여부를 함께 검토한다.
-- Repo-local validation helper:
-  - `.codex/hooks/verify.sh`
+- Repo-local validation helper: `.codex/hooks/verify.sh`
 
 ## Testing Conventions
 
-- Test behavior, return values, and observable state before internal call structure.
-- Mock only at boundaries such as DB, external HTTP, filesystem, clock, randomness, network, or process boundaries.
-- Avoid mocking or spying on internal collaborators in the same codebase when a real object is practical.
-- `verify(...)` is not the primary proof. Use it only as a secondary check for a boundary side effect that cannot be asserted through returned data or saved state.
-- Prefer plain JUnit plus real objects for pure policies, strategies, and entities.
-- Prefer `@WebMvcTest` or `MockMvcBuilders.standaloneSetup` for controller slices.
-- Use `@SpringBootTest` only when DB, transaction, scheduler, filter, or wider wiring behavior is part of the behavior under test.
-- Keep test seed data local to the test or fixture. Do not rely on startup bootstrap side effects.
+- Assert behavior, return values, and observable state before internal call structure.
+- Mock only at boundaries; avoid spies on internal collaborators when real objects are practical.
+- `verify(...)` is secondary proof only when returned data or saved state cannot show the side effect.
+- Prefer plain JUnit for pure policies and `@WebMvcTest` or standalone MockMvc for controller slices.
+- Use `@SpringBootTest` only when DB, transaction, scheduler, filter, or wider wiring matters.
 - Follow `.codex/rules/testing.md` for detailed test writing and review guidance.
 
 ## Agent Routing Defaults
@@ -84,42 +65,19 @@
 
 ## Custom Agents
 
-- `feature_mapper`
-  - Use when starting a feature or change and you need affected modules, entrypoints, and validation scope mapped first.
-- `architecture_guard`
-  - Use when a task mixes layers, component boundaries, DI shape, transaction placement, or naming conventions.
-- `validation_triager`
-  - Use when Java 25, Gradle, Spotless, compile, test, or CI parity scope is unclear.
-- `harness_curator`
-  - Use when repeated prompts, review comments, or recurring misunderstandings may need a harness rule update.
+- `feature_mapper`: map affected modules, entrypoints, and validation scope before feature work.
+- `architecture_guard`: review layers, boundaries, DI shape, transaction placement, and naming conventions.
+- `validation_triager`: choose Java 25, Gradle, Spotless, compile, test, or CI parity scope.
+- `harness_curator`: inspect repeated prompts, review comments, or candidate rule promotions.
 
 ## Repo-Local Skills
 
-- `yogieat-agent-router`
-  - Classify prompts and decide whether the work stays local or should consider repo-local agents.
-- `yogieat-feature-scaffold`
-  - Add new features without drifting from Yogieat module and component conventions.
-- `yogieat-clean-architecture-guard`
-  - Guard layer boundaries, DI shape, validator extraction, and component naming choices.
-- `yogieat-testing-guard`
-  - Write and review tests with behavior-first assertions and boundary-only mocking.
-- `yogieat-java25-gradle-validation`
-  - Choose the smallest Java 25 Gradle validation command that proves a change is safe.
-- `yogieat-harness-governor`
-  - Turn repeated instructions or misunderstandings into candidate or stable harness rules.
-
-## Quick Commands
-
-- Open an interactive Codex session:
-  - `codex -C .`
-- Ask `feature_mapper` to map a change:
-  - `codex exec -C . "Spawn feature_mapper to map the affected modules, likely entrypoints, validators or processors to extract, and the smallest validation scope. Wait for it and respond in Korean."`
-- Ask `architecture_guard` to review boundaries:
-  - `codex exec -C . "Spawn architecture_guard to review this change for facade or service boundary drift, validator extraction gaps, DI bloat, transaction placement, and unnecessary private helpers. Wait for it and summarize only concrete findings in Korean."`
-- Ask `validation_triager` to choose validation:
-  - `codex exec -C . "Spawn validation_triager to choose the smallest Java 25 Gradle validation scope for the current diff. Explain whether this change needs module-local tests or ./gradlew test --daemon. Respond in Korean."`
-- Ask `harness_curator` to inspect recurring instructions:
-  - `codex exec -C . "Spawn harness_curator to inspect this conversation or diff for repeat instructions, repeated review comments, and candidate harness rule promotions. Do not edit files. Respond in Korean."`
+- `yogieat-agent-router`: classify prompts and decide whether repo-local agents are useful.
+- `yogieat-feature-scaffold`: add features without drifting from module/component conventions.
+- `yogieat-clean-architecture-guard`: guard boundaries, DI shape, validator extraction, and naming.
+- `yogieat-testing-guard`: write/review behavior-first, boundary-mocking tests.
+- `yogieat-java25-gradle-validation`: choose the smallest proof command.
+- `yogieat-harness-governor`: turn repeated observations into candidate or stable rules.
 
 ## Usage Rules
 

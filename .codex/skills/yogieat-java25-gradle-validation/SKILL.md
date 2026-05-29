@@ -1,8 +1,6 @@
 ---
 name: yogieat-java25-gradle-validation
 description: Use when validating Yogieat changes or choosing the smallest Java 25 Gradle proof command. Applies Spotless first, then compile, then module-local or full tests based on repo-specific escalation rules.
-metadata:
-  short-description: Validate Yogieat changes with Java 25 and Gradle
 ---
 
 # Yogieat Java 25 Gradle Validation

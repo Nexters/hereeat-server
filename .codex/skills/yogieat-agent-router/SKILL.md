@@ -1,8 +1,6 @@
 ---
 name: yogieat-agent-router
 description: Use when deciding whether a Yogieat prompt should stay on the main thread or consider repo-local agents. Classifies prompts, maps them to `feature_mapper`, `architecture_guard`, `validation_triager`, or `harness_curator`, and keeps delegation intentionally minimal.
-metadata:
-  short-description: Route Yogieat prompts to the right repo-local agents
 ---
 
 # Yogieat Agent Router
