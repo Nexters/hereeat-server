@@ -47,7 +47,7 @@ public class RestaurantSyncService {
     private static final Logger log = LoggerFactory.getLogger(RestaurantSyncService.class);
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final double SYNC_REGION_RADIUS_KM = 1.0;
+    private static final double SYNC_REGION_RADIUS_KM = 0.7;
     private static final int DB_BATCH_SIZE = 300;
     private static final String SEARCH_CACHE_PREFIX = "search:";
     private static final String DETAIL_CACHE_PREFIX = "detail:";
