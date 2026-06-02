@@ -148,6 +148,7 @@ class RestaurantSyncServiceTest {
                 "123",
                 new GeoJson.Point(List.of(127.0280, 37.4980)),
                 "https://admin.example.com/image.jpg",
+                "관리자 대표 리뷰",
                 "관리자 요약",
                 "[\"관리자\", \"요약\"]",
                 77L
@@ -167,10 +168,12 @@ class RestaurantSyncServiceTest {
         verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
         RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
         assertThat(command.imageUrl()).isEqualTo("https://admin.example.com/image.jpg");
+        assertThat(command.representativeReview()).isEqualTo("관리자 대표 리뷰");
+        assertThat(command.representMenu()).isEqualTo("메뉴");
+        assertThat(command.representMenuPrice()).isEqualTo(15000);
         assertThat(command.aiMateSummaryTitle()).isEqualTo("관리자 요약");
         assertThat(command.aiMateSummaryContents()).isEqualTo("[\"관리자\", \"요약\"]");
         assertThat(command.categoryId()).isEqualTo(77L);
-        assertThat(command.representativeReview()).isEqualTo("리뷰");
         verifyNoInteractions(categoryService);
     }
 

@@ -12,6 +12,7 @@ public record RestaurantSyncTarget(
         String externalId,
         GeoJson.Point location,
         String imageUrl,
+        String representativeReview,
         String aiMateSummaryTitle,
         String aiMateSummaryContents,
         Long categoryId
@@ -31,6 +32,7 @@ public record RestaurantSyncTarget(
                 region == null ? null : region.getCoordinatesStandard(),
                 externalId,
                 location,
+                null,
                 null,
                 null,
                 null,

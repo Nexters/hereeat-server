@@ -510,9 +510,11 @@ public class RestaurantSyncService {
         boolean preserveAdminEditableFields =
                 fieldUpdatePolicy == RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE;
         // TODO: Replace this scheduled-sync suppression with per-field admin override locks
-        //  for imageUrl, aiMateSummary, and categoryId.
+        //  for imageUrl, representativeReview, aiMateSummary, and categoryId.
         String imageUrl = preserveAdminEditableFields ? target.imageUrl() : detail != null ? detail.mainPhotoUrl() : null;
-        String representativeReview = detail != null ? detail.representativeReview() : null;
+        String representativeReview = preserveAdminEditableFields
+                ? target.representativeReview()
+                : detail != null ? detail.representativeReview() : null;
         Integer reviewCount = detail != null ? detail.reviewCount() : null;
         Integer blogReviewCount = detail != null ? detail.blogReviewCount() : null;
         String representMenu = detail != null ? detail.representMenu() : null;

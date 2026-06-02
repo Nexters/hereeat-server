@@ -6,7 +6,6 @@ import com.yogieat.restaurant.sync.domain.RestaurantSyncChunkResult;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncJob;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncFieldUpdatePolicy;
 import com.yogieat.restaurant.sync.domain.value.RestaurantSyncScope;
-import com.yogieat.restaurant.sync.domain.value.RestaurantSyncTriggerType;
 import com.yogieat.restaurant.sync.service.RestaurantSyncJobRepository;
 import com.yogieat.restaurant.sync.service.RestaurantSyncService;
 import java.time.Duration;
@@ -104,7 +103,7 @@ public class RestaurantSyncJobWorker {
                 List.of(job.targetRestaurantId()),
                 syncJobExecutor,
                 Math.max(1, job.parallelism() == null ? 1 : job.parallelism()),
-                fieldUpdatePolicy(job)
+                fieldUpdatePolicy()
         );
         syncJobRepository.updateProgress(
                 job.id(),
@@ -155,7 +154,7 @@ public class RestaurantSyncJobWorker {
             RestaurantSyncChunkResult chunkResult = syncChunkWithRetry(
                     ids,
                     Math.max(1, job.parallelism() == null ? syncJobProperties.resolvedParallelism() : job.parallelism()),
-                    fieldUpdatePolicy(job)
+                    fieldUpdatePolicy()
             );
             long chunkDurationMs = (System.nanoTime() - chunkStartAt) / 1_000_000L;
             long successCount = chunkResult.successCount();
@@ -296,10 +295,7 @@ public class RestaurantSyncJobWorker {
         throw lastError;
     }
 
-    private RestaurantSyncFieldUpdatePolicy fieldUpdatePolicy(RestaurantSyncJob job) {
-        if (job.triggerType() == RestaurantSyncTriggerType.SCHEDULED) {
-            return RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE;
-        }
-        return RestaurantSyncFieldUpdatePolicy.UPDATE_ALL;
+    private RestaurantSyncFieldUpdatePolicy fieldUpdatePolicy() {
+        return RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE;
     }
 }
