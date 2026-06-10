@@ -47,7 +47,7 @@ public class RestaurantSyncService {
     private static final Logger log = LoggerFactory.getLogger(RestaurantSyncService.class);
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final double SYNC_REGION_RADIUS_KM = 1.0;
+    private static final double SYNC_REGION_RADIUS_KM = 0.7;
     private static final int DB_BATCH_SIZE = 300;
     private static final String SEARCH_CACHE_PREFIX = "search:";
     private static final String DETAIL_CACHE_PREFIX = "detail:";
@@ -510,22 +510,38 @@ public class RestaurantSyncService {
         boolean preserveAdminEditableFields =
                 fieldUpdatePolicy == RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE;
         // TODO: Replace this scheduled-sync suppression with per-field admin override locks
-        //  for imageUrl, aiMateSummary, and categoryId.
-        String imageUrl = preserveAdminEditableFields ? target.imageUrl() : detail != null ? detail.mainPhotoUrl() : null;
-        String representativeReview = detail != null ? detail.representativeReview() : null;
+        //  for imageUrl, representativeReview, aiMateSummary, and categoryId.
+        String imageUrl = resolveAdminEditableField(
+                preserveAdminEditableFields,
+                target.imageUrl(),
+                () -> detail != null ? detail.mainPhotoUrl() : null
+        );
+        String representativeReview = resolveAdminEditableField(
+                preserveAdminEditableFields,
+                target.representativeReview(),
+                () -> detail != null ? detail.representativeReview() : null
+        );
         Integer reviewCount = detail != null ? detail.reviewCount() : null;
         Integer blogReviewCount = detail != null ? detail.blogReviewCount() : null;
         String representMenu = detail != null ? detail.representMenu() : null;
         Integer representMenuPrice = normalizeMenuPrice(detail != null ? detail.representMenuPrice() : null);
         String priceLevel = detail != null ? detail.priceLevel() : null;
-        String aiMateSummaryTitle = preserveAdminEditableFields
-                ? target.aiMateSummaryTitle()
-                : detail != null ? detail.aiMateSummaryTitle() : null;
-        String aiMateSummaryContents = preserveAdminEditableFields
-                ? target.aiMateSummaryContents()
-                : detail != null ? toJson(detail.aiMateSummaryContents()) : null;
+        String aiMateSummaryTitle = resolveAdminEditableField(
+                preserveAdminEditableFields,
+                target.aiMateSummaryTitle(),
+                () -> detail != null ? detail.aiMateSummaryTitle() : null
+        );
+        String aiMateSummaryContents = resolveAdminEditableField(
+                preserveAdminEditableFields,
+                target.aiMateSummaryContents(),
+                () -> detail != null ? toJson(detail.aiMateSummaryContents()) : null
+        );
         String station = detail != null ? detail.station() : null;
-        Long categoryId = preserveAdminEditableFields ? target.categoryId() : resolveCategoryId(detail);
+        Long categoryId = resolveAdminEditableField(
+                preserveAdminEditableFields,
+                target.categoryId(),
+                () -> resolveCategoryId(detail)
+        );
         String offDays = detail != null ? offDaysToJson(detail.offDays()) : null;
         String phoneNumber = detail != null ? detail.phoneNumber() : null;
 
@@ -550,6 +566,17 @@ public class RestaurantSyncService {
                 offDays,
                 phoneNumber
         );
+    }
+
+    private <T> T resolveAdminEditableField(
+            boolean preserveAdminEditableFields,
+            T currentValue,
+            Supplier<T> externalValueSupplier
+    ) {
+        if (preserveAdminEditableFields && currentValue != null) {
+            return currentValue;
+        }
+        return externalValueSupplier.get();
     }
 
     private Long resolveCategoryId(KakaoPlaceDetailData detail) {

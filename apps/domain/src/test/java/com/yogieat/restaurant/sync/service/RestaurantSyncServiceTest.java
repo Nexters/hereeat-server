@@ -148,6 +148,7 @@ class RestaurantSyncServiceTest {
                 "123",
                 new GeoJson.Point(List.of(127.0280, 37.4980)),
                 "https://admin.example.com/image.jpg",
+                "관리자 대표 리뷰",
                 "관리자 요약",
                 "[\"관리자\", \"요약\"]",
                 77L
@@ -167,11 +168,39 @@ class RestaurantSyncServiceTest {
         verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
         RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
         assertThat(command.imageUrl()).isEqualTo("https://admin.example.com/image.jpg");
+        assertThat(command.representativeReview()).isEqualTo("관리자 대표 리뷰");
+        assertThat(command.representMenu()).isEqualTo("메뉴");
+        assertThat(command.representMenuPrice()).isEqualTo(15000);
         assertThat(command.aiMateSummaryTitle()).isEqualTo("관리자 요약");
         assertThat(command.aiMateSummaryContents()).isEqualTo("[\"관리자\", \"요약\"]");
         assertThat(command.categoryId()).isEqualTo(77L);
-        assertThat(command.representativeReview()).isEqualTo("리뷰");
         verifyNoInteractions(categoryService);
+    }
+
+    @Test
+    void syncChunk_whenPreservingAdminEditableFieldsAndExistingValuesAreNull_fillsKakaoDetailFields() {
+        RestaurantSyncTarget target = new RestaurantSyncTarget(1L, "와인코르크", gangnam(), "123",
+                new GeoJson.Point(List.of(127.0280, 37.4980)));
+        when(restaurantRepository.findSyncTargetsByIds(List.of(1L))).thenReturn(List.of(target));
+        when(kakaoPlaceDetailClient.fetchPlaceDetailResult("123"))
+                .thenReturn(KakaoPlaceDetailFetchResult.success(detailDataWithCategory("술집", "와인바")));
+        when(categoryService.findOrCreateCategory(eq(LargeCategory.WESTERN), eq("와인바"))).thenReturn(88L);
+
+        RestaurantSyncChunkResult result = restaurantSyncService.syncChunk(
+                List.of(1L),
+                Runnable::run,
+                1,
+                RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE
+        );
+
+        assertThat(result.successCount()).isEqualTo(1);
+        verify(restaurantRepository).batchApplySyncPatch(patchCommandsCaptor.capture());
+        RestaurantSyncPatchCommand command = patchCommandsCaptor.getValue().getFirst();
+        assertThat(command.imageUrl()).isEqualTo("https://img");
+        assertThat(command.representativeReview()).isEqualTo("리뷰");
+        assertThat(command.aiMateSummaryTitle()).isEqualTo("요약");
+        assertThat(command.aiMateSummaryContents()).isEqualTo("[\"a\",\"b\"]");
+        assertThat(command.categoryId()).isEqualTo(88L);
     }
 
     @Test

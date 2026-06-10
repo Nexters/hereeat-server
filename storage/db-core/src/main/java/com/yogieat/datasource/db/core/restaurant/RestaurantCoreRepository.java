@@ -617,6 +617,7 @@ public class RestaurantCoreRepository implements RestaurantRepository {
                                     ? null
                                     : new GeoJson.Point(List.of(entity.getLocation().getX(), entity.getLocation().getY())),
                             entity.getImageUrl(),
+                            entity.getRepresentativeReview(),
                             entity.getAiMateSummaryTitle(),
                             entity.getAiMateSummaryContents(),
                             entity.getCategoryId()

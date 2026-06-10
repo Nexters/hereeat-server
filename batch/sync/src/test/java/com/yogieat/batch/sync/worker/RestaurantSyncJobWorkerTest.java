@@ -61,7 +61,7 @@ class RestaurantSyncJobWorkerTest {
     }
 
     @Test
-    void pollPendingJob_shouldUseConfiguredParallelismForAllJob() {
+    void pollPendingJob_shouldPreserveAdminEditableFieldsForManualAllJob() {
         RestaurantSyncJob job = new RestaurantSyncJob(
                 10L,
                 RestaurantSyncScope.ALL,
@@ -91,7 +91,7 @@ class RestaurantSyncJobWorkerTest {
                 eq(List.of(1L)),
                 eq(syncJobExecutor),
                 eq(3),
-                eq(RestaurantSyncFieldUpdatePolicy.UPDATE_ALL)
+                eq(RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE)
         ))
                 .thenReturn(RestaurantSyncChunkResult.of(1, 1, 0, List.of()));
 
@@ -101,7 +101,49 @@ class RestaurantSyncJobWorkerTest {
                 eq(List.of(1L)),
                 eq(syncJobExecutor),
                 eq(3),
-                eq(RestaurantSyncFieldUpdatePolicy.UPDATE_ALL)
+                eq(RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE)
+        );
+        verify(syncJobRepository).markSuccess(10L);
+    }
+
+    @Test
+    void pollPendingJob_shouldPreserveAdminEditableFieldsForManualSingleJob() {
+        RestaurantSyncJob job = new RestaurantSyncJob(
+                10L,
+                RestaurantSyncScope.SINGLE,
+                RestaurantSyncTriggerType.MANUAL,
+                1L,
+                RestaurantSyncJobStatus.RUNNING,
+                50,
+                3,
+                null,
+                0L,
+                0L,
+                0L,
+                0L,
+                null,
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now(),
+                LocalDateTime.now()
+        );
+        when(syncJobProperties.resolvedStaleRunningThresholdMinutes()).thenReturn(60L);
+        when(syncJobRepository.claimNextPendingJob()).thenReturn(Optional.of(job));
+        when(restaurantSyncService.syncChunk(
+                eq(List.of(1L)),
+                eq(syncJobExecutor),
+                eq(3),
+                eq(RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE)
+        ))
+                .thenReturn(RestaurantSyncChunkResult.of(1, 1, 0, List.of()));
+
+        worker.pollPendingJob();
+
+        verify(restaurantSyncService).syncChunk(
+                eq(List.of(1L)),
+                eq(syncJobExecutor),
+                eq(3),
+                eq(RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE)
         );
         verify(syncJobRepository).markSuccess(10L);
     }
