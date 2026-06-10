@@ -511,23 +511,37 @@ public class RestaurantSyncService {
                 fieldUpdatePolicy == RestaurantSyncFieldUpdatePolicy.PRESERVE_ADMIN_EDITABLE;
         // TODO: Replace this scheduled-sync suppression with per-field admin override locks
         //  for imageUrl, representativeReview, aiMateSummary, and categoryId.
-        String imageUrl = preserveAdminEditableFields ? target.imageUrl() : detail != null ? detail.mainPhotoUrl() : null;
-        String representativeReview = preserveAdminEditableFields
-                ? target.representativeReview()
-                : detail != null ? detail.representativeReview() : null;
+        String imageUrl = resolveAdminEditableField(
+                preserveAdminEditableFields,
+                target.imageUrl(),
+                () -> detail != null ? detail.mainPhotoUrl() : null
+        );
+        String representativeReview = resolveAdminEditableField(
+                preserveAdminEditableFields,
+                target.representativeReview(),
+                () -> detail != null ? detail.representativeReview() : null
+        );
         Integer reviewCount = detail != null ? detail.reviewCount() : null;
         Integer blogReviewCount = detail != null ? detail.blogReviewCount() : null;
         String representMenu = detail != null ? detail.representMenu() : null;
         Integer representMenuPrice = normalizeMenuPrice(detail != null ? detail.representMenuPrice() : null);
         String priceLevel = detail != null ? detail.priceLevel() : null;
-        String aiMateSummaryTitle = preserveAdminEditableFields
-                ? target.aiMateSummaryTitle()
-                : detail != null ? detail.aiMateSummaryTitle() : null;
-        String aiMateSummaryContents = preserveAdminEditableFields
-                ? target.aiMateSummaryContents()
-                : detail != null ? toJson(detail.aiMateSummaryContents()) : null;
+        String aiMateSummaryTitle = resolveAdminEditableField(
+                preserveAdminEditableFields,
+                target.aiMateSummaryTitle(),
+                () -> detail != null ? detail.aiMateSummaryTitle() : null
+        );
+        String aiMateSummaryContents = resolveAdminEditableField(
+                preserveAdminEditableFields,
+                target.aiMateSummaryContents(),
+                () -> detail != null ? toJson(detail.aiMateSummaryContents()) : null
+        );
         String station = detail != null ? detail.station() : null;
-        Long categoryId = preserveAdminEditableFields ? target.categoryId() : resolveCategoryId(detail);
+        Long categoryId = resolveAdminEditableField(
+                preserveAdminEditableFields,
+                target.categoryId(),
+                () -> resolveCategoryId(detail)
+        );
         String offDays = detail != null ? offDaysToJson(detail.offDays()) : null;
         String phoneNumber = detail != null ? detail.phoneNumber() : null;
 
@@ -552,6 +566,17 @@ public class RestaurantSyncService {
                 offDays,
                 phoneNumber
         );
+    }
+
+    private <T> T resolveAdminEditableField(
+            boolean preserveAdminEditableFields,
+            T currentValue,
+            Supplier<T> externalValueSupplier
+    ) {
+        if (preserveAdminEditableFields && currentValue != null) {
+            return currentValue;
+        }
+        return externalValueSupplier.get();
     }
 
     private Long resolveCategoryId(KakaoPlaceDetailData detail) {
