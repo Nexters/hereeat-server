@@ -139,7 +139,7 @@ public class RecommendationProcessor {
         return calculateRecommendations(gatheringId, region, excludedRestaurantIds, scoringPolicy.candidate().topKSize());
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public RecommendationCandidateResult calculateRecommendations(
             Long gatheringId,
             Region region,
