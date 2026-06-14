@@ -136,6 +136,16 @@ public class RecommendationProcessor {
             Region region,
             List<Long> excludedRestaurantIds
     ) {
+        return calculateRecommendations(gatheringId, region, excludedRestaurantIds, scoringPolicy.candidate().topKSize());
+    }
+
+    @Transactional
+    public RecommendationCandidateResult calculateRecommendations(
+            Long gatheringId,
+            Region region,
+            List<Long> excludedRestaurantIds,
+            int topKSize
+    ) {
         Gathering gathering = gatheringRepository.findById(gatheringId).orElse(null);
         TimeSlot gatheringTimeSlot = gathering != null ? gathering.timeSlot() : null;
 
@@ -182,22 +192,23 @@ public class RecommendationProcessor {
 
         GeoJson.Point centerPoint = region.getCoordinatesStandard();
 
-        List<ScoredRestaurant> top3 = findTopRestaurantsWithFallback(
+        List<ScoredRestaurant> topRestaurants = findTopRestaurantsWithFallback(
                 restaurants,
                 categoryMap,
                 participantContext,
                 participants,
                 centerPoint,
-                gatheringTimeSlot
+                gatheringTimeSlot,
+                topKSize
         );
-        if (top3.isEmpty()) {
+        if (topRestaurants.isEmpty()) {
             return RecommendationCandidateResult.failure(
                     FailureReason.NO_RESTAURANTS,
                     "No suitable restaurants found after filtering"
             );
         }
 
-        return RecommendationCandidateResult.success(top3);
+        return RecommendationCandidateResult.success(topRestaurants);
     }
 
     private List<Restaurant> findRecommendationCandidates(
@@ -273,9 +284,8 @@ public class RecommendationProcessor {
             RecommendationParticipantContext participantContext,
             List<Participant> participants,
             GeoJson.Point centerPoint,
-            TimeSlot gatheringTimeSlot) {
-
-        int topKSize = scoringPolicy.candidate().topKSize();
+            TimeSlot gatheringTimeSlot,
+            int topKSize) {
 
         // 점수 계산은 1회만 수행하고, 필터 전략만 다르게 적용
         List<CategoryScoredRestaurant> scoredCandidates = scoreRestaurants(
@@ -288,7 +298,8 @@ public class RecommendationProcessor {
         List<ScoredRestaurant> primaryResults = selectTopRestaurantsByStrategy(
                 scoredCandidates,
                 participantContext,
-                FilterStrategy.PREFERENCE_SCORE_POSITIVE
+                FilterStrategy.PREFERENCE_SCORE_POSITIVE,
+                topKSize
         );
         if (primaryResults.size() >= topKSize) {
             return primaryResults;
@@ -298,7 +309,8 @@ public class RecommendationProcessor {
         List<ScoredRestaurant> fallbackResults = selectTopRestaurantsByStrategy(
                 scoredCandidates,
                 participantContext,
-                FilterStrategy.DISLIKED_EXCLUDED
+                FilterStrategy.DISLIKED_EXCLUDED,
+                topKSize
         );
 
         if (primaryResults.isEmpty()) {
@@ -427,9 +439,9 @@ public class RecommendationProcessor {
     private List<ScoredRestaurant> selectTopRestaurantsByStrategy(
             List<CategoryScoredRestaurant> scoredByCategory,
             RecommendationParticipantContext participantContext,
-            FilterStrategy strategy
+            FilterStrategy strategy,
+            int topKSize
     ) {
-        int topKSize = scoringPolicy.candidate().topKSize();
         List<CategoryScoredRestaurant> baseCandidates = applyNoDislikePreferredFilter(
                 scoredByCategory,
                 participantContext,
