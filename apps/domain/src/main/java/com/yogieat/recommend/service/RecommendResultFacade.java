@@ -117,7 +117,6 @@ public class RecommendResultFacade {
                 .orElse(0.0) * 100.0) / 100.0;
     }
 
-    @Transactional
     public RecommendResultData.Get getRecommendResultsV2(String accessKey) {
         // 1. accessKey로 Gathering 조회
         Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
@@ -161,29 +160,38 @@ public class RecommendResultFacade {
                         .toList()
         );
 
-        // 9. 저장된 reroll 이력이 있으면 재사용, 없으면 계산 후 저장
+        // 9. 저장된 reroll 이력이 있으면 재사용, 없으면 락 내에서 이중 검증 후 계산 저장
         List<RecommendRerollHistory.Result> rerollHistoryResults = recommendRerollHistoryService
                 .findLatestByGatheringId(gathering.id())
                 .map(RecommendRerollHistory::rerolledResults)
                 .orElse(null);
 
         if (rerollHistoryResults == null) {
-            int requestedCount = 9 - rankings.size();
-            RecommendationCandidateResult rerollCandidate = recommendationProcessor.calculateRecommendations(
-                    gathering.id(),
-                    gathering.region(),
-                    originalRestaurantIds,
-                    requestedCount
-            );
+            rerollHistoryResults = lockManager.executeWithLock(accessKey, () -> {
+                List<RecommendRerollHistory.Result> innerResults = recommendRerollHistoryService
+                        .findLatestByGatheringId(gathering.id())
+                        .map(RecommendRerollHistory::rerolledResults)
+                        .orElse(null);
+                if (innerResults != null) {
+                    return innerResults;
+                }
 
-            if (!rerollCandidate.failed()) {
-                rerollHistoryResults = toRerollHistoryResults(rerollCandidate.restaurants());
-                recommendRerollHistoryService.create(gathering.id(), originalRestaurantIds, rerollHistoryResults);
-                log.info("[V2] reroll 계산 완료 - gatheringId={}, 요청={}, 실제={}", gathering.id(), requestedCount, rerollHistoryResults.size());
-            } else {
-                log.warn("[V2] reroll 계산 실패 - gatheringId={}, reason={}, message={}", gathering.id(), rerollCandidate.failureReason(), rerollCandidate.failureMessage());
-                rerollHistoryResults = List.of();
-            }
+                int requestedCount = 9 - rankings.size();
+                RecommendationCandidateResult rerollCandidate = recommendationProcessor.calculateRecommendations(
+                        gathering.id(),
+                        gathering.region(),
+                        originalRestaurantIds,
+                        requestedCount
+                );
+
+                if (!rerollCandidate.failed()) {
+                    List<RecommendRerollHistory.Result> calculated = toRerollHistoryResults(rerollCandidate.restaurants());
+                    recommendRerollHistoryService.create(gathering.id(), originalRestaurantIds, calculated);
+                    return calculated;
+                } else {
+                    return List.<RecommendRerollHistory.Result>of();
+                }
+            });
         }
 
         // 10. reroll 이력 기반 나머지 맛집 빌드
