@@ -12,6 +12,7 @@ dependencies {
 
     // API runtime
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    runtimeOnly 'org.postgresql:postgresql'
 
     // Validation (used only by apps:api for request validation)
     implementation 'org.springframework.boot:spring-boot-starter-validation'
