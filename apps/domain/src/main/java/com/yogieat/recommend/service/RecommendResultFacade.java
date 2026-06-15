@@ -66,9 +66,13 @@ public class RecommendResultFacade {
             return RecommendResultData.Get.ofEmpty(gatheringInfo);
         }
 
-        // 4. PENDING 상태인 경우
-        if (recommendResults.getFirst().status() == RecommendStatus.PENDING) {
+        // 4. PENDING / FAILED 상태인 경우
+        RecommendStatus firstStatus = recommendResults.getFirst().status();
+        if (firstStatus == RecommendStatus.PENDING) {
             return RecommendResultData.Get.ofPending(gatheringInfo);
+        }
+        if (firstStatus == RecommendStatus.FAILED) {
+            return RecommendResultData.Get.ofFailed(gatheringInfo);
         }
 
         // 5. 참여자 목록 조회
@@ -130,9 +134,13 @@ public class RecommendResultFacade {
             return RecommendResultData.Get.ofEmpty(gatheringInfo);
         }
 
-        // 4. PENDING 상태인 경우
-        if (recommendResults.getFirst().status() == RecommendStatus.PENDING) {
+        // 4. PENDING / FAILED 상태인 경우
+        RecommendStatus firstStatus = recommendResults.getFirst().status();
+        if (firstStatus == RecommendStatus.PENDING) {
             return RecommendResultData.Get.ofPending(gatheringInfo);
+        }
+        if (firstStatus == RecommendStatus.FAILED) {
+            return RecommendResultData.Get.ofFailed(gatheringInfo);
         }
 
         // 5. 참여자 목록 조회

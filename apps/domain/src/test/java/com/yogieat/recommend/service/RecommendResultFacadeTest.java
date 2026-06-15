@@ -137,6 +137,38 @@ class RecommendResultFacadeTest {
     }
 
     @Test
+    @DisplayName("FAILED 상태이면 status=FAILED, 빈 랭킹을 반환한다 (restaurantId=null로 인한 예외 방지)")
+    void getRecommendResults_ShouldReturnFailed_WhenFirstResultIsFailed() {
+        Gathering gathering = gathering(1L, "access-key");
+        when(gatheringService.getGatheringByAccessKey("access-key")).thenReturn(gathering);
+        when(recommendResultService.findByGatheringId(1L)).thenReturn(List.of(
+                RecommendResult.Create.of(1L, null, 0.0, RecommendStatus.FAILED, null, 0.0, null)
+        ));
+
+        RecommendResultData.Get result = recommendResultFacade.getRecommendResults("access-key");
+
+        assertThat(result.status()).isEqualTo(RecommendStatus.FAILED);
+        assertThat(result.rankings()).isEmpty();
+        verifyNoInteractions(restaurantService, participantService);
+    }
+
+    @Test
+    @DisplayName("v2 조회: FAILED 상태이면 status=FAILED, 빈 랭킹을 반환한다 (restaurantId=null로 인한 예외 방지)")
+    void getRecommendResultsV2_ShouldReturnFailed_WhenFirstResultIsFailed() {
+        Gathering gathering = gathering(1L, "key");
+        when(gatheringService.getGatheringByAccessKey("key")).thenReturn(gathering);
+        when(recommendResultService.findByGatheringId(1L)).thenReturn(List.of(
+                RecommendResult.Create.of(1L, null, 0.0, RecommendStatus.FAILED, null, 0.0, null)
+        ));
+
+        RecommendResultData.Get result = recommendResultFacade.getRecommendResultsV2("key");
+
+        assertThat(result.status()).isEqualTo(RecommendStatus.FAILED);
+        assertThat(result.rankings()).isEmpty();
+        verifyNoInteractions(restaurantService, participantService, lockManager);
+    }
+
+    @Test
     @DisplayName("v2 조회: 추천 결과가 없으면 status=null, 빈 랭킹을 반환한다")
     void getRecommendResultsV2_ShouldReturnEmpty_WhenNoResults() {
         Gathering gathering = gathering(1L, "key");
