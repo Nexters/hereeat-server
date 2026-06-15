@@ -72,6 +72,18 @@ public record RecommendResultData() {
             );
         }
 
+        public static Get ofFailed(GatheringInfo gathering) {
+            return new Get(
+                RecommendStatus.FAILED,
+                Collections.emptyList(),
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                0.0,
+                gathering
+            );
+        }
+
         public static Get ofEmpty(GatheringInfo gathering) {
             return new Get(
                 null,

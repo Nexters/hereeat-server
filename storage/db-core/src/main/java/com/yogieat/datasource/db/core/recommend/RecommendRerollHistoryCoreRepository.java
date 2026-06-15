@@ -2,6 +2,7 @@ package com.yogieat.datasource.db.core.recommend;
 
 import com.yogieat.recommend.domain.RecommendRerollHistory;
 import com.yogieat.recommend.service.RecommendRerollHistoryRepository;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -16,5 +17,12 @@ public class RecommendRerollHistoryCoreRepository implements RecommendRerollHist
         RecommendRerollHistoryEntity savedEntity =
                 recommendRerollHistoryJpaRepository.save(RecommendRerollHistoryEntity.from(recommendRerollHistory));
         return savedEntity.toDomain();
+    }
+
+    @Override
+    public Optional<RecommendRerollHistory> findLatestByGatheringId(Long gatheringId) {
+        return recommendRerollHistoryJpaRepository
+                .findTopByGatheringIdOrderByIdDesc(gatheringId)
+                .map(RecommendRerollHistoryEntity::toDomain);
     }
 }

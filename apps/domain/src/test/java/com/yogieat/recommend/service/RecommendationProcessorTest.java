@@ -594,6 +594,83 @@ class RecommendationProcessorTest {
         assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(101L, 102L, 201L);
     }
 
+    @Test
+    @DisplayName("topKSize를 6으로 지정하면 최대 6개의 후보 맛집을 반환한다")
+    void returnsUpToTopKRestaurants_when_topKSizeIsSpecified() {
+        Long gatheringId = 61L;
+        Region region = gangnam();
+        int requestedTopK = 6;
+
+        List<Participant> participants = List.of(
+                participant(1L, gatheringId, DistanceRange.ANY, "한식", null),
+                participant(2L, gatheringId, DistanceRange.ANY, "한식", null)
+        );
+        List<Category> categories = List.of(category(1L, LargeCategory.KOREAN));
+        List<Restaurant> restaurants = List.of(
+                restaurant(101L, 1L, "한식A", 4.9, point(127.0276, 37.4979), 30),
+                restaurant(102L, 1L, "한식B", 4.8, point(127.0277, 37.4978), 28),
+                restaurant(103L, 1L, "한식C", 4.7, point(127.0278, 37.4977), 25),
+                restaurant(104L, 1L, "한식D", 4.6, point(127.0279, 37.4976), 22),
+                restaurant(105L, 1L, "한식E", 4.5, point(127.0280, 37.4975), 20),
+                restaurant(106L, 1L, "한식F", 4.4, point(127.0281, 37.4974), 18)
+        );
+
+        when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
+        when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
+        when(categoryService.findAll()).thenReturn(categories);
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
+                .thenReturn(restaurants);
+
+        RecommendationCandidateResult result = recommendationProcessor.calculateRecommendations(
+                gatheringId,
+                region,
+                List.of(),
+                requestedTopK
+        );
+
+        assertThat(result.failed()).isFalse();
+        assertThat(result.restaurants()).hasSize(requestedTopK);
+        assertThat(result.restaurants())
+                .extracting(scored -> scored.restaurant().id())
+                .containsExactly(101L, 102L, 103L, 104L, 105L, 106L);
+    }
+
+    @Test
+    @DisplayName("topKSize를 6으로 지정해도 후보가 4개뿐이면 4개만 반환한다")
+    void returnsLessRestaurantsThanTopKSize_when_candidatesAreInsufficient() {
+        Long gatheringId = 62L;
+        Region region = gangnam();
+        int requestedTopK = 6;
+
+        List<Participant> participants = List.of(
+                participant(1L, gatheringId, DistanceRange.ANY, "한식", null),
+                participant(2L, gatheringId, DistanceRange.ANY, "한식", null)
+        );
+        List<Category> categories = List.of(category(1L, LargeCategory.KOREAN));
+        List<Restaurant> restaurants = List.of(
+                restaurant(101L, 1L, "한식A", 4.9, point(127.0276, 37.4979), 30),
+                restaurant(102L, 1L, "한식B", 4.7, point(127.0277, 37.4978), 25),
+                restaurant(103L, 1L, "한식C", 4.5, point(127.0278, 37.4977), 20),
+                restaurant(104L, 1L, "한식D", 4.3, point(127.0279, 37.4976), 15)
+        );
+
+        when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
+        when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
+        when(categoryService.findAll()).thenReturn(categories);
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
+                .thenReturn(restaurants);
+
+        RecommendationCandidateResult result = recommendationProcessor.calculateRecommendations(
+                gatheringId,
+                region,
+                List.of(),
+                requestedTopK
+        );
+
+        assertThat(result.failed()).isFalse();
+        assertThat(result.restaurants()).hasSize(4);
+    }
+
     private RecommendResult findRank(List<RecommendResult> results, int rank) {
         return results.stream()
                 .filter(result -> result.rank() == rank)
