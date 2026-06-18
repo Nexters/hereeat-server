@@ -66,9 +66,13 @@ public class RecommendResultFacade {
             return RecommendResultData.Get.ofEmpty(gatheringInfo);
         }
 
-        // 4. PENDING 상태인 경우
-        if (recommendResults.getFirst().status() == RecommendStatus.PENDING) {
+        // 4. PENDING / FAILED 상태인 경우
+        RecommendStatus firstStatus = recommendResults.getFirst().status();
+        if (firstStatus == RecommendStatus.PENDING) {
             return RecommendResultData.Get.ofPending(gatheringInfo);
+        }
+        if (firstStatus == RecommendStatus.FAILED) {
+            return RecommendResultData.Get.ofFailed(gatheringInfo);
         }
 
         // 5. 참여자 목록 조회
@@ -115,6 +119,124 @@ public class RecommendResultFacade {
                 .mapToDouble(Double::doubleValue)
                 .average()
                 .orElse(0.0) * 100.0) / 100.0;
+    }
+
+    public RecommendResultData.Get getRecommendResultsV2(String accessKey) {
+        // 1. accessKey로 Gathering 조회
+        Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
+        RecommendResultData.GatheringInfo gatheringInfo = RecommendResultData.GatheringInfo.of(gathering);
+
+        // 2. gatheringId로 RecommendResult 목록 조회 (rank 순서대로)
+        List<RecommendResult> recommendResults = recommendResultService.findByGatheringId(gathering.id());
+
+        // 3. 결과가 없는 경우
+        if (recommendResults.isEmpty()) {
+            return RecommendResultData.Get.ofEmpty(gatheringInfo);
+        }
+
+        // 4. PENDING / FAILED 상태인 경우
+        RecommendStatus firstStatus = recommendResults.getFirst().status();
+        if (firstStatus == RecommendStatus.PENDING) {
+            return RecommendResultData.Get.ofPending(gatheringInfo);
+        }
+        if (firstStatus == RecommendStatus.FAILED) {
+            return RecommendResultData.Get.ofFailed(gatheringInfo);
+        }
+
+        // 5. 참여자 목록 조회
+        List<Participant> participants = participantService.getByGatheringId(gathering.id());
+
+        // 6. 카테고리별 선호도/불호 집계
+        CategoryAggregation aggregation = participantAnalyzer.aggregateCategoryPreferences(participants);
+
+        // 6-1. DistanceRange별 집계
+        Map<String, Integer> distances = participantAnalyzer.aggregateDistanceRanges(participants);
+
+        // 7. Restaurant 정보와 Category 정보 조회 및 캐싱
+        List<Long> originalRestaurantIds = recommendResults.stream()
+                .map(RecommendResult::restaurantId)
+                .toList();
+        Map<Long, Restaurant> restaurantMap = restaurantService.findByIds(originalRestaurantIds).stream()
+                .collect(Collectors.toMap(Restaurant::id, Function.identity()));
+        Map<Long, Category> categoryMap = categoryService.findAll().stream()
+                .collect(Collectors.toMap(Category::id, Function.identity()));
+
+        // 8. 원본 추천 결과 (1~3위) 빌드
+        List<RecommendResultData.Ranking> rankings = new ArrayList<>(
+                recommendResults.stream()
+                        .map(result -> buildRankingResult(result, restaurantMap, categoryMap, gathering.region()))
+                        .toList()
+        );
+
+        // 9. 저장된 reroll 이력이 있으면 재사용, 없으면 락 내에서 이중 검증 후 계산 저장
+        List<RecommendRerollHistory.Result> rerollHistoryResults = recommendRerollHistoryService
+                .findLatestByGatheringId(gathering.id())
+                .map(RecommendRerollHistory::rerolledResults)
+                .orElse(null);
+
+        if (rerollHistoryResults == null) {
+            rerollHistoryResults = lockManager.executeWithLock(accessKey, () -> {
+                List<RecommendRerollHistory.Result> innerResults = recommendRerollHistoryService
+                        .findLatestByGatheringId(gathering.id())
+                        .map(RecommendRerollHistory::rerolledResults)
+                        .orElse(null);
+                if (innerResults != null) {
+                    return innerResults;
+                }
+
+                int requestedCount = 9 - rankings.size();
+                RecommendationCandidateResult rerollCandidate = recommendationProcessor.calculateRecommendations(
+                        gathering.id(),
+                        gathering.region(),
+                        originalRestaurantIds,
+                        requestedCount
+                );
+
+                if (!rerollCandidate.failed()) {
+                    List<RecommendRerollHistory.Result> calculated = toRerollHistoryResults(rerollCandidate.restaurants());
+                    recommendRerollHistoryService.create(gathering.id(), originalRestaurantIds, calculated);
+                    return calculated;
+                } else {
+                    return List.<RecommendRerollHistory.Result>of();
+                }
+            });
+        }
+
+        // 10. reroll 이력 기반 나머지 맛집 빌드
+        if (!rerollHistoryResults.isEmpty()) {
+            List<Long> rerollRestaurantIds = rerollHistoryResults.stream()
+                    .map(RecommendRerollHistory.Result::restaurantId)
+                    .toList();
+            Map<Long, Restaurant> rerollRestaurantMap = restaurantService.findByIds(rerollRestaurantIds).stream()
+                    .collect(Collectors.toMap(Restaurant::id, Function.identity()));
+
+            int nextRank = rankings.size() + 1;
+            for (RecommendRerollHistory.Result rerollResult : rerollHistoryResults) {
+                Restaurant restaurant = rerollRestaurantMap.get(rerollResult.restaurantId());
+                if (restaurant != null) {
+                    rankings.add(buildRankingResult(
+                            nextRank++,
+                            rerollResult.reasonText(),
+                            restaurant,
+                            categoryMap,
+                            gathering.region()
+                    ));
+                }
+            }
+        }
+
+        // 11. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
+        double averageAgreementRate = calculateAverageAgreementRate(recommendResults);
+
+        return RecommendResultData.Get.of(
+                RecommendStatus.COMPLETED,
+                List.copyOf(rankings),
+                aggregation.preferences(),
+                aggregation.dislikes(),
+                distances,
+                averageAgreementRate,
+                gatheringInfo
+        );
     }
 
     @Transactional

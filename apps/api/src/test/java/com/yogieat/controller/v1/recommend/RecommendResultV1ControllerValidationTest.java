@@ -9,12 +9,12 @@ import java.lang.reflect.Parameter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class RecommendResultControllerValidationTest {
+class RecommendResultV1ControllerValidationTest {
 
     @Test
     @DisplayName("재추천 API 요청 바디 파라미터에 @Valid가 선언되어 있다")
     void rerollRequestBodyParameter_ShouldHaveValidAnnotation() throws NoSuchMethodException {
-        Method method = RecommendResultController.class.getDeclaredMethod(
+        Method method = RecommendResultV1Controller.class.getDeclaredMethod(
                 "rerollRecommendResults",
                 RerollRecommendResultRequest.class
         );

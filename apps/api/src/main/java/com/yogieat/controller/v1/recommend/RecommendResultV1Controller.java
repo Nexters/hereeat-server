@@ -16,11 +16,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "🍽 RecommendResult API", description = "추천 결과 관련 API")
+@Tag(name = "🍽 RecommendResult API (v1)", description = "추천 결과 관련 API (v1)")
 @RestController
 @RequestMapping("/api/v1/recommend-results")
 @RequiredArgsConstructor
-public class RecommendResultController {
+public class RecommendResultV1Controller {
     private final RecommendResultFacade recommendResultFacade;
 
     @Operation(summary = "추천 결과 조회", description = "모임의 추천 결과를 조회합니다.")
