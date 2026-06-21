@@ -230,6 +230,45 @@ class RecommendResultFacadeTest {
         verifyNoInteractions(lockManager, recommendRerollHistoryService, recommendationProcessor);
     }
 
+    @Test
+    @DisplayName("v1 조회: 저장된 결과가 더 많아도 대표 추천 상위 3개(top 1 + other 2)만 반환한다")
+    void getRecommendResults_ShouldReturnOnlyTop3_WhenMoreStored() {
+        Gathering gathering = gathering(1L, "key");
+
+        List<RecommendResult> storedResults = new ArrayList<>();
+        List<Restaurant> top3Restaurants = new ArrayList<>();
+        List<Long> top3Ids = new ArrayList<>();
+        for (int rank = 1; rank <= 9; rank++) {
+            long restaurantId = 100L + rank;
+            storedResults.add(RecommendResult.Create.of(
+                    1L, restaurantId, 30.0, RecommendStatus.COMPLETED, rank, 4.0, "근거" + rank));
+            if (rank <= 3) {
+                top3Restaurants.add(restaurant(restaurantId, 1L, "식당" + rank));
+                top3Ids.add(restaurantId);
+            }
+        }
+
+        when(gatheringService.getGatheringByAccessKey("key")).thenReturn(gathering);
+        when(recommendResultService.findByGatheringId(1L)).thenReturn(storedResults);
+        when(participantService.getByGatheringId(1L)).thenReturn(List.of());
+        when(participantAnalyzer.aggregateCategoryPreferences(List.of())).thenReturn(CategoryAggregation.of(Map.of(), Map.of()));
+        when(participantAnalyzer.aggregateDistanceRanges(List.of())).thenReturn(Map.of());
+        when(restaurantService.findByIds(top3Ids)).thenReturn(top3Restaurants);
+        when(categoryService.findAll()).thenReturn(List.of(category(1L)));
+        when(participantAnalyzer.determineMajorityDistanceRange(any(), any())).thenReturn(DistanceRange.ANY);
+
+        RecommendResultData.Get result = recommendResultFacade.getRecommendResults("key");
+
+        assertThat(result.status()).isEqualTo(RecommendStatus.COMPLETED);
+        assertThat(result.rankings()).hasSize(3);
+        assertThat(result.rankings()).extracting(RecommendResultData.Ranking::rank)
+                .containsExactly(1, 2, 3);
+        assertThat(result.rankings()).extracting(RecommendResultData.Ranking::restaurantId)
+                .containsExactly(101L, 102L, 103L);
+        // 노출 대상(상위 3개)에 대해서만 맛집 조회가 일어난다
+        verify(restaurantService).findByIds(top3Ids);
+    }
+
     private Gathering gathering(Long id, String accessKey) {
         return new Gathering(
                 id,

@@ -40,6 +40,9 @@ public class RecommendResultFacade {
 
     private static final Logger log = LoggerFactory.getLogger(RecommendResultFacade.class);
 
+    /** v1 조회는 대표 추천(상위 1개 + 그 외 2개)만 노출한다. */
+    private static final int V1_RANKING_SIZE = 3;
+
     private final GatheringService gatheringService;
     private final RecommendResultService recommendResultService;
     private final RestaurantService restaurantService;
@@ -54,14 +57,17 @@ public class RecommendResultFacade {
 
     @Transactional(readOnly = true)
     public RecommendResultData.Get getRecommendResults(String accessKey) {
-        return buildRecommendResults(accessKey);
+        // v1: 대표 추천 상위 3개만 노출
+        return buildRecommendResults(accessKey, V1_RANKING_SIZE);
     }
 
     /**
      * accessKey 기준으로 저장된 추천 결과를 조회해 응답을 구성한다.
      * 추천 생성 시점(RecommendationProcessor)에 1~N위를 모두 적재하므로 조회는 단순 읽기로 처리한다.
+     *
+     * @param maxRankingSize 응답에 포함할 최대 추천 수 (rank 오름차순 기준 상위 N개)
      */
-    private RecommendResultData.Get buildRecommendResults(String accessKey) {
+    private RecommendResultData.Get buildRecommendResults(String accessKey, int maxRankingSize) {
         // 1. accessKey로 Gathering 조회
         Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
         RecommendResultData.GatheringInfo gatheringInfo = RecommendResultData.GatheringInfo.of(gathering);
@@ -83,6 +89,11 @@ public class RecommendResultFacade {
             return RecommendResultData.Get.ofFailed(gatheringInfo);
         }
 
+        // 4-1. 노출 개수 제한 (rank 오름차순 기준 상위 N개)
+        List<RecommendResult> displayResults = recommendResults.stream()
+                .limit(maxRankingSize)
+                .toList();
+
         // 5. 참여자 목록 조회
         List<Participant> participants = participantService.getByGatheringId(gathering.id());
 
@@ -93,7 +104,7 @@ public class RecommendResultFacade {
         Map<String, Integer> distances = participantAnalyzer.aggregateDistanceRanges(participants);
 
         // 7. Restaurant 정보와 Category 정보 조회 및 캐싱
-        List<Long> restaurantIds = recommendResults.stream()
+        List<Long> restaurantIds = displayResults.stream()
                 .map(RecommendResult::restaurantId)
                 .toList();
         Map<Long, Restaurant> restaurantMap = restaurantService.findByIds(restaurantIds).stream()
@@ -101,13 +112,13 @@ public class RecommendResultFacade {
         Map<Long, Category> categoryMap = categoryService.findAll().stream()
                 .collect(Collectors.toMap(Category::id, Function.identity()));
 
-        // 8. 저장된 추천 결과 (1~N위) 빌드
-        List<RecommendResultData.Ranking> rankings = recommendResults.stream()
+        // 8. 저장된 추천 결과 빌드
+        List<RecommendResultData.Ranking> rankings = displayResults.stream()
                 .map(result -> buildRankingResult(result, restaurantMap, categoryMap, gathering.region()))
                 .toList();
 
-        // 9. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
-        double averageAgreementRate = calculateAverageAgreementRate(recommendResults);
+        // 9. 평균 의견 일치율 계산 (노출 결과 기준, 소수점 둘째자리 반올림)
+        double averageAgreementRate = calculateAverageAgreementRate(displayResults);
 
         return RecommendResultData.Get.of(
                 RecommendStatus.COMPLETED,
@@ -131,7 +142,8 @@ public class RecommendResultFacade {
 
     @Transactional(readOnly = true)
     public RecommendResultData.Get getRecommendResultsV2(String accessKey) {
-        return buildRecommendResults(accessKey);
+        // v2: 저장된 추천 결과(최대 resultSize, 기본 9개)를 모두 노출
+        return buildRecommendResults(accessKey, Integer.MAX_VALUE);
     }
 
     @Transactional

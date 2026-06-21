@@ -18,7 +18,7 @@ Yogieat의 추천 시스템은 외부 ML 서비스 없이 **순수 Java 로직�
 ## 개요
 
 추천 파이프라인의 계산 진입점은 `RecommendationProcessor.calculateRecommendations()`이고, 최초 추천 저장 진입점은 `RecommendationProcessor.processRecommendation()`입니다.
-모임 참여자의 선호/불호/거리 선호를 집계해 **대표 Top 3 + 추가 추천을 합쳐 최대 `resultSize`(기본 9)개 맛집을 자동 산출**하고, 최초 추천 결과는 `RecommendResult`에 rank 1~N으로 저장합니다. 따라서 결과 조회 API(`GET /api/v1`, `GET /api/v2`)는 저장된 결과를 그대로 읽는 단순 조회로 동작합니다.
+모임 참여자의 선호/불호/거리 선호를 집계해 **대표 Top 3 + 추가 추천을 합쳐 최대 `resultSize`(기본 9)개 맛집을 자동 산출**하고, 최초 추천 결과는 `RecommendResult`에 rank 1~N으로 저장합니다. 결과 조회 API는 저장된 결과를 그대로 읽는 단순 조회로 동작하며, 노출 개수만 버전별로 다릅니다: `GET /api/v1`은 대표 추천 상위 3개(top 1 + other 2), `GET /api/v2`는 저장된 전체(최대 9개)를 반환합니다.
 재추천은 기존 결과를 덮어쓰지 않고 제외할 맛집 목록을 반영해 후보를 다시 산출한 뒤 `RecommendRerollHistory`에 요청/결과 이력을 저장합니다.
 
 핵심 목표:
