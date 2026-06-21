@@ -54,74 +54,14 @@ public class RecommendResultFacade {
 
     @Transactional(readOnly = true)
     public RecommendResultData.Get getRecommendResults(String accessKey) {
-        // 1. accessKey로 Gathering 조회
-        Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
-        RecommendResultData.GatheringInfo gatheringInfo = RecommendResultData.GatheringInfo.of(gathering);
-
-        // 2. gatheringId로 RecommendResult 목록 조회 (rank 순서대로)
-        List<RecommendResult> recommendResults = recommendResultService.findByGatheringId(gathering.id());
-
-        // 3. 결과가 없는 경우
-        if (recommendResults.isEmpty()) {
-            return RecommendResultData.Get.ofEmpty(gatheringInfo);
-        }
-
-        // 4. PENDING / FAILED 상태인 경우
-        RecommendStatus firstStatus = recommendResults.getFirst().status();
-        if (firstStatus == RecommendStatus.PENDING) {
-            return RecommendResultData.Get.ofPending(gatheringInfo);
-        }
-        if (firstStatus == RecommendStatus.FAILED) {
-            return RecommendResultData.Get.ofFailed(gatheringInfo);
-        }
-
-        // 5. 참여자 목록 조회
-        List<Participant> participants = participantService.getByGatheringId(gathering.id());
-
-        // 7. 카테고리별 선호도/불호 집계
-        CategoryAggregation aggregation = participantAnalyzer.aggregateCategoryPreferences(participants);
-
-        // 7-1. DistanceRange별 집계
-        Map<String, Integer> distances = participantAnalyzer.aggregateDistanceRanges(participants);
-
-        // 8. Restaurant 정보와 Category 정보 조회 및 캐싱
-        List<Long> restaurantIds = recommendResults.stream()
-                .map(RecommendResult::restaurantId)
-                .toList();
-        Map<Long, Restaurant> restaurantMap = restaurantService.findByIds(restaurantIds).stream()
-                .collect(Collectors.toMap(Restaurant::id, Function.identity()));
-        Map<Long, Category> categoryMap = categoryService.findAll().stream()
-                .collect(Collectors.toMap(Category::id, Function.identity()));
-
-        // 9. Result 생성
-        List<RecommendResultData.Ranking> rankings = recommendResults.stream()
-                .map(result -> buildRankingResult(result, restaurantMap, categoryMap, gathering.region()))
-                .toList();
-
-        // 10. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
-        double averageAgreementRate = calculateAverageAgreementRate(recommendResults);
-
-        return RecommendResultData.Get.of(
-                RecommendStatus.COMPLETED,
-                rankings,
-                aggregation.preferences(),
-                aggregation.dislikes(),
-                distances,
-                averageAgreementRate,
-                gatheringInfo
-        );
+        return buildRecommendResults(accessKey);
     }
 
-    private double calculateAverageAgreementRate(List<RecommendResult> recommendResults) {
-        return Math.round(recommendResults.stream()
-                .map(RecommendResult::agreementRate)
-                .filter(rate -> rate != null)
-                .mapToDouble(Double::doubleValue)
-                .average()
-                .orElse(0.0) * 100.0) / 100.0;
-    }
-
-    public RecommendResultData.Get getRecommendResultsV2(String accessKey) {
+    /**
+     * accessKey 기준으로 저장된 추천 결과를 조회해 응답을 구성한다.
+     * 추천 생성 시점(RecommendationProcessor)에 1~N위를 모두 적재하므로 조회는 단순 읽기로 처리한다.
+     */
+    private RecommendResultData.Get buildRecommendResults(String accessKey) {
         // 1. accessKey로 Gathering 조회
         Gathering gathering = gatheringService.getGatheringByAccessKey(accessKey);
         RecommendResultData.GatheringInfo gatheringInfo = RecommendResultData.GatheringInfo.of(gathering);
@@ -153,90 +93,45 @@ public class RecommendResultFacade {
         Map<String, Integer> distances = participantAnalyzer.aggregateDistanceRanges(participants);
 
         // 7. Restaurant 정보와 Category 정보 조회 및 캐싱
-        List<Long> originalRestaurantIds = recommendResults.stream()
+        List<Long> restaurantIds = recommendResults.stream()
                 .map(RecommendResult::restaurantId)
                 .toList();
-        Map<Long, Restaurant> restaurantMap = restaurantService.findByIds(originalRestaurantIds).stream()
+        Map<Long, Restaurant> restaurantMap = restaurantService.findByIds(restaurantIds).stream()
                 .collect(Collectors.toMap(Restaurant::id, Function.identity()));
         Map<Long, Category> categoryMap = categoryService.findAll().stream()
                 .collect(Collectors.toMap(Category::id, Function.identity()));
 
-        // 8. 원본 추천 결과 (1~3위) 빌드
-        List<RecommendResultData.Ranking> rankings = new ArrayList<>(
-                recommendResults.stream()
-                        .map(result -> buildRankingResult(result, restaurantMap, categoryMap, gathering.region()))
-                        .toList()
-        );
+        // 8. 저장된 추천 결과 (1~N위) 빌드
+        List<RecommendResultData.Ranking> rankings = recommendResults.stream()
+                .map(result -> buildRankingResult(result, restaurantMap, categoryMap, gathering.region()))
+                .toList();
 
-        // 9. 저장된 reroll 이력이 있으면 재사용, 없으면 락 내에서 이중 검증 후 계산 저장
-        List<RecommendRerollHistory.Result> rerollHistoryResults = recommendRerollHistoryService
-                .findLatestByGatheringId(gathering.id())
-                .map(RecommendRerollHistory::rerolledResults)
-                .orElse(null);
-
-        if (rerollHistoryResults == null) {
-            rerollHistoryResults = lockManager.executeWithLock(accessKey, () -> {
-                List<RecommendRerollHistory.Result> innerResults = recommendRerollHistoryService
-                        .findLatestByGatheringId(gathering.id())
-                        .map(RecommendRerollHistory::rerolledResults)
-                        .orElse(null);
-                if (innerResults != null) {
-                    return innerResults;
-                }
-
-                int requestedCount = 9 - rankings.size();
-                RecommendationCandidateResult rerollCandidate = recommendationProcessor.calculateRecommendations(
-                        gathering.id(),
-                        gathering.region(),
-                        originalRestaurantIds,
-                        requestedCount
-                );
-
-                if (!rerollCandidate.failed()) {
-                    List<RecommendRerollHistory.Result> calculated = toRerollHistoryResults(rerollCandidate.restaurants());
-                    recommendRerollHistoryService.create(gathering.id(), originalRestaurantIds, calculated);
-                    return calculated;
-                } else {
-                    return List.<RecommendRerollHistory.Result>of();
-                }
-            });
-        }
-
-        // 10. reroll 이력 기반 나머지 맛집 빌드
-        if (!rerollHistoryResults.isEmpty()) {
-            List<Long> rerollRestaurantIds = rerollHistoryResults.stream()
-                    .map(RecommendRerollHistory.Result::restaurantId)
-                    .toList();
-            Map<Long, Restaurant> rerollRestaurantMap = restaurantService.findByIds(rerollRestaurantIds).stream()
-                    .collect(Collectors.toMap(Restaurant::id, Function.identity()));
-
-            int nextRank = rankings.size() + 1;
-            for (RecommendRerollHistory.Result rerollResult : rerollHistoryResults) {
-                Restaurant restaurant = rerollRestaurantMap.get(rerollResult.restaurantId());
-                if (restaurant != null) {
-                    rankings.add(buildRankingResult(
-                            nextRank++,
-                            rerollResult.reasonText(),
-                            restaurant,
-                            categoryMap,
-                            gathering.region()
-                    ));
-                }
-            }
-        }
-
-        // 11. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
+        // 9. 평균 의견 일치율 계산 (소수점 둘째자리 반올림)
         double averageAgreementRate = calculateAverageAgreementRate(recommendResults);
 
         return RecommendResultData.Get.of(
                 RecommendStatus.COMPLETED,
-                List.copyOf(rankings),
+                rankings,
                 aggregation.preferences(),
                 aggregation.dislikes(),
                 distances,
                 averageAgreementRate,
                 gatheringInfo
         );
+    }
+
+    private double calculateAverageAgreementRate(List<RecommendResult> recommendResults) {
+        return Math.round(recommendResults.stream()
+                .map(RecommendResult::agreementRate)
+                .filter(rate -> rate != null)
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .orElse(0.0) * 100.0) / 100.0;
+    }
+
+    @Transactional(readOnly = true)
+    public RecommendResultData.Get getRecommendResultsV2(String accessKey) {
+        return buildRecommendResults(accessKey);
     }
 
     @Transactional

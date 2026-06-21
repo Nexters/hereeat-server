@@ -80,35 +80,39 @@ public class RecommendationProcessor {
                 recommendResultRepository.deleteByGatheringId(gatheringId);
             }
 
-            RecommendationCandidateResult candidateResult =
+            // 1차: 기존과 동일하게 튜닝된 Top-K(기본 3) 대표 추천 계산
+            RecommendationCandidateResult primaryResult =
                     calculateRecommendations(gatheringId, region, List.of());
 
-            if (candidateResult.failed()) {
+            if (primaryResult.failed()) {
                 saveFailedResult(
                         gatheringId,
-                        candidateResult.failureReason(),
-                        candidateResult.failureMessage()
+                        primaryResult.failureReason(),
+                        primaryResult.failureMessage()
                 );
                 return;
             }
 
-            List<ScoredRestaurant> top3 = candidateResult.restaurants();
+            // 2차: 부족분(resultSize - primary)을 1차 결과를 제외하고 추가 계산해 함께 적재한다.
+            //      조회 시점 lazy reroll을 제거하고 생성 시점에 미리 N(기본 9)개를 확보하기 위함.
+            List<ScoredRestaurant> recommendedRestaurants = collectRecommendations(
+                    gatheringId, region, primaryResult.restaurants());
 
-            log.info("Top 3 restaurants: {}", top3.stream()
+            log.info("Top {} restaurants: {}", recommendedRestaurants.size(), recommendedRestaurants.stream()
                     .map(sr -> String.format("%s(%.2f%%)", sr.restaurant().name(), sr.agreementRate()))
                     .collect(Collectors.joining(", ")));
 
             // 10. RecommendResult 저장 (추천 근거 텍스트 포함)
             List<RecommendResult> results = new ArrayList<>();
-            for (int i = 0; i < top3.size(); i++) {
-                ScoredRestaurant scored = top3.get(i);
+            for (int i = 0; i < recommendedRestaurants.size(); i++) {
+                ScoredRestaurant scored = recommendedRestaurants.get(i);
                 results.add(RecommendResult.Create.of(
                         gatheringId,
                         scored.restaurant().id(),
                         scored.agreementRate(),
                         RecommendStatus.COMPLETED,
-                        i + 1, // rank: 1, 2, 3,
-                        top3.get(i).totalScore(),
+                        i + 1, // rank: 1 ~ N
+                        scored.totalScore(),
                         scored.reasonText()  // 추천 근거 텍스트 (신규)
                 ));
             }
@@ -128,6 +132,35 @@ public class RecommendationProcessor {
             saveFailedResult(gatheringId, FailureReason.PROCESSING_EXCEPTION,
                     e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * 대표 추천(1차) 결과를 기준으로 resultSize(기본 9)개까지 추천 목록을 채운다.
+     * 부족분은 1차 결과를 제외하고 추가 계산하며, 추가 계산이 실패하면 1차 결과만 사용한다.
+     */
+    private List<ScoredRestaurant> collectRecommendations(
+            Long gatheringId,
+            Region region,
+            List<ScoredRestaurant> primaryRestaurants
+    ) {
+        List<ScoredRestaurant> recommended = new ArrayList<>(primaryRestaurants);
+
+        int additionalCount = scoringPolicy.candidate().resultSize() - recommended.size();
+        if (additionalCount <= 0) {
+            return recommended;
+        }
+
+        List<Long> primaryRestaurantIds = primaryRestaurants.stream()
+                .map(scored -> scored.restaurant().id())
+                .toList();
+
+        RecommendationCandidateResult additionalResult =
+                calculateRecommendations(gatheringId, region, primaryRestaurantIds, additionalCount);
+        if (!additionalResult.failed()) {
+            recommended.addAll(additionalResult.restaurants());
+        }
+
+        return recommended;
     }
 
     @Transactional

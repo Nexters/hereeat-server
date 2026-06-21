@@ -33,7 +33,7 @@ public record RecommendationScoringPolicy(
                 new ColdStart(30, 10, 4.0, 0.3),
                 new Freshness(7, 30, 90, 0.3, 0.1, -0.2),
                 new Credibility(1.5, 5.0, 3.0, 5.0),
-                new Candidate(10, 3)
+                new Candidate(10, 3, 9)
         );
     }
 
@@ -76,7 +76,8 @@ public record RecommendationScoringPolicy(
 
     public record Candidate(
             @DefaultValue("10") int poolSize,
-            @DefaultValue("3") int topKSize
+            @DefaultValue("3") int topKSize,
+            @DefaultValue("9") int resultSize
     ) {
     }
 }
