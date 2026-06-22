@@ -126,14 +126,49 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
         recommendationProcessor.processRecommendation(gatheringId, region);
 
         assertThat(savedRecommendationBatches).hasSize(1);
-        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(101L, 102L, 201L);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).startsWith(101L, 102L, 201L);
+    }
+
+    @Test
+    @DisplayName("후보가 충분하면 생성 시점에 resultSize(기본 9)개를 rank 1~9로 한 번에 적재한다")
+    void storesUpToResultSizeRestaurants_when_enoughCandidatesExist() {
+        Long gatheringId = 60L;
+        Region region = gangnam();
+
+        List<Participant> participants = List.of(
+                participant(1L, gatheringId, DistanceRange.ANY, "한식", null),
+                participant(2L, gatheringId, DistanceRange.ANY, "한식", null)
+        );
+        List<Category> categories = List.of(category(1L, LargeCategory.KOREAN));
+
+        List<Restaurant> restaurants = new ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            long restaurantId = 100L + i;
+            restaurants.add(restaurant(
+                    restaurantId, 1L, "한식" + i, 4.5 - i * 0.01, point(127.0276 + i * 0.0001, 37.4979), 20 - i));
+        }
+
+        when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
+        when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
+        when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
+        stubRecommendationCandidates(region, restaurants);
+        when(categoryService.findAll()).thenReturn(categories);
+
+        recommendationProcessor.processRecommendation(gatheringId, region);
+
+        // saveAll은 1회만 호출되고 1~9위가 중복 없이 연속 rank로 적재된다
+        assertThat(savedRecommendationBatches).hasSize(1);
+        List<RecommendResult> saved = savedRecommendationBatches.getFirst();
+        assertThat(saved).hasSize(9);
+        assertThat(saved.stream().map(RecommendResult::rank).sorted().toList())
+                .containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9);
+        assertThat(saved.stream().map(RecommendResult::restaurantId).distinct().count()).isEqualTo(9L);
     }
 
     @Test
@@ -173,8 +208,7 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
         recommendationProcessor.processRecommendation(gatheringId, region);
@@ -202,8 +236,7 @@ class RecommendationProcessorTest {
         when(gatheringRepository.findById(11L)).thenReturn(Optional.empty());
         when(gatheringRepository.findById(12L)).thenReturn(Optional.empty());
         when(gatheringRepository.findById(13L)).thenReturn(Optional.empty());
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
         when(participantRepository.findByGatheringId(11L)).thenReturn(List.of(
@@ -253,8 +286,7 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
         recommendationProcessor.processRecommendation(gatheringId, region);
@@ -309,7 +341,7 @@ class RecommendationProcessorTest {
             Collection<Long> categoryIds = invocation.getArgument(1);
             capturedCandidateCategoryIds = List.copyOf(categoryIds);
             capturedCandidateTimeSlot = invocation.getArgument(2, TimeSlot.class);
-            return restaurants;
+            return filterByExcluded(restaurants, invocation.getArgument(3));
         });
 
         recommendationProcessor.processRecommendation(gatheringId, region);
@@ -423,14 +455,13 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
         recommendationProcessor.processRecommendation(gatheringId, region);
 
         assertThat(savedRecommendationBatches).hasSize(1);
-        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(301L, 302L, 303L);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).startsWith(301L, 302L, 303L);
     }
 
     @Test
@@ -468,14 +499,13 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
         recommendationProcessor.processRecommendation(gatheringId, region);
 
         assertThat(savedRecommendationBatches).hasSize(1);
-        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(101L, 102L, 201L);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).startsWith(101L, 102L, 201L);
     }
 
     @Test
@@ -508,8 +538,7 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
         recommendationProcessor.processRecommendation(gatheringId, region);
@@ -546,14 +575,13 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
         recommendationProcessor.processRecommendation(gatheringId, region);
 
         assertThat(savedRecommendationBatches).hasSize(1);
-        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(101L, 102L, 201L);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).startsWith(101L, 102L, 201L);
     }
 
     @Test
@@ -584,14 +612,13 @@ class RecommendationProcessorTest {
         when(recommendResultRepository.findByGatheringId(gatheringId)).thenReturn(List.of());
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
         when(categoryService.findAll()).thenReturn(categories);
 
         recommendationProcessor.processRecommendation(gatheringId, region);
 
         assertThat(savedRecommendationBatches).hasSize(1);
-        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).containsExactly(101L, 102L, 201L);
+        assertThat(restaurantIdsByRank(savedRecommendationBatches.get(0))).startsWith(101L, 102L, 201L);
     }
 
     @Test
@@ -618,8 +645,7 @@ class RecommendationProcessorTest {
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
         when(categoryService.findAll()).thenReturn(categories);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
 
         RecommendationCandidateResult result = recommendationProcessor.calculateRecommendations(
                 gatheringId,
@@ -657,8 +683,7 @@ class RecommendationProcessorTest {
         when(gatheringRepository.findById(gatheringId)).thenReturn(Optional.empty());
         when(participantRepository.findByGatheringId(gatheringId)).thenReturn(participants);
         when(categoryService.findAll()).thenReturn(categories);
-        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
-                .thenReturn(restaurants);
+        stubRecommendationCandidates(region, restaurants);
 
         RecommendationCandidateResult result = recommendationProcessor.calculateRecommendations(
                 gatheringId,
@@ -676,6 +701,24 @@ class RecommendationProcessorTest {
                 .filter(result -> result.rank() == rank)
                 .findFirst()
                 .orElseThrow();
+    }
+
+    /**
+     * findRecommendationCandidates 모킹 시 실제 저장소처럼 제외 ID를 반영하도록 한다.
+     * (생성 시점 2차 추천 계산이 1차 결과를 제외하고 후보를 조회하는 동작을 재현)
+     */
+    private void stubRecommendationCandidates(Region region, List<Restaurant> restaurants) {
+        when(restaurantRepository.findRecommendationCandidates(eq(region), anyCollection(), any(), anyCollection(), any()))
+                .thenAnswer(invocation -> filterByExcluded(restaurants, invocation.getArgument(3)));
+    }
+
+    private List<Restaurant> filterByExcluded(List<Restaurant> restaurants, Collection<Long> excludedIds) {
+        if (excludedIds == null || excludedIds.isEmpty()) {
+            return restaurants;
+        }
+        return restaurants.stream()
+                .filter(restaurant -> !excludedIds.contains(restaurant.id()))
+                .toList();
     }
 
     private List<Long> restaurantIdsByRank(List<RecommendResult> results) {

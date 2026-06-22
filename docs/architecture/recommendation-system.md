@@ -18,7 +18,7 @@ Yogieat의 추천 시스템은 외부 ML 서비스 없이 **순수 Java 로직�
 ## 개요
 
 추천 파이프라인의 계산 진입점은 `RecommendationProcessor.calculateRecommendations()`이고, 최초 추천 저장 진입점은 `RecommendationProcessor.processRecommendation()`입니다.
-모임 참여자의 선호/불호/거리 선호를 집계해 **Top 3 맛집을 자동 산출**하고, 최초 추천 결과는 `RecommendResult`에 저장합니다.
+모임 참여자의 선호/불호/거리 선호를 집계해 **대표 Top 3 + 추가 추천을 합쳐 최대 `resultSize`(기본 9)개 맛집을 자동 산출**하고, 최초 추천 결과는 `RecommendResult`에 rank 1~N으로 저장합니다. 결과 조회 API는 저장된 결과를 그대로 읽는 단순 조회로 동작하며, 노출 개수만 버전별로 다릅니다: `GET /api/v1`은 대표 추천 상위 3개(top 1 + other 2), `GET /api/v2`는 저장된 전체(최대 9개)를 반환합니다.
 재추천은 기존 결과를 덮어쓰지 않고 제외할 맛집 목록을 반영해 후보를 다시 산출한 뒤 `RecommendRerollHistory`에 요청/결과 이력을 저장합니다.
 
 핵심 목표:
@@ -152,8 +152,13 @@ flowchart TD
     style P fill:#e1ffe1
 ```
 
-`processRecommendation()`은 위 계산 결과가 성공이면 `COMPLETED` 상태의 `RecommendResult` 3건을 rank 1~3으로 저장합니다.
-실패하거나 예외가 발생하면 PENDING 레코드를 정리한 뒤 `FAILED` 상태와 `RecommendResultFailed` 상세 컨텍스트를 저장합니다.
+`processRecommendation()`은 위 계산을 두 단계로 수행합니다.
+
+1. **대표 추천(1차)**: `topK=3`으로 튜닝된 Top 3를 산출합니다. 1차가 실패하면 PENDING을 정리하고 `FAILED`로 저장합니다.
+2. **추가 추천(2차)**: 부족분(`resultSize - 3`, 기본 6)을 1차 결과를 `excludedRestaurantIds`로 제외하고 추가 계산해 합칩니다. 2차가 실패하면 1차 결과만 사용합니다.
+
+성공 시 합쳐진 결과를 `COMPLETED` 상태의 `RecommendResult`로 rank 1~N(최대 `resultSize`, 기본 9)으로 한 번에 저장합니다. 이렇게 생성 시점에 N개를 미리 적재하므로 조회 시점에는 별도 계산이 없습니다.
+예외가 발생하면 PENDING 레코드를 정리한 뒤 `FAILED` 상태와 `RecommendResultFailed` 상세 컨텍스트를 저장합니다.
 
 ### 재추천
 
@@ -296,6 +301,10 @@ recommendation:
   scoring:
     distance-bonus: 1.0
     team-recommendation-boost: 3.0
+    candidate:
+      pool-size: 10      # 카테고리당 후보 풀 크기
+      top-k-size: 3      # 1차 대표 추천/재추천 1회당 선정 수
+      result-size: 9     # 최초 추천 생성 시 적재할 총 결과 수 (1차 + 추가)
     ai-summary:
       group-size-threshold: 4
       group-keywords: ["단체석", "대형 테이블", "모임", "단체"]
