@@ -238,13 +238,13 @@ class RecommendResultFacadeTest {
         List<RecommendResult> storedResults = new ArrayList<>();
         List<Restaurant> top3Restaurants = new ArrayList<>();
         List<Long> top3Ids = new ArrayList<>();
-        for (int rank = 1; rank <= 9; rank++) {
+        for (int rank = 9; rank >= 1; rank--) {
             long restaurantId = 100L + rank;
             storedResults.add(RecommendResult.Create.of(
                     1L, restaurantId, 30.0, RecommendStatus.COMPLETED, rank, 4.0, "근거" + rank));
             if (rank <= 3) {
-                top3Restaurants.add(restaurant(restaurantId, 1L, "식당" + rank));
-                top3Ids.add(restaurantId);
+                top3Restaurants.addFirst(restaurant(restaurantId, 1L, "식당" + rank));
+                top3Ids.addFirst(restaurantId);
             }
         }
 

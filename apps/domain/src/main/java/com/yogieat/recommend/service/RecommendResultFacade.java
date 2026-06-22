@@ -23,6 +23,7 @@ import com.yogieat.restaurant.domain.Restaurant;
 import com.yogieat.restaurant.service.RestaurantService;
 import com.yogieat.util.LockManager;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -91,6 +92,10 @@ public class RecommendResultFacade {
 
         // 4-1. 노출 개수 제한 (rank 오름차순 기준 상위 N개)
         List<RecommendResult> displayResults = recommendResults.stream()
+                .sorted(Comparator.comparing(
+                        RecommendResult::rank,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ))
                 .limit(maxRankingSize)
                 .toList();
 
