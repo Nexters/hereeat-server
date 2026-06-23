@@ -37,9 +37,9 @@ class RegionControllerTest {
     }
 
     @Test
-    @DisplayName("지역 목록 조회 응답이 200으로 반환된다")
-    void getRegions_ShouldReturnOk() throws Exception {
-        when(regionService.findActiveRegions()).thenReturn(List.of(
+    @DisplayName("지역 목록 조회 응답은 모든 운영 상태 지역을 반환한다")
+    void getRegions_ShouldReturnAllStatusRegions() throws Exception {
+        when(regionService.findAllRegions()).thenReturn(List.of(
                 new RegionMaster(
                         1L,
                         "GANGNAM",
@@ -57,7 +57,7 @@ class RegionControllerTest {
                         "서울",
                         "홍대입구역",
                         new GeoJson.Point(List.of(126.92378, 37.55684)),
-                        RegionStatus.ACTIVE,
+                        RegionStatus.PENDING,
                         1,
                         null,
                         null
@@ -68,7 +68,7 @@ class RegionControllerTest {
                         "서울",
                         "역삼역",
                         new GeoJson.Point(List.of(127.033, 37.5006)),
-                        RegionStatus.ACTIVE,
+                        RegionStatus.INACTIVE,
                         2,
                         null,
                         null
@@ -83,8 +83,9 @@ class RegionControllerTest {
                 .andExpect(jsonPath("$.data.regions[0].status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.regions[0].coordinatesStandard.coordinates[0]").value(127.0276))
                 .andExpect(jsonPath("$.data.regions[1].code").value("HONGDAE"))
-                .andExpect(jsonPath("$.data.regions[1].status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.regions[1].status").value("PENDING"))
                 .andExpect(jsonPath("$.data.regions[2].code").value("YEOKSAM"))
-                .andExpect(jsonPath("$.data.regions[2].displayName").value("역삼역"));
+                .andExpect(jsonPath("$.data.regions[2].displayName").value("역삼역"))
+                .andExpect(jsonPath("$.data.regions[2].status").value("INACTIVE"));
     }
 }
