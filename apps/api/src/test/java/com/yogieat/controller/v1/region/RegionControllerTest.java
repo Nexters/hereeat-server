@@ -10,6 +10,7 @@ import com.yogieat.controller.advice.ErrorHttpStatusMapper;
 import com.yogieat.controller.advice.GlobalApiResponseAdvice;
 import com.yogieat.controller.advice.GlobalExceptionHandler;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.region.service.RegionService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +46,7 @@ class RegionControllerTest {
                         "서울",
                         "강남역",
                         new GeoJson.Point(List.of(127.0276, 37.4979)),
-                        true,
+                        RegionStatus.ACTIVE,
                         0,
                         null,
                         null
@@ -56,7 +57,7 @@ class RegionControllerTest {
                         "서울",
                         "홍대입구역",
                         new GeoJson.Point(List.of(126.92378, 37.55684)),
-                        true,
+                        RegionStatus.ACTIVE,
                         1,
                         null,
                         null
@@ -67,7 +68,7 @@ class RegionControllerTest {
                         "서울",
                         "역삼역",
                         new GeoJson.Point(List.of(127.033, 37.5006)),
-                        true,
+                        RegionStatus.ACTIVE,
                         2,
                         null,
                         null

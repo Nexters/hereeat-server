@@ -10,6 +10,7 @@ import com.yogieat.category.domain.value.LargeCategory;
 import com.yogieat.category.service.CategoryService;
 import com.yogieat.common.GeoJson;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.restaurant.domain.SuggestionRestaurant;
 import java.util.HashSet;
 import java.util.List;
@@ -41,7 +42,7 @@ class RestaurantCollectionWriteServiceTest {
             "서울",
             "강남역",
             new GeoJson.Point(List.of(127.0276, 37.4979)),
-            true,
+            RegionStatus.ACTIVE,
             0,
             null,
             null

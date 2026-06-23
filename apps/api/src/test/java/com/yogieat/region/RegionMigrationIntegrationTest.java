@@ -18,6 +18,7 @@ import com.yogieat.gathering.domain.value.TimeSlot;
 import com.yogieat.gathering.service.GatheringAdminCriteria;
 import com.yogieat.gathering.service.GatheringRepository;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.region.domain.RegionSummary;
 import com.yogieat.region.service.RegionCommand;
 import com.yogieat.region.service.RegionService;
@@ -72,7 +73,7 @@ class RegionMigrationIntegrationTest {
     }
 
     @Test
-    @DisplayName("앱 지역 목록은 active DB region 을 sort_order 순으로 모두 반환한다")
+    @DisplayName("앱 지역 목록은 ACTIVE DB region 을 sort_order 순으로 모두 반환한다")
     void findActiveRegionsForApp_ShouldReturnAllActiveDbRegions() {
         RegionEntity hongdae = regionJpaRepository.findByCodeAndDeletedAtIsNull("HONGDAE").orElseThrow();
         hongdae.apply(new RegionMaster(
@@ -81,7 +82,7 @@ class RegionMigrationIntegrationTest {
                 hongdae.getProvince(),
                 hongdae.getDisplayName(),
                 new GeoJson.Point(List.of(hongdae.getLongitude(), hongdae.getLatitude())),
-                false,
+                RegionStatus.INACTIVE,
                 hongdae.getSortOrder(),
                 hongdae.getCreatedAt(),
                 hongdae.getUpdatedAt()
@@ -102,6 +103,10 @@ class RegionMigrationIntegrationTest {
                         "SAMGAKJI",
                         "SEONGSU"
                 );
+
+        assertThat(regionService.findRegionDashboard(null))
+                .extracting(summary -> summary.region().code())
+                .contains("HONGDAE", "KONKUK");
     }
 
     @Test
@@ -112,7 +117,7 @@ class RegionMigrationIntegrationTest {
                 "서울",
                 "역삼역",
                 new GeoJson.Point(List.of(127.033, 37.5006)),
-                true,
+                RegionStatus.ACTIVE,
                 null
         ));
 
@@ -148,7 +153,7 @@ class RegionMigrationIntegrationTest {
                 "서울",
                 "역삼역",
                 new GeoJson.Point(List.of(127.033, 37.5006)),
-                true,
+                RegionStatus.ACTIVE,
                 8
         ));
 
@@ -157,7 +162,7 @@ class RegionMigrationIntegrationTest {
                 "경기",
                 "역삼",
                 null,
-                false,
+                null,
                 3
         ));
 
@@ -166,8 +171,20 @@ class RegionMigrationIntegrationTest {
         assertThat(updatedRegion.region().province()).isEqualTo("경기");
         assertThat(updatedRegion.region().displayName()).isEqualTo("역삼");
         assertThat(updatedRegion.region().coordinatesStandard().getCoordinates()).containsExactly(127.033, 37.5006);
-        assertThat(updatedRegion.region().active()).isFalse();
+        assertThat(updatedRegion.region().status()).isEqualTo(RegionStatus.ACTIVE);
         assertThat(updatedRegion.region().sortOrder()).isEqualTo(3);
+
+        regionService.updateRegion(yeoksam.id(), new RegionCommand.Patch(
+                null,
+                null,
+                null,
+                null,
+                RegionStatus.INACTIVE,
+                null
+        ));
+
+        RegionSummary inactiveRegion = regionService.getRegionSummaryById(yeoksam.id());
+        assertThat(inactiveRegion.region().status()).isEqualTo(RegionStatus.INACTIVE);
     }
 
     @Test
@@ -398,22 +415,22 @@ class RegionMigrationIntegrationTest {
 
     private static List<RegionEntity> seedRegions() {
         return List.of(
-                region("HONGDAE", "서울", "홍대입구역", 126.92378, 37.55684, true, 0),
-                region("GANGNAM", "서울", "강남역", 127.0276, 37.4979, true, 1),
-                region("GONGDEOK", "서울", "공덕역", 126.9507, 37.54437, true, 2),
-                region("EULJIRO3GA", "서울", "을지로3가역", 126.99224, 37.56623, true, 3),
-                region("SADANG", "서울", "사당역", 126.98231, 37.47625, true, 4),
-                region("JONGNO3GA", "서울", "종로3가역", 126.99171, 37.5727, true, 5),
-                region("JAMSIL", "서울", "잠실역", 127.10128, 37.51379, true, 6),
-                region("SAMGAKJI", "서울", "삼각지역", 126.97346, 37.53453, true, 7),
-                region("KONKUK", "서울", "건대입구역", 126.9334, 37.5407, false, 8),
-                region("YEOUIDO", "서울", "여의도역", 126.9242, 37.5216, false, 9),
-                region("GOSTERM", "서울", "고속터미널역", 127.0047, 37.5047, false, 10),
-                region("SEONGSU", "서울", "성수역", 127.0556, 37.5447, true, 11),
-                region("SEOMYEON", "부산", "서면역", 129.0593, 35.1579, false, 12),
-                region("PANGYO", "경기", "판교역", 127.1112, 37.3947, false, 13),
-                region("JEONPO", "부산", "전포역", 129.0632, 35.1549, false, 13),
-                region("BUSAN", "부산", "부산역", 129.0421, 35.115, false, 14)
+                region("HONGDAE", "서울", "홍대입구역", 126.92378, 37.55684, RegionStatus.ACTIVE, 0),
+                region("GANGNAM", "서울", "강남역", 127.0276, 37.4979, RegionStatus.ACTIVE, 1),
+                region("GONGDEOK", "서울", "공덕역", 126.9507, 37.54437, RegionStatus.ACTIVE, 2),
+                region("EULJIRO3GA", "서울", "을지로3가역", 126.99224, 37.56623, RegionStatus.ACTIVE, 3),
+                region("SADANG", "서울", "사당역", 126.98231, 37.47625, RegionStatus.ACTIVE, 4),
+                region("JONGNO3GA", "서울", "종로3가역", 126.99171, 37.5727, RegionStatus.ACTIVE, 5),
+                region("JAMSIL", "서울", "잠실역", 127.10128, 37.51379, RegionStatus.ACTIVE, 6),
+                region("SAMGAKJI", "서울", "삼각지역", 126.97346, 37.53453, RegionStatus.ACTIVE, 7),
+                region("KONKUK", "서울", "건대입구역", 126.9334, 37.5407, RegionStatus.PENDING, 8),
+                region("YEOUIDO", "서울", "여의도역", 126.9242, 37.5216, RegionStatus.INACTIVE, 9),
+                region("GOSTERM", "서울", "고속터미널역", 127.0047, 37.5047, RegionStatus.INACTIVE, 10),
+                region("SEONGSU", "서울", "성수역", 127.0556, 37.5447, RegionStatus.ACTIVE, 11),
+                region("SEOMYEON", "부산", "서면역", 129.0593, 35.1579, RegionStatus.INACTIVE, 12),
+                region("PANGYO", "경기", "판교역", 127.1112, 37.3947, RegionStatus.INACTIVE, 13),
+                region("JEONPO", "부산", "전포역", 129.0632, 35.1549, RegionStatus.INACTIVE, 13),
+                region("BUSAN", "부산", "부산역", 129.0421, 35.115, RegionStatus.INACTIVE, 14)
         );
     }
 
@@ -423,7 +440,7 @@ class RegionMigrationIntegrationTest {
             String displayName,
             double longitude,
             double latitude,
-            boolean active,
+            RegionStatus status,
             int sortOrder
     ) {
         return RegionEntity.of(new RegionMaster(
@@ -432,7 +449,7 @@ class RegionMigrationIntegrationTest {
                 province,
                 displayName,
                 new GeoJson.Point(List.of(longitude, latitude)),
-                active,
+                status,
                 sortOrder,
                 null,
                 null

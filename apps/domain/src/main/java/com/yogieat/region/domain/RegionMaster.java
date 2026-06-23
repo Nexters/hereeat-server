@@ -9,7 +9,7 @@ public record RegionMaster(
         String province,
         String displayName,
         GeoJson.Point coordinatesStandard,
-        boolean active,
+        RegionStatus status,
         int sortOrder,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

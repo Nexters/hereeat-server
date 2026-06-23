@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.yogieat.common.GeoJson;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.region.domain.RegionSummary;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -43,7 +44,7 @@ class RestaurantCollectionPlanTest {
                         "서울",
                         displayName,
                         new GeoJson.Point(List.of(127.0, 37.0)),
-                        true,
+                        RegionStatus.ACTIVE,
                         0,
                         null,
                         null

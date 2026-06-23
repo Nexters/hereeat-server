@@ -16,6 +16,7 @@ import com.yogieat.participant.domain.command.ParticipantCommand;
 import com.yogieat.participant.service.ParticipantFacade;
 import com.yogieat.participant.service.ParticipantRepository;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -52,7 +53,7 @@ class ParticipantFacadeConcurrencyTest {
                 "서울",
                 "강남역",
                 new GeoJson.Point(List.of(127.0276, 37.4979)),
-                true,
+                RegionStatus.ACTIVE,
                 1,
                 null,
                 null
