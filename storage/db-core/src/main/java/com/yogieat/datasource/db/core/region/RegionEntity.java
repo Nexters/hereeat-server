@@ -3,8 +3,11 @@ package com.yogieat.datasource.db.core.region;
 import com.yogieat.common.GeoJson;
 import com.yogieat.datasource.db.core.common.BaseEntity;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.util.List;
@@ -18,7 +21,7 @@ import lombok.NoArgsConstructor;
 @Table(
         name = "t_region",
         indexes = {
-            @Index(name = "idx_region_active_sort_order", columnList = "is_active, sort_order")
+            @Index(name = "idx_region_status_sort_order", columnList = "status, sort_order")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -39,8 +42,9 @@ public class RegionEntity extends BaseEntity {
     @Column(nullable = false)
     private Double latitude;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean active;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RegionStatus status;
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
@@ -52,7 +56,7 @@ public class RegionEntity extends BaseEntity {
             String displayName,
             Double longitude,
             Double latitude,
-            boolean active,
+            RegionStatus status,
             int sortOrder
     ) {
         this.code = code;
@@ -60,7 +64,7 @@ public class RegionEntity extends BaseEntity {
         this.displayName = displayName;
         this.longitude = longitude;
         this.latitude = latitude;
-        this.active = active;
+        this.status = status;
         this.sortOrder = sortOrder;
     }
 
@@ -71,7 +75,7 @@ public class RegionEntity extends BaseEntity {
                 .displayName(regionMaster.displayName())
                 .longitude(toLongitude(regionMaster.coordinatesStandard()))
                 .latitude(toLatitude(regionMaster.coordinatesStandard()))
-                .active(regionMaster.active())
+                .status(regionMaster.status())
                 .sortOrder(regionMaster.sortOrder())
                 .build();
     }
@@ -83,7 +87,7 @@ public class RegionEntity extends BaseEntity {
                 entity.getProvince(),
                 entity.getDisplayName(),
                 new GeoJson.Point(List.of(entity.getLongitude(), entity.getLatitude())),
-                entity.isActive(),
+                entity.getStatus(),
                 entity.getSortOrder(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
@@ -96,7 +100,7 @@ public class RegionEntity extends BaseEntity {
         this.displayName = regionMaster.displayName();
         this.longitude = toLongitude(regionMaster.coordinatesStandard());
         this.latitude = toLatitude(regionMaster.coordinatesStandard());
-        this.active = regionMaster.active();
+        this.status = regionMaster.status();
         this.sortOrder = regionMaster.sortOrder();
     }
 

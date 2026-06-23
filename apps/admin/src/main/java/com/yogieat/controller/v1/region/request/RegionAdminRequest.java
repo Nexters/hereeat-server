@@ -3,6 +3,7 @@ package com.yogieat.controller.v1.region.request;
 import com.yogieat.common.GeoJson;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.region.service.RegionCommand;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -17,7 +18,7 @@ public final class RegionAdminRequest {
             @NotBlank String province,
             @NotBlank String displayName,
             @NotNull CoordinatesRequest coordinatesStandard,
-            Boolean active,
+            RegionStatus status,
             Integer sortOrder
     ) {
         public static RegionCommand.Create toCommand(Create request) {
@@ -30,7 +31,7 @@ public final class RegionAdminRequest {
                     trimOrNull(request.province()),
                     trimOrNull(request.displayName()),
                     parseCoordinates(request.coordinatesStandard()),
-                    request.active() == null || request.active(),
+                    request.status() == null ? RegionStatus.ACTIVE : request.status(),
                     request.sortOrder()
             );
         }
@@ -41,7 +42,7 @@ public final class RegionAdminRequest {
             String province,
             String displayName,
             CoordinatesRequest coordinatesStandard,
-            Boolean active,
+            RegionStatus status,
             Integer sortOrder
     ) {
         public static RegionCommand.Patch toCommand(Patch request) {
@@ -54,7 +55,7 @@ public final class RegionAdminRequest {
                     trimOrNull(request.province()),
                     trimOrNull(request.displayName()),
                     parseOptionalCoordinates(request.coordinatesStandard()),
-                    request.active(),
+                    request.status(),
                     request.sortOrder()
             );
         }

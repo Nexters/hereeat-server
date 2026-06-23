@@ -10,6 +10,7 @@ import com.yogieat.controller.advice.ErrorHttpStatusMapper;
 import com.yogieat.controller.advice.GlobalApiResponseAdvice;
 import com.yogieat.controller.advice.GlobalExceptionHandler;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.region.service.RegionService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +46,7 @@ class RegionControllerTest {
                         "서울",
                         "강남역",
                         new GeoJson.Point(List.of(127.0276, 37.4979)),
-                        true,
+                        RegionStatus.ACTIVE,
                         0,
                         null,
                         null
@@ -56,7 +57,7 @@ class RegionControllerTest {
                         "서울",
                         "홍대입구역",
                         new GeoJson.Point(List.of(126.92378, 37.55684)),
-                        true,
+                        RegionStatus.ACTIVE,
                         1,
                         null,
                         null
@@ -67,7 +68,7 @@ class RegionControllerTest {
                         "서울",
                         "역삼역",
                         new GeoJson.Point(List.of(127.033, 37.5006)),
-                        true,
+                        RegionStatus.ACTIVE,
                         2,
                         null,
                         null
@@ -79,8 +80,10 @@ class RegionControllerTest {
                 .andExpect(jsonPath("$.data.regions[0].code").value("GANGNAM"))
                 .andExpect(jsonPath("$.data.regions[0].province").value("서울"))
                 .andExpect(jsonPath("$.data.regions[0].displayName").value("강남역"))
+                .andExpect(jsonPath("$.data.regions[0].status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.regions[0].coordinatesStandard.coordinates[0]").value(127.0276))
                 .andExpect(jsonPath("$.data.regions[1].code").value("HONGDAE"))
+                .andExpect(jsonPath("$.data.regions[1].status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.regions[2].code").value("YEOKSAM"))
                 .andExpect(jsonPath("$.data.regions[2].displayName").value("역삼역"));
     }

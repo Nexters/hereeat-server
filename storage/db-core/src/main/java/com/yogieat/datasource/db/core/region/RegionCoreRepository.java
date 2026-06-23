@@ -6,6 +6,7 @@ import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.region.domain.RegionSummary;
 import com.yogieat.region.service.RegionRepository;
 import java.util.Collection;
@@ -48,7 +49,7 @@ public class RegionCoreRepository implements RegionRepository {
 
     @Override
     public List<RegionMaster> findAllActiveOrderBySortOrder() {
-        return regionJpaRepository.findAllByActiveTrueAndDeletedAtIsNullOrderBySortOrderAsc().stream()
+        return regionJpaRepository.findAllByStatusAndDeletedAtIsNullOrderBySortOrderAsc(RegionStatus.ACTIVE).stream()
                 .map(RegionEntity::toDomain)
                 .toList();
     }
@@ -60,12 +61,14 @@ public class RegionCoreRepository implements RegionRepository {
 
     @Override
     public List<RegionSummary> findAllActiveRegionSummariesOrderBySortOrder() {
-        return toRegionSummaries(regionJpaRepository.findAllByActiveTrueAndDeletedAtIsNullOrderBySortOrderAsc());
+        return toRegionSummaries(
+                regionJpaRepository.findAllByStatusAndDeletedAtIsNullOrderBySortOrderAsc(RegionStatus.ACTIVE)
+        );
     }
 
     @Override
     public Optional<RegionMaster> findActiveByDisplayName(String displayName) {
-        return regionJpaRepository.findByDisplayNameAndActiveTrueAndDeletedAtIsNull(displayName)
+        return regionJpaRepository.findByDisplayNameAndStatusAndDeletedAtIsNull(displayName, RegionStatus.ACTIVE)
                 .map(RegionEntity::toDomain);
     }
 

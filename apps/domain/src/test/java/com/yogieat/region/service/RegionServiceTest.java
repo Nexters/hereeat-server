@@ -5,6 +5,7 @@ import static org.mockito.Mockito.when;
 
 import com.yogieat.common.GeoJson;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.region.domain.RegionSummary;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -27,8 +28,8 @@ class RegionServiceTest {
 
     @Test
     void findActiveRegions_returns_db_only_regions() {
-        RegionMaster activeRegion = region(1L, "GANGNAM", "강남역", true);
-        RegionMaster dbOnlyRegion = region(2L, "YEOKSAM", "역삼역", true);
+        RegionMaster activeRegion = region(1L, "GANGNAM", "강남역", RegionStatus.ACTIVE);
+        RegionMaster dbOnlyRegion = region(2L, "YEOKSAM", "역삼역", RegionStatus.ACTIVE);
 
         when(regionRepository.findAllActiveOrderBySortOrder())
                 .thenReturn(List.of(dbOnlyRegion, activeRegion));
@@ -42,8 +43,8 @@ class RegionServiceTest {
 
     @Test
     void findCollectionRegionSummaries_returns_inactive_regions_for_collection() {
-        RegionSummary activeRegion = summary(1L, "GANGNAM", "강남역", true);
-        RegionSummary inactiveRegion = summary(2L, "SEONGSU", "성수역", false);
+        RegionSummary activeRegion = summary(1L, "GANGNAM", "강남역", RegionStatus.ACTIVE);
+        RegionSummary inactiveRegion = summary(2L, "SEONGSU", "성수역", RegionStatus.INACTIVE);
 
         when(regionRepository.findAllRegionSummariesOrderBySortOrder())
                 .thenReturn(List.of(activeRegion, inactiveRegion));
@@ -55,18 +56,18 @@ class RegionServiceTest {
                 .containsExactly("강남역", "성수역");
     }
 
-    private RegionSummary summary(Long id, String code, String displayName, boolean active) {
-        return new RegionSummary(region(id, code, displayName, active), 0);
+    private RegionSummary summary(Long id, String code, String displayName, RegionStatus status) {
+        return new RegionSummary(region(id, code, displayName, status), 0);
     }
 
-    private RegionMaster region(Long id, String code, String displayName, boolean active) {
+    private RegionMaster region(Long id, String code, String displayName, RegionStatus status) {
         return new RegionMaster(
                 id,
                 code,
                 "서울",
                 displayName,
                 new GeoJson.Point(List.of(127.0, 37.0)),
-                active,
+                status,
                 id.intValue(),
                 null,
                 null

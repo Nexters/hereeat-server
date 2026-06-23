@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.yogieat.datasource.db.core.region.RegionEntity;
 import com.yogieat.datasource.db.core.region.RegionJpaRepository;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.restaurant.sync.domain.RestaurantSyncTarget;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -80,7 +81,7 @@ class RestaurantCoreRepositoryTest {
         when(region.getDisplayName()).thenReturn("강남역");
         when(region.getLongitude()).thenReturn(127.0276);
         when(region.getLatitude()).thenReturn(37.4979);
-        when(region.isActive()).thenReturn(true);
+        when(region.getStatus()).thenReturn(RegionStatus.ACTIVE);
         when(region.getSortOrder()).thenReturn(1);
         return region;
     }

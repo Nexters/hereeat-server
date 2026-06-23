@@ -1,5 +1,6 @@
 package com.yogieat.datasource.db.core.region;
 
+import com.yogieat.region.domain.RegionStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,11 +10,11 @@ import org.springframework.data.repository.query.Param;
 public interface RegionJpaRepository extends JpaRepository<RegionEntity, Long> {
     Optional<RegionEntity> findByIdAndDeletedAtIsNull(Long id);
     Optional<RegionEntity> findByCodeAndDeletedAtIsNull(String code);
-    Optional<RegionEntity> findByDisplayNameAndActiveTrueAndDeletedAtIsNull(String displayName);
+    Optional<RegionEntity> findByDisplayNameAndStatusAndDeletedAtIsNull(String displayName, RegionStatus status);
     List<RegionEntity> findByIdInAndDeletedAtIsNull(List<Long> ids);
 
     List<RegionEntity> findAllByDeletedAtIsNullOrderBySortOrderAsc();
-    List<RegionEntity> findAllByActiveTrueAndDeletedAtIsNullOrderBySortOrderAsc();
+    List<RegionEntity> findAllByStatusAndDeletedAtIsNullOrderBySortOrderAsc(RegionStatus status);
     boolean existsByCode(String code);
     boolean existsByDisplayNameAndDeletedAtIsNull(String displayName);
 

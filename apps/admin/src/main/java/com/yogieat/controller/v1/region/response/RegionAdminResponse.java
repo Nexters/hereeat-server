@@ -2,6 +2,7 @@ package com.yogieat.controller.v1.region.response;
 
 import com.yogieat.common.GeoJson;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.region.domain.RegionSummary;
 import java.util.List;
 import lombok.NoArgsConstructor;
@@ -25,7 +26,7 @@ public final class RegionAdminResponse {
             String province,
             String displayName,
             GeoJson.Point coordinatesStandard,
-            boolean active,
+            RegionStatus status,
             int sortOrder,
             long restaurantCount
     ) {
@@ -37,7 +38,7 @@ public final class RegionAdminResponse {
                     region.province(),
                     region.displayName(),
                     region.coordinatesStandard(),
-                    region.active(),
+                    region.status(),
                     region.sortOrder(),
                     summary.restaurantCount()
             );
@@ -53,7 +54,7 @@ public final class RegionAdminResponse {
                             region.province(),
                             region.displayName(),
                             region.coordinatesStandard(),
-                            region.active(),
+                            region.status(),
                             region.sortOrder(),
                             0L
                     )

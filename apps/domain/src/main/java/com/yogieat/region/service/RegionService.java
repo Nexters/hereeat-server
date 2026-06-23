@@ -3,6 +3,7 @@ package com.yogieat.region.service;
 import com.yogieat.common.error.CustomException;
 import com.yogieat.common.error.ErrorCode;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.region.domain.RegionSummary;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -84,7 +85,7 @@ public class RegionService {
                 command.province(),
                 command.displayName(),
                 command.coordinatesStandard(),
-                command.active(),
+                command.status() != null ? command.status() : RegionStatus.ACTIVE,
                 sortOrder,
                 null,
                 null
@@ -103,7 +104,7 @@ public class RegionService {
                 command.province() != null ? command.province() : currentRegion.province(),
                 command.displayName() != null ? command.displayName() : currentRegion.displayName(),
                 command.coordinatesStandard() != null ? command.coordinatesStandard() : currentRegion.coordinatesStandard(),
-                command.active() != null ? command.active() : currentRegion.active(),
+                command.status() != null ? command.status() : currentRegion.status(),
                 command.sortOrder() != null ? command.sortOrder() : currentRegion.sortOrder(),
                 currentRegion.createdAt(),
                 currentRegion.updatedAt()

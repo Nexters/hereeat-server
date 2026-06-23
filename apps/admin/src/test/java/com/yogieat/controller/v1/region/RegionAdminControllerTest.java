@@ -16,6 +16,7 @@ import com.yogieat.controller.advice.ErrorHttpStatusMapper;
 import com.yogieat.controller.advice.GlobalApiResponseAdvice;
 import com.yogieat.controller.advice.GlobalExceptionHandler;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import com.yogieat.region.domain.RegionSummary;
 import com.yogieat.region.facade.RegionAdminFacade;
 import com.yogieat.region.service.RegionCommand;
@@ -82,7 +83,7 @@ class RegionAdminControllerTest {
                                 "서울",
                                 "강남역",
                                 new GeoJson.Point(List.of(127.0276, 37.4979)),
-                                true,
+                                RegionStatus.ACTIVE,
                                 1,
                                 null,
                                 null
@@ -96,7 +97,7 @@ class RegionAdminControllerTest {
                                 "서울",
                                 "홍대입구역",
                                 new GeoJson.Point(List.of(126.92378, 37.55684)),
-                                true,
+                                RegionStatus.ACTIVE,
                                 2,
                                 null,
                                 null
@@ -111,7 +112,7 @@ class RegionAdminControllerTest {
                 .andExpect(jsonPath("$.data.regions[0].name").value("GANGNAM"))
                 .andExpect(jsonPath("$.data.regions[0].province").value("서울"))
                 .andExpect(jsonPath("$.data.regions[0].displayName").value("강남역"))
-                .andExpect(jsonPath("$.data.regions[0].active").value(true))
+                .andExpect(jsonPath("$.data.regions[0].status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.regions[0].sortOrder").value(1))
                 .andExpect(jsonPath("$.data.regions[0].restaurantCount").value(12))
                 .andExpect(jsonPath("$.data.regions[0].coordinatesStandard.coordinates[0]").value(127.0276))
@@ -129,7 +130,7 @@ class RegionAdminControllerTest {
                                 "경기",
                                 "수원역",
                                 new GeoJson.Point(List.of(127.0000, 37.2667)),
-                                true,
+                                RegionStatus.ACTIVE,
                                 3,
                                 null,
                                 null
@@ -157,7 +158,7 @@ class RegionAdminControllerTest {
                                 "서울",
                                 "강남역",
                                 new GeoJson.Point(List.of(127.0276, 37.4979)),
-                                true,
+                                RegionStatus.ACTIVE,
                                 1,
                                 null,
                                 null
@@ -183,7 +184,7 @@ class RegionAdminControllerTest {
                         "서울",
                         "역삼역",
                         new GeoJson.Point(List.of(127.033, 37.5006)),
-                        true,
+                        RegionStatus.ACTIVE,
                         3,
                         null,
                         null
@@ -200,14 +201,52 @@ class RegionAdminControllerTest {
                                   "coordinatesStandard": {
                                     "coordinates": [127.033, 37.5006]
                                   },
-                                  "active": true
+                                  "status": "ACTIVE"
                 }
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.region.id").value(3))
                 .andExpect(jsonPath("$.data.region.name").value("YEOKSAM"))
                 .andExpect(jsonPath("$.data.region.province").value("서울"))
-                .andExpect(jsonPath("$.data.region.displayName").value("역삼역"));
+                .andExpect(jsonPath("$.data.region.displayName").value("역삼역"))
+                .andExpect(jsonPath("$.data.region.status").value("ACTIVE"));
+    }
+
+    @Test
+    @DisplayName("region 생성 요청에서 status가 없으면 ACTIVE로 처리한다")
+    void createRegion_ShouldUseActiveStatus_WhenStatusIsOmitted() throws Exception {
+        when(regionAdminFacade.createRegion(Mockito.argThat(command ->
+                command != null && command.status() == RegionStatus.ACTIVE
+        ))).thenReturn(
+                new RegionMaster(
+                        4L,
+                        "SEONGSU",
+                        "서울",
+                        "성수역",
+                        new GeoJson.Point(List.of(127.0556, 37.5447)),
+                        RegionStatus.ACTIVE,
+                        4,
+                        null,
+                        null
+                )
+        );
+
+        mockMvc.perform(post(BASE_URL)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "code": "seongsu",
+                                  "province": "서울",
+                                  "displayName": "성수역",
+                                  "coordinatesStandard": {
+                                    "coordinates": [127.0556, 37.5447]
+                                  }
+                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.region.id").value(4))
+                .andExpect(jsonPath("$.data.region.name").value("SEONGSU"))
+                .andExpect(jsonPath("$.data.region.status").value("ACTIVE"));
     }
 
     @Test
@@ -221,7 +260,7 @@ class RegionAdminControllerTest {
                                 "서울",
                                 "역삼",
                                 new GeoJson.Point(List.of(127.033, 37.5006)),
-                                false,
+                                RegionStatus.INACTIVE,
                                 5,
                                 null,
                                 null
@@ -235,7 +274,7 @@ class RegionAdminControllerTest {
                         .content("""
                                 {
                                   "displayName": "역삼",
-                                  "active": false,
+                                  "status": "INACTIVE",
                                   "sortOrder": 5
                                 }
                                 """))
@@ -243,7 +282,7 @@ class RegionAdminControllerTest {
                 .andExpect(jsonPath("$.data.region.id").value(3))
                 .andExpect(jsonPath("$.data.region.name").value("YEOKSAM"))
                 .andExpect(jsonPath("$.data.region.displayName").value("역삼"))
-                .andExpect(jsonPath("$.data.region.active").value(false))
+                .andExpect(jsonPath("$.data.region.status").value("INACTIVE"))
                 .andExpect(jsonPath("$.data.region.sortOrder").value(5))
                 .andExpect(jsonPath("$.data.region.restaurantCount").value(2));
     }
