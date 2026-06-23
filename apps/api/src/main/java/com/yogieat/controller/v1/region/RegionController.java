@@ -18,6 +18,6 @@ public class RegionController {
 
     @GetMapping
     public GetRegionsResponse getRegions() {
-        return GetRegionsResponse.from(regionService.findActiveRegions());
+        return GetRegionsResponse.from(regionService.findAllRegions());
     }
 }

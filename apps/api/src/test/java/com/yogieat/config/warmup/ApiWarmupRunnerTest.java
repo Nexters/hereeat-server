@@ -60,7 +60,7 @@ class ApiWarmupRunnerTest {
 
         verify(statement).execute("select 1");
         verify(categoryService).findAll();
-        verify(regionService).findActiveRegions();
+        verify(regionService).findAllRegions();
         verify(restaurantService).countActiveRestaurants();
     }
 
@@ -74,7 +74,7 @@ class ApiWarmupRunnerTest {
 
         verify(statement).execute("select 1");
         verify(categoryService).findAll();
-        verify(regionService).findActiveRegions();
+        verify(regionService).findAllRegions();
         verify(restaurantService).countActiveRestaurants();
     }
 }

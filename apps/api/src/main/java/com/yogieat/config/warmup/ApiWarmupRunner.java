@@ -40,7 +40,7 @@ public class ApiWarmupRunner implements ApplicationRunner {
 
         runStep("database connection", this::warmUpDatabaseConnection);
         runStep("categories", categoryService::findAll);
-        runStep("regions", regionService::findActiveRegions);
+        runStep("regions", regionService::findAllRegions);
         runStep("active restaurant count", restaurantService::countActiveRestaurants);
     }
 
