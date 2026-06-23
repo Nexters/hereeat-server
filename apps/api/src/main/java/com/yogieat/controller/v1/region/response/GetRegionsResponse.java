@@ -2,6 +2,7 @@ package com.yogieat.controller.v1.region.response;
 
 import com.yogieat.common.GeoJson;
 import com.yogieat.region.domain.RegionMaster;
+import com.yogieat.region.domain.RegionStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
@@ -25,6 +26,8 @@ public record GetRegionsResponse(
             String province,
             @Schema(description = "지역 표시명", example = "강남역")
             String displayName,
+            @Schema(description = "지역 운영 상태", example = "ACTIVE")
+            RegionStatus status,
             @Schema(description = "지역 기준 좌표")
             GeoJson.Point coordinatesStandard
     ) {
@@ -33,6 +36,7 @@ public record GetRegionsResponse(
                     region.code(),
                     region.province(),
                     region.displayName(),
+                    region.status(),
                     region.coordinatesStandard()
             );
         }
