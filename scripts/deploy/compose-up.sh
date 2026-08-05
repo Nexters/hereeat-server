@@ -300,6 +300,10 @@ verify_deployed_images() {
     expected_image="$(resolve_image_url "${service_name}")"
     actual_image="$(docker inspect --format '{{.Config.Image}}' "${container_name}")"
 
+    # Docker 버전에 따라 docker.io/ 접두어가 붙어서 리포트되므로 제거 후 비교
+    expected_image="${expected_image#docker.io/}"
+    actual_image="${actual_image#docker.io/}"
+
     [[ "${actual_image}" = "${expected_image}" ]] \
       || error "${service_name} image mismatch: expected=${expected_image}, actual=${actual_image}"
   done
