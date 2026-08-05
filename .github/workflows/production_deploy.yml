@@ -42,8 +42,8 @@ jobs:
           remote_host: ${{ secrets.SERVER_HOST }}
           remote_user: ${{ secrets.SERVER_USERNAME }}
           remote_key: ${{ secrets.SERVER_PRIVATE_KEY }}
-          path: ./scripts/deploy/
-          remote_path: /home/ubuntu/scripts/deploy/
+          path: ./scripts/deploy
+          remote_path: /home/ubuntu/scripts/
 
       # EC2로 배포
       - name: Deploy to Instance Server
