@@ -4,7 +4,9 @@ services:
     cpus: "1.00"
     mem_limit: "1536m"
     mem_reservation: "768m"
+    depends_on: !reset []
     environment:
+      - DATASOURCE_DB_CORE_JDBC_URL=${DATASOURCE_DB_CORE_JDBC_URL:?prod requires a managed Postgres JDBC URL}
       - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=18
       - DATASOURCE_DB_CORE_MINIMUM_IDLE=4
       - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=3000
@@ -16,7 +18,9 @@ services:
     cpus: "0.25"
     mem_limit: "512m"
     mem_reservation: "256m"
+    depends_on: !reset []
     environment:
+      - DATASOURCE_DB_CORE_JDBC_URL=${DATASOURCE_DB_CORE_JDBC_URL:?prod requires a managed Postgres JDBC URL}
       - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=6
       - DATASOURCE_DB_CORE_MINIMUM_IDLE=2
       - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=2000
@@ -28,20 +32,11 @@ services:
     cpus: "0.20"
     mem_limit: "512m"
     mem_reservation: "256m"
+    depends_on: !reset []
     environment:
+      - DATASOURCE_DB_CORE_JDBC_URL=${DATASOURCE_DB_CORE_JDBC_URL:?prod requires a managed Postgres JDBC URL}
       - DATASOURCE_DB_CORE_MAXIMUM_POOL_SIZE=4
       - DATASOURCE_DB_CORE_MINIMUM_IDLE=1
       - DATASOURCE_DB_CORE_CONNECTION_TIMEOUT=2000
       - SYNC_JOB_PARALLELISM=4
       - JAVA_TOOL_OPTIONS=-XX:+UseG1GC -XX:MaxRAMPercentage=50.0 -XX:MaxGCPauseMillis=400
-
-  yogieat-db:
-    cpus: "0.35"
-    mem_limit: "768m"
-    mem_reservation: "384m"
-    environment:
-      - PG_LOG_STATEMENT=none
-      - PG_SHARED_BUFFERS=256MB
-      - PG_WORK_MEM=8MB
-      - PG_MAINTENANCE_WORK_MEM=64MB
-      - PG_MAX_CONNECTIONS=48
