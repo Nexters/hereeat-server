@@ -320,7 +320,7 @@ print_deploy_summary() {
   echo "Compose files: ${COMPOSE_FILES[*]}"
   echo "Target services: ${SELECTED_APP_SERVICES[*]}"
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
-    echo "Auto restore DB: ${AUTO_RESTORE_DB:-true}"
+    [[ "${DEPLOY_ENV}" == "prod" ]] || echo "Auto restore DB: ${AUTO_RESTORE_DB:-true}"
     echo "Auto cleanup stale app containers: ${AUTO_CLEANUP_STALE_APP_CONTAINERS:-true}"
     echo "App network name: ${APP_NETWORK_NAME:-yogieat-network}"
   fi
@@ -337,7 +337,11 @@ main() {
   export PULL_IMAGES_ON_DEPLOY
 
   if [[ "${DEPLOY_SCOPE}" == "app" ]]; then
-    ensure_db_running_for_app_scope
+    if [[ "${DEPLOY_ENV}" == "prod" ]]; then
+      echo "Skip DB container reconciliation: prod uses managed Postgres."
+    else
+      ensure_db_running_for_app_scope
+    fi
     cleanup_stale_app_containers
   fi
 
