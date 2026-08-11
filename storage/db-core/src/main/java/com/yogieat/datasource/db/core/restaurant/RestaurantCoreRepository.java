@@ -84,6 +84,25 @@ public class RestaurantCoreRepository implements RestaurantRepository {
     }
 
     @Override
+    @Transactional
+    public Restaurant saveOrRevive(CreateRestaurant createRestaurant, Long regionId) {
+        Long resolvedRegionId = regionId != null ? regionId : requireRegionId(createRestaurant.region());
+
+        return restaurantJpaRepository.findByExternalId(createRestaurant.externalId())
+                .filter(entity -> entity.getDeletedAt() != null)
+                .map(entity -> {
+                    entity.applyRevive(createRestaurant, resolvedRegionId);
+                    return toDomain(entity);
+                })
+                .orElseGet(() -> {
+                    RestaurantEntity savedEntity = restaurantJpaRepository.save(
+                            RestaurantEntity.from(createRestaurant, resolvedRegionId)
+                    );
+                    return toDomain(savedEntity);
+                });
+    }
+
+    @Override
     public List<Restaurant> findAll() {
         return toDomainRestaurants(restaurantJpaRepository.findAllByDeletedAtIsNull());
     }

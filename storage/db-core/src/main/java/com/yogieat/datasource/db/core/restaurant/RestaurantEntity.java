@@ -238,6 +238,42 @@ public class RestaurantEntity extends BaseEntity {
                 .build();
     }
 
+    /**
+     * 소프트 삭제된(deleted_at IS NOT NULL) row를 새 CreateRestaurant 데이터로 완전히
+     * 덮어쓰고 되살린다. external_id가 같은 카카오 장소가 재수집될 때, 죽은 row가
+     * external_id를 계속 점유하고 있어 새 row를 insert할 수 없는 문제를 우회한다.
+     */
+    public void applyRevive(CreateRestaurant createRestaurant, Long regionId) {
+        this.externalId = createRestaurant.externalId();
+        this.categoryId = createRestaurant.categoryId();
+        this.name = createRestaurant.name();
+        this.address = createRestaurant.address();
+        this.rating = createRestaurant.rating();
+        this.imageUrl = createRestaurant.imageUrl();
+        this.mapUrl = createRestaurant.mapUrl();
+        this.representativeReview = createRestaurant.representativeReview();
+        this.description = createRestaurant.description();
+        this.regionId = regionId;
+        this.location = createRestaurant.location() != null
+                ? toJtsPoint(createRestaurant.location())
+                : null;
+        this.reviewCount = createRestaurant.reviewCount();
+        this.blogReviewCount = createRestaurant.blogReviewCount();
+        this.representMenu = createRestaurant.representMenu();
+        this.representMenuPrice = createRestaurant.representMenuPrice();
+        this.priceLevel = createRestaurant.priceLevel();
+        this.aiMateSummaryTitle = createRestaurant.aiMateSummaryTitle();
+        this.aiMateSummaryContents = createRestaurant.aiMateSummaryContents();
+        this.timeSlot = createRestaurant.timeSlot();
+        this.offDays = createRestaurant.offDays();
+        this.offDaysUpdatedAt = createRestaurant.offDays() != null ? LocalDateTime.now() : null;
+        this.phoneNumber = createRestaurant.phoneNumber();
+        this.teamRecommendationTitle = createRestaurant.teamRecommendationTitle();
+        this.teamRecommendationReason = createRestaurant.teamRecommendationReason();
+        this.isDisplay = createRestaurant.isDisplay() != null ? createRestaurant.isDisplay() : Boolean.TRUE;
+        restore();
+    }
+
     public static Restaurant toDomain(RestaurantEntity entity, Region region) {
         return new Restaurant(
                 entity.getId(),
