@@ -25,6 +25,13 @@ ALTER TABLE t_restaurant
 ALTER TABLE t_restaurant
     DROP CONSTRAINT IF EXISTS uk_restaurant_external_id;
 
+-- The dropped constraint was also the only btree index serving an equality
+-- lookup on external_id. saveOrRevive looks the column up WITHOUT a deleted_at
+-- filter, and a partial index cannot serve that query, so add a plain one.
+-- (RestaurantEntity declares the same index, so ddl-auto creates it elsewhere.)
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_restaurant_external_id
+    ON t_restaurant (external_id);
+
 -- Post-check: should return 0 rows before and after this migration.
 -- SELECT external_id, count(*) FROM t_restaurant
 -- WHERE deleted_at IS NULL GROUP BY external_id HAVING count(*) > 1;

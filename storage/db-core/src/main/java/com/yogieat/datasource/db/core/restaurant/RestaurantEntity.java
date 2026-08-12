@@ -66,6 +66,13 @@ import org.locationtech.jts.geom.PrecisionModel;
                         name = "idx_restaurant_region_id_deleted_at",
                         columnList = "region_id, deleted_at",
                         unique = false
+                ),
+                // saveOrRevive가 삭제 여부와 무관하게 external_id를 조회한다.
+                // uk_restaurant_external_id_active는 partial index라 이 조회에 못 쓰인다.
+                @Index(
+                        name = "idx_restaurant_external_id",
+                        columnList = "external_id",
+                        unique = false
                 )
         }
 )
@@ -88,7 +95,9 @@ public class RestaurantEntity extends BaseEntity {
     private Long regionId;
     private Point location; // 위도, 경도
 
-    @Column(unique = true, nullable = false)
+    // uniqueness는 partial unique index(uk_restaurant_external_id_active, deleted_at IS NULL)가 담당한다.
+    // unique = true를 두면 ddl-auto: update가 매 부팅마다 테이블 전체 unique 제약을 다시 붙인다.
+    @Column(nullable = false)
     private String externalId; // Kakao Place ID
 
     // 매핑 필드
