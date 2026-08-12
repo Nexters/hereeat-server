@@ -77,7 +77,7 @@ public class RestaurantCollectionWriteService {
                     Boolean.TRUE
             );
 
-            restaurantRepository.save(createRestaurant, restaurantRegion.id());
+            restaurantRepository.saveOrRevive(createRestaurant, restaurantRegion.id());
             restaurantValidator.addToCache(
                     validationContext,
                     enrichedData.externalId(),

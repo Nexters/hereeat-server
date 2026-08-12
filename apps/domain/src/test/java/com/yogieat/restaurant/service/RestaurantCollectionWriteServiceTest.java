@@ -63,7 +63,7 @@ class RestaurantCollectionWriteServiceTest {
         boolean saved = writeService.persistRestaurant(suggestion, GANGNAM, LargeCategory.KOREAN, suggestion.mediumCategory(), data, context);
 
         assertThat(saved).isTrue();
-        verify(restaurantRepository).save(any(), org.mockito.ArgumentMatchers.eq(GANGNAM.id()));
+        verify(restaurantRepository).saveOrRevive(any(), org.mockito.ArgumentMatchers.eq(GANGNAM.id()));
     }
 
     @Test
@@ -81,7 +81,7 @@ class RestaurantCollectionWriteServiceTest {
         boolean saved = writeService.persistRestaurant(suggestion, GANGNAM, LargeCategory.KOREAN, suggestion.mediumCategory(), data, context);
 
         assertThat(saved).isFalse();
-        verify(restaurantRepository, never()).save(any(), any());
+        verify(restaurantRepository, never()).saveOrRevive(any(), any());
     }
 
     @Test
@@ -108,7 +108,7 @@ class RestaurantCollectionWriteServiceTest {
         );
 
         assertThat(saved).isTrue();
-        verify(restaurantRepository).save(any(), org.mockito.ArgumentMatchers.eq(GANGNAM.id()));
+        verify(restaurantRepository).saveOrRevive(any(), org.mockito.ArgumentMatchers.eq(GANGNAM.id()));
     }
 
     private SuggestionRestaurant suggestion() {
