@@ -8,6 +8,7 @@ public interface RestaurantJpaRepository extends JpaRepository<RestaurantEntity,
     boolean existsByExternalIdAndDeletedAtIsNull(String externalId);
     boolean existsByNameAndAddressAndDeletedAtIsNull(String name, String address);
     Optional<RestaurantEntity> findByExternalIdAndDeletedAtIsNull(String externalId);
+    Optional<RestaurantEntity> findByExternalId(String externalId);
     Optional<RestaurantEntity> findByIdAndDeletedAtIsNull(Long id);
     List<RestaurantEntity> findByIdInAndDeletedAtIsNull(List<Long> ids);
     List<RestaurantEntity> findAllByDeletedAtIsNull();

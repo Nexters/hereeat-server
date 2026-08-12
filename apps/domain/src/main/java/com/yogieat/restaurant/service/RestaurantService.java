@@ -126,7 +126,7 @@ public class RestaurantService {
             String externalId
     ) {
         try {
-            Restaurant createdRestaurant = restaurantCommandService.save(createRestaurant);
+            Restaurant createdRestaurant = restaurantCommandService.saveOrRevive(createRestaurant);
             return RestaurantAdminResult.Create.created(createdRestaurant.id());
         } catch (DataIntegrityViolationException e) {
             return restaurantRepository.findByExternalId(externalId)

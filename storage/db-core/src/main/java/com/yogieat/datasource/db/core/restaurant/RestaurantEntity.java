@@ -66,6 +66,13 @@ import org.locationtech.jts.geom.PrecisionModel;
                         name = "idx_restaurant_region_id_deleted_at",
                         columnList = "region_id, deleted_at",
                         unique = false
+                ),
+                // saveOrRevive가 삭제 여부와 무관하게 external_id를 조회한다.
+                // uk_restaurant_external_id_active는 partial index라 이 조회에 못 쓰인다.
+                @Index(
+                        name = "idx_restaurant_external_id",
+                        columnList = "external_id",
+                        unique = false
                 )
         }
 )
@@ -88,7 +95,9 @@ public class RestaurantEntity extends BaseEntity {
     private Long regionId;
     private Point location; // 위도, 경도
 
-    @Column(unique = true, nullable = false)
+    // uniqueness는 partial unique index(uk_restaurant_external_id_active, deleted_at IS NULL)가 담당한다.
+    // unique = true를 두면 ddl-auto: update가 매 부팅마다 테이블 전체 unique 제약을 다시 붙인다.
+    @Column(nullable = false)
     private String externalId; // Kakao Place ID
 
     // 매핑 필드
@@ -236,6 +245,42 @@ public class RestaurantEntity extends BaseEntity {
                 .teamRecommendationReason(createRestaurant.teamRecommendationReason())
                 .isDisplay(createRestaurant.isDisplay())
                 .build();
+    }
+
+    /**
+     * 소프트 삭제된(deleted_at IS NOT NULL) row를 새 CreateRestaurant 데이터로 완전히
+     * 덮어쓰고 되살린다. external_id가 같은 카카오 장소가 재수집될 때, 죽은 row가
+     * external_id를 계속 점유하고 있어 새 row를 insert할 수 없는 문제를 우회한다.
+     */
+    public void applyRevive(CreateRestaurant createRestaurant, Long regionId) {
+        this.externalId = createRestaurant.externalId();
+        this.categoryId = createRestaurant.categoryId();
+        this.name = createRestaurant.name();
+        this.address = createRestaurant.address();
+        this.rating = createRestaurant.rating();
+        this.imageUrl = createRestaurant.imageUrl();
+        this.mapUrl = createRestaurant.mapUrl();
+        this.representativeReview = createRestaurant.representativeReview();
+        this.description = createRestaurant.description();
+        this.regionId = regionId;
+        this.location = createRestaurant.location() != null
+                ? toJtsPoint(createRestaurant.location())
+                : null;
+        this.reviewCount = createRestaurant.reviewCount();
+        this.blogReviewCount = createRestaurant.blogReviewCount();
+        this.representMenu = createRestaurant.representMenu();
+        this.representMenuPrice = createRestaurant.representMenuPrice();
+        this.priceLevel = createRestaurant.priceLevel();
+        this.aiMateSummaryTitle = createRestaurant.aiMateSummaryTitle();
+        this.aiMateSummaryContents = createRestaurant.aiMateSummaryContents();
+        this.timeSlot = createRestaurant.timeSlot();
+        this.offDays = createRestaurant.offDays();
+        this.offDaysUpdatedAt = createRestaurant.offDays() != null ? LocalDateTime.now() : null;
+        this.phoneNumber = createRestaurant.phoneNumber();
+        this.teamRecommendationTitle = createRestaurant.teamRecommendationTitle();
+        this.teamRecommendationReason = createRestaurant.teamRecommendationReason();
+        this.isDisplay = createRestaurant.isDisplay() != null ? createRestaurant.isDisplay() : Boolean.TRUE;
+        restore();
     }
 
     public static Restaurant toDomain(RestaurantEntity entity, Region region) {

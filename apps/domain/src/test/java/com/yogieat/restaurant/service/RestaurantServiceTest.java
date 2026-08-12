@@ -126,7 +126,7 @@ class RestaurantServiceTest {
                 .thenReturn(Optional.empty(), Optional.empty(), Optional.of(existingRestaurant));
         when(restaurantAdminLookupService.fetchPlaceDetail(externalId))
                 .thenReturn(KakaoPlaceDetailFetchResult.success(sampleDetail(externalId)));
-        when(restaurantCommandService.save(any(CreateRestaurant.class)))
+        when(restaurantCommandService.saveOrRevive(any(CreateRestaurant.class)))
                 .thenThrow(new DataIntegrityViolationException("duplicate external id"));
 
         RestaurantAdminResult.Create result = restaurantService.createRestaurant(command);

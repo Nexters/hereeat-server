@@ -17,4 +17,9 @@ public class RestaurantCommandService {
     public Restaurant save(CreateRestaurant createRestaurant) {
         return restaurantRepository.save(createRestaurant);
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Restaurant saveOrRevive(CreateRestaurant createRestaurant) {
+        return restaurantRepository.saveOrRevive(createRestaurant);
+    }
 }
